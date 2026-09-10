@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRequest } from '../auth/user-request';
 import { Request } from 'express';
@@ -20,5 +20,12 @@ export class PaymentsController {
       dto.idempotencyKey,
       dto.provider ?? 'mock',
     );
+  }
+
+  /** Development-only provider simulation. Real providers will call signed webhooks. */
+  @Post('mock/:paymentId/succeed')
+  confirmMockPayment(@UserRequest() request: Request, @Param('paymentId') paymentId: string) {
+    const user = request.user!;
+    return this.paymentsService.confirmMockPayment(user.tenantId, user.id, paymentId);
   }
 }
