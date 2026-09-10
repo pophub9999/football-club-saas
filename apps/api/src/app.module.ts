@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
+import { ErpModule } from './erp/erp.module';
 import { HealthModule } from './health/health.module';
 import { MembershipModule } from './membership/membership.module';
 import { MeModule } from './me/me.module';
@@ -14,6 +15,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
     DatabaseModule,
     TenancyModule,
     AuthModule,
+    ErpModule,
     HealthModule,
     MeModule,
     MembershipModule,
