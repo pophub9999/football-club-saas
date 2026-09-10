@@ -46,36 +46,37 @@ export class AuthService {
       );
     }
 
-    const authenticatedUser: AuthenticatedUser = {
+    return this.issueTokens({
       id: user.id,
       tenantId: membership.tenantId,
       email: user.email,
       roles: membership.roles,
-    };
-
-    return this.issueTokens(authenticatedUser);
+    });
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {
     const tokenHash = this.hashToken(refreshToken);
     const session = await this.prisma.userSession.findUnique({
       where: { refreshTokenHash: tokenHash },
-      include: { user: { include: { userTenants: true } } },
+      include: { user: true },
     });
 
     if (
       !session ||
       session.revokedAt ||
       session.expiresAt <= new Date() ||
-      session.user.status !== 'ACTIVE'
+      session.user.status !== 'ACTIVE' ||
+      !session.user.email
     ) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const membership = session.user.userTenants.find((item) => item.tenantId === session.user.member?.id);
-    const activeMembership = membership ?? session.user.userTenants[0];
-    if (!activeMembership || !session.user.email) {
-      throw new UnauthorizedException('User has no active club membership');
+    const membership = await this.prisma.userTenant.findUnique({
+      where: { userId_tenantId: { userId: session.userId, tenantId: session.tenantId } },
+    });
+
+    if (!membership) {
+      throw new UnauthorizedException('User is no longer associated with this club');
     }
 
     await this.prisma.userSession.update({
@@ -85,9 +86,9 @@ export class AuthService {
 
     return this.issueTokens({
       id: session.user.id,
-      tenantId: activeMembership.tenantId,
+      tenantId: membership.tenantId,
       email: session.user.email,
-      roles: activeMembership.roles,
+      roles: membership.roles,
     });
   }
 
@@ -114,6 +115,7 @@ export class AuthService {
     await this.prisma.userSession.create({
       data: {
         userId: user.id,
+        tenantId: user.tenantId,
         refreshTokenHash,
         expiresAt,
         lastUsedAt: new Date(),
