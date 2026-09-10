@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, foundation-clean]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: football_club
+          POSTGRES_USER: football
+          POSTGRES_PASSWORD: football_dev_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U football -d football_club"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://football:football_dev_only@localhost:5432/football_club?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Prisma validate
+        run: pnpm --filter @football/api prisma:validate
+
+      - name: Prisma generate
+        run: pnpm --filter @football/api prisma:generate
+
+      - name: Typecheck
+        run: pnpm --filter @football/api typecheck
+
+      - name: Unit tests
+        run: pnpm --filter @football/api test -- --runInBand
+
+      - name: Build
+        run: pnpm --filter @football/api build
