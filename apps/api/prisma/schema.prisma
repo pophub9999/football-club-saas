@@ -42,13 +42,14 @@ enum PaymentStatus {
 }
 
 model Tenant {
-  id           String        @id @default(uuid()) @db.Uuid
-  slug         String        @unique @db.VarChar(80)
-  name         String        @db.VarChar(160)
-  status       String        @default("active") @db.VarChar(32)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id           String                @id @default(uuid()) @db.Uuid
+  slug         String                @unique @db.VarChar(80)
+  name         String                @db.VarChar(160)
+  status       String                @default("active") @db.VarChar(32)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
   userTenants  UserTenant[]
+  sessions     UserSession[]
   members      Member[]
   memberships  Membership[]
   dues         Due[]
@@ -94,15 +95,17 @@ model UserTenant {
 model UserSession {
   id               String    @id @default(uuid()) @db.Uuid
   userId           String    @db.Uuid
-  refreshTokenHash String    @db.VarChar(128)
+  tenantId         String    @db.Uuid
+  refreshTokenHash String    @unique @db.VarChar(128)
   expiresAt        DateTime
   revokedAt        DateTime?
   createdAt        DateTime  @default(now())
   lastUsedAt       DateTime?
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
-  @@index([refreshTokenHash])
+  @@index([tenantId, expiresAt])
   @@map("user_sessions")
 }
 
@@ -202,9 +205,9 @@ model AuditLog {
   resourceId String?  @db.VarChar(120)
   metadata   Json?
   ipAddress  String?  @db.VarChar(64)
-  createdAt  DateTime @default(now())
-  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
+  tenant     Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
