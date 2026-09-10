@@ -146,7 +146,7 @@ model Membership {
 }
 
 model Due {
-  id String @id @default(uuid()) @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
   memberId String @db.Uuid
   reference String @db.VarChar(120)
