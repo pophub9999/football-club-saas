@@ -7,10 +7,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserStatus { ACTIVE SUSPENDED DELETED }
-enum MembershipStatus { PENDING ACTIVE SUSPENDED EXPIRED CANCELLED }
-enum DueStatus { OPEN PARTIALLY_PAID PAID OVERDUE CANCELLED }
-enum PaymentStatus { PENDING REQUIRES_ACTION AUTHORIZED PAID FAILED CANCELLED REFUNDED PARTIALLY_REFUNDED DISPUTED }
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  CANCELLED
+}
+
+enum DueStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  REQUIRES_ACTION
+  AUTHORIZED
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  DISPUTED
+}
 
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
@@ -30,6 +59,7 @@ model Tenant {
   @@index([status])
   @@map("tenants")
 }
+
 model User {
   id String @id @default(uuid()) @db.Uuid
   email String? @unique @db.VarChar(320)
@@ -45,6 +75,7 @@ model User {
   @@index([status])
   @@map("users")
 }
+
 model UserTenant {
   id String @id @default(uuid()) @db.Uuid
   userId String @db.Uuid
@@ -58,6 +89,7 @@ model UserTenant {
   @@index([tenantId, userId])
   @@map("user_tenants")
 }
+
 model UserSession {
   id String @id @default(uuid()) @db.Uuid
   userId String @db.Uuid
@@ -73,6 +105,7 @@ model UserSession {
   @@index([tenantId, expiresAt])
   @@map("user_sessions")
 }
+
 model Member {
   id String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
@@ -93,6 +126,7 @@ model Member {
   @@index([tenantId, phone])
   @@map("members")
 }
+
 model Membership {
   id String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
@@ -110,8 +144,9 @@ model Membership {
   @@index([tenantId, memberId, status])
   @@map("memberships")
 }
+
 model Due {
-  id String @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
   memberId String @db.Uuid
   reference String @db.VarChar(120)
@@ -131,6 +166,7 @@ model Due {
   @@index([tenantId, memberId, status, dueDate])
   @@map("dues")
 }
+
 model PaymentTransaction {
   id String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
@@ -153,6 +189,7 @@ model PaymentTransaction {
   @@index([tenantId, status, createdAt])
   @@map("payment_transactions")
 }
+
 model Receipt {
   id String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
@@ -171,6 +208,7 @@ model Receipt {
   @@index([tenantId, issuedAt])
   @@map("receipts")
 }
+
 model AuditLog {
   id String @id @default(uuid()) @db.Uuid
   tenantId String? @db.Uuid
