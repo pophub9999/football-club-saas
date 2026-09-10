@@ -7,13 +7,15 @@ import { AuthenticatedUser } from './auth.types';
 
 @Injectable()
 export class AuthService {
+  constructor(private readonly prisma: PrismaService) {}
+
   async login(dto: LoginDto): Promise<{ accessToken: string; user: AuthenticatedUser }> {
-    const user = await this.prisma.user.findFirst({
-      where: { email: dto.email.toLowerCase(), status: 'ACTIVE' },
-      select: { id: true, tenantId: true, email: true, passwordHash: true },
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+      include: { userTenants: true },
     });
 
-    if (!user || !user.tenantId || !user.email || !user.passwordHash) {
+    if (!user || user.status !== 'ACTIVE' || !user.email || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -22,11 +24,23 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const membership = dto.tenantId
+      ? user.userTenants.find((item) => item.tenantId === dto.tenantId)
+      : user.userTenants.length === 1
+        ? user.userTenants[0]
+        : undefined;
+
+    if (!membership) {
+      throw new UnauthorizedException(
+        user.userTenants.length > 1 ? 'Tenant selection is required' : 'User is not associated with a club',
+      );
+    }
+
     const authenticatedUser: AuthenticatedUser = {
       id: user.id,
-      tenantId: user.tenantId,
+      tenantId: membership.tenantId,
       email: user.email,
-      roles: [],
+      roles: membership.roles,
     };
 
     const secret = process.env.JWT_ACCESS_SECRET;
@@ -37,6 +51,4 @@ export class AuthService {
     const accessToken = jwt.sign(authenticatedUser, secret, { expiresIn: '15m' });
     return { accessToken, user: authenticatedUser };
   }
-
-  constructor(private readonly prisma: PrismaService) {}
 }
