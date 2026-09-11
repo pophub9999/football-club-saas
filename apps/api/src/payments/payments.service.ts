@@ -41,6 +41,63 @@ export class PaymentsService {
     }
   }
 
+  async getPaymentHistory(tenantId: string, userId: string) {
+    const member = await this.getMemberId(tenantId, userId);
+    const payments = await this.prisma.paymentTransaction.findMany({
+      where: { tenantId, due: { memberId: member.id } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, provider: true, providerPaymentId: true, amount: true, currency: true,
+        status: true, paidAt: true, createdAt: true,
+        due: { select: { id: true, reference: true, description: true, dueDate: true } },
+        receipt: { select: { id: true, receiptNumber: true, externalId: true, issuedAt: true, documentUrl: true } },
+      },
+    });
+    return payments;
+  }
+
+  async getPayment(tenantId: string, userId: string, paymentId: string) {
+    const member = await this.getMemberId(tenantId, userId);
+    const payment = await this.prisma.paymentTransaction.findFirst({
+      where: { id: paymentId, tenantId, due: { memberId: member.id } },
+      select: {
+        id: true, provider: true, providerPaymentId: true, amount: true, currency: true,
+        status: true, paidAt: true, createdAt: true, updatedAt: true,
+        due: { select: { id: true, reference: true, description: true, amount: true, paidAmount: true, dueDate: true, status: true } },
+        receipt: { select: { id: true, receiptNumber: true, externalId: true, issuedAt: true, documentUrl: true } },
+      },
+    });
+    if (!payment) throw new NotFoundException('Payment not found');
+    return payment;
+  }
+
+  async getReceipts(tenantId: string, userId: string) {
+    const member = await this.getMemberId(tenantId, userId);
+    return this.prisma.receipt.findMany({
+      where: { tenantId, paymentTransaction: { due: { memberId: member.id } } },
+      orderBy: { issuedAt: 'desc' },
+      select: {
+        id: true, receiptNumber: true, externalId: true, issuedAt: true,
+        amount: true, currency: true, documentUrl: true,
+        paymentTransaction: { select: { id: true, provider: true, providerPaymentId: true, paidAt: true, due: { select: { id: true, reference: true, description: true } } } },
+      },
+    });
+  }
+
+  async getReceipt(tenantId: string, userId: string, receiptId: string) {
+    const member = await this.getMemberId(tenantId, userId);
+    const receipt = await this.prisma.receipt.findFirst({
+      where: { id: receiptId, tenantId, paymentTransaction: { due: { memberId: member.id } } },
+      select: {
+        id: true, receiptNumber: true, externalId: true, issuedAt: true,
+        amount: true, currency: true, documentUrl: true, metadata: true,
+        paymentTransaction: { select: { id: true, provider: true, providerPaymentId: true, paidAt: true, amount: true, currency: true, due: { select: { id: true, reference: true, description: true } } } },
+      },
+    });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+    return receipt;
+  }
+
   async confirmMockPayment(tenantId: string, userId: string, paymentId: string) {
     const payment = await this.prisma.paymentTransaction.findFirst({
       where: { id: paymentId, tenantId },
@@ -48,8 +105,8 @@ export class PaymentsService {
     });
     if (!payment) throw new NotFoundException('Payment not found');
 
-    const member = await this.prisma.member.findFirst({ where: { tenantId, userId }, select: { id: true } });
-    if (!member || payment.due?.memberId !== member.id) throw new NotFoundException('Payment not found');
+    const member = await this.getMemberId(tenantId, userId);
+    if (payment.due?.memberId !== member.id) throw new NotFoundException('Payment not found');
 
     if (payment.status === PaymentStatus.PAID) return payment;
     if (payment.status !== PaymentStatus.PENDING) throw new BadRequestException(`Payment cannot be confirmed from status ${payment.status}`);
@@ -68,7 +125,7 @@ export class PaymentsService {
     };
     const erpResult = await this.erpService.registerPayment(erpInput);
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       const fresh = await tx.paymentTransaction.findFirst({ where: { id: payment.id, tenantId }, include: { due: true, receipt: true } });
       if (!fresh) throw new NotFoundException('Payment not found');
       if (fresh.status === PaymentStatus.PAID) return fresh;
@@ -76,34 +133,28 @@ export class PaymentsService {
 
       const newPaidAmount = fresh.due.paidAmount.plus(fresh.amount);
       const dueStatus = newPaidAmount.greaterThanOrEqualTo(fresh.due.amount) ? DueStatus.PAID : DueStatus.PARTIALLY_PAID;
-
       const updatedPayment = await tx.paymentTransaction.update({
         where: { id: fresh.id },
         data: {
-          status: PaymentStatus.PAID,
-          paidAt,
-          providerPaymentId,
+          status: PaymentStatus.PAID, paidAt, providerPaymentId,
           metadata: { ...(fresh.metadata as Record<string, unknown> | null), erpPaymentId: erpResult.externalId },
         },
       });
-
       await tx.due.update({ where: { id: fresh.due.id }, data: { paidAmount: newPaidAmount, status: dueStatus } });
-
       const receipt = await tx.receipt.create({
         data: {
-          tenantId,
-          paymentTransactionId: fresh.id,
-          receiptNumber: erpResult.receiptNumber,
-          externalId: erpResult.receiptExternalId,
-          issuedAt: erpResult.registeredAt,
-          amount: fresh.amount,
-          currency: fresh.currency,
+          tenantId, paymentTransactionId: fresh.id, receiptNumber: erpResult.receiptNumber,
+          externalId: erpResult.receiptExternalId, issuedAt: erpResult.registeredAt,
+          amount: fresh.amount, currency: fresh.currency,
         },
       });
-
       return { ...updatedPayment, receipt };
     });
+  }
 
-    return result;
+  private async getMemberId(tenantId: string, userId: string) {
+    const member = await this.prisma.member.findFirst({ where: { tenantId, userId }, select: { id: true } });
+    if (!member) throw new NotFoundException('Member profile is not linked to this club');
+    return member;
   }
 }
