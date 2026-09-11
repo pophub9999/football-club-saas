@@ -6,6 +6,7 @@ class ClubBranding {
     this.shortName,
     this.slogan,
     this.logoUrl,
+    this.logoDarkUrl,
     this.heroImageUrl,
     this.primaryColor = const Color(0xFF008C45),
     this.secondaryColor = const Color(0xFF005B2A),
@@ -20,6 +21,7 @@ class ClubBranding {
   final String? shortName;
   final String? slogan;
   final String? logoUrl;
+  final String? logoDarkUrl;
   final String? heroImageUrl;
   final Color primaryColor;
   final Color secondaryColor;
@@ -46,6 +48,7 @@ class ClubBranding {
       shortName: branding['shortName'] as String?,
       slogan: branding['slogan'] as String?,
       logoUrl: branding['logoUrl'] as String?,
+      logoDarkUrl: branding['logoDarkUrl'] as String?,
       heroImageUrl: branding['heroImageUrl'] as String?,
       primaryColor: parseColor(branding['primaryColor'], const Color(0xFF008C45)),
       secondaryColor: parseColor(branding['secondaryColor'], const Color(0xFF005B2A)),
