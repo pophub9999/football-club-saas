@@ -7,39 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-  DELETED
-}
-
-enum MembershipStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  EXPIRED
-  CANCELLED
-}
-
-enum DueStatus {
-  OPEN
-  PARTIALLY_PAID
-  PAID
-  OVERDUE
-  CANCELLED
-}
-
-enum PaymentStatus {
-  PENDING
-  REQUIRES_ACTION
-  AUTHORIZED
-  PAID
-  FAILED
-  CANCELLED
-  REFUNDED
-  PARTIALLY_REFUNDED
-  DISPUTED
-}
+enum UserStatus { ACTIVE SUSPENDED DELETED }
+enum MembershipStatus { PENDING ACTIVE SUSPENDED EXPIRED CANCELLED }
+enum DueStatus { OPEN PARTIALLY_PAID PAID OVERDUE CANCELLED }
+enum PaymentStatus { PENDING REQUIRES_ACTION AUTHORIZED PAID FAILED CANCELLED REFUNDED PARTIALLY_REFUNDED DISPUTED }
 
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
@@ -156,7 +127,7 @@ model Member {
 }
 
 model Membership {
-  id String @id @default(uuid()) @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
   memberId String @db.Uuid
   planCode String @db.VarChar(80)
@@ -196,7 +167,7 @@ model Due {
 }
 
 model PaymentTransaction {
-  id String @id @default(uuid()) @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
   dueId String? @db.Uuid
   provider String @db.VarChar(40)
