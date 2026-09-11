@@ -48,6 +48,7 @@ model Tenant {
   status String @default("active") @db.VarChar(32)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  settings TenantSettings?
   userTenants UserTenant[]
   sessions UserSession[]
   members Member[]
@@ -58,6 +59,33 @@ model Tenant {
   auditLogs AuditLog[]
   @@index([status])
   @@map("tenants")
+}
+
+model TenantSettings {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @db.Uuid
+  logoUrl String?
+  logoDarkUrl String?
+  heroImageUrl String?
+  appIconUrl String?
+  primaryColor String @default("#008C45") @db.VarChar(9)
+  secondaryColor String @default("#005B2A") @db.VarChar(9)
+  accentColor String @default("#D7E83F") @db.VarChar(9)
+  backgroundColor String @default("#07110D") @db.VarChar(9)
+  surfaceColor String @default("#102019") @db.VarChar(9)
+  textColor String @default("#FFFFFF") @db.VarChar(9)
+  mutedTextColor String @default("#A7B5AE") @db.VarChar(9)
+  slogan String? @db.VarChar(255)
+  shortName String? @db.VarChar(80)
+  defaultLocale String @default("pt-PT") @db.VarChar(10)
+  enabledFeatures Json?
+  homeConfiguration Json?
+  socialLinks Json?
+  legalLinks Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@map("tenant_settings")
 }
 
 model User {
@@ -128,7 +156,7 @@ model Member {
 }
 
 model Membership {
-  id String @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
   memberId String @db.Uuid
   planCode String @db.VarChar(80)
@@ -168,7 +196,7 @@ model Due {
 }
 
 model PaymentTransaction {
-  id String @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
   dueId String? @db.Uuid
   provider String @db.VarChar(40)
