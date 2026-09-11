@@ -2,7 +2,7 @@ import { Controller, Get, NotFoundException, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRequest } from '../auth/user-request';
-import { Request } from 'express';
+import { AuthenticatedUser } from '../auth/auth.types';
 
 @Controller('membership')
 @UseGuards(JwtAuthGuard)
@@ -10,9 +10,7 @@ export class MembershipController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get('me')
-  async getMyMembership(@UserRequest() request: Request) {
-    const user = request.user!;
-
+  async getMyMembership(@UserRequest() user: AuthenticatedUser) {
     const member = await this.prisma.member.findFirst({
       where: { userId: user.id, tenantId: user.tenantId },
       include: {
