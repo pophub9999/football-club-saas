@@ -1,8 +1,8 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { DueStatus } from '@prisma/client';
+import { IsEnum, IsOptional } from 'class-validator';
 
 export class DuesQueryDto {
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  status?: string;
+  @IsEnum(DueStatus)
+  status?: DueStatus;
 }
