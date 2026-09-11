@@ -57,15 +57,16 @@ export class PaymentsService {
 
     const paidAt = new Date();
     const providerPaymentId = `mock_${payment.id}`;
-    const erpResult = await this.erpService.registerPayment({
+    const erpInput = {
       tenantId,
-      dueExternalId: payment.due.externalId ?? undefined,
       paymentExternalId: providerPaymentId,
       amount: payment.amount,
       currency: payment.currency,
       paidAt,
       metadata: { paymentId: payment.id, dueId: payment.due.id },
-    });
+      ...(payment.due.externalId ? { dueExternalId: payment.due.externalId } : {}),
+    };
+    const erpResult = await this.erpService.registerPayment(erpInput);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const fresh = await tx.paymentTransaction.findFirst({ where: { id: payment.id, tenantId }, include: { due: true, receipt: true } });
