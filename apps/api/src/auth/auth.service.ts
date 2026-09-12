@@ -47,18 +47,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!dto.tenantId && user.userTenants.length > 1) {
+    const activeTenants = user.userTenants.filter((item) => item.tenant.status.toLowerCase() === 'active');
+
+    if (!dto.tenantId && activeTenants.length > 1) {
       return {
         selectionRequired: true,
-        clubs: user.userTenants
-          .filter((item) => item.tenant.status === 'ACTIVE')
-          .map((item) => ({ id: item.tenantId, slug: item.tenant.slug, name: item.tenant.name })),
+        clubs: activeTenants.map((item) => ({ id: item.tenantId, slug: item.tenant.slug, name: item.tenant.name })),
       };
     }
 
     const membership = dto.tenantId
-      ? user.userTenants.find((item) => item.tenantId === dto.tenantId && item.tenant.status === 'ACTIVE')
-      : user.userTenants.find((item) => item.tenant.status === 'ACTIVE');
+      ? activeTenants.find((item) => item.tenantId === dto.tenantId)
+      : activeTenants[0];
 
     if (!membership) {
       throw new UnauthorizedException('User is not associated with an active club');
@@ -84,7 +84,7 @@ export class AuthService {
       session.revokedAt ||
       session.expiresAt <= new Date() ||
       session.user.status !== 'ACTIVE' ||
-      session.tenant.status !== 'ACTIVE' ||
+      session.tenant.status.toLowerCase() !== 'active' ||
       !session.user.email
     ) {
       throw new UnauthorizedException('Invalid refresh token');
