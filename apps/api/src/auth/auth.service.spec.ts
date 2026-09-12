@@ -1,5 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { AuthService, AuthTokens } from './auth.service';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 
@@ -26,13 +26,14 @@ describe('AuthService', () => {
     prisma.userSession.create.mockResolvedValue({ id: 'session-1' });
 
     const result = await service.login({ email: 'Demo@Example.Test', password: 'DemoPass123!' });
+    const authenticated = result as AuthTokens;
 
-    expect(result.user).toEqual({ id: 'user-1', tenantId: 'tenant-1', email: 'demo@example.test', roles: ['member'] });
-    expect(result.accessToken).toBeTruthy();
-    expect(result.refreshToken).toBeTruthy();
+    expect(authenticated.user).toEqual({ id: 'user-1', tenantId: 'tenant-1', email: 'demo@example.test', roles: ['member'] });
+    expect(authenticated.accessToken).toBeTruthy();
+    expect(authenticated.refreshToken).toBeTruthy();
     expect(prisma.userSession.create).toHaveBeenCalledTimes(1);
     expect(prisma.userSession.create.mock.calls[0][0].data.tenantId).toBe('tenant-1');
-    const payload = jwt.verify(result.accessToken, process.env.JWT_ACCESS_SECRET!) as jwt.JwtPayload;
+    const payload = jwt.verify(authenticated.accessToken, process.env.JWT_ACCESS_SECRET!) as jwt.JwtPayload;
     expect(payload.tenantId).toBe('tenant-1');
   });
 
