@@ -51,7 +51,10 @@ class _FootballClubAppState extends State<FootballClubApp> {
       theme: buildAppTheme(branding),
       home: _session == null
           ? LoginScreen(branding: branding, onAuthenticated: _authenticated)
-          : HomeScreen(branding: branding),
+          : HomeScreen(
+              branding: branding,
+              displayName: _session!.user['email'] as String?,
+            ),
     );
   }
 }
