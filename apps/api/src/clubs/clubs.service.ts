@@ -71,10 +71,11 @@ export class ClubsService {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
     if (!tenant) throw new NotFoundException('Club not found');
 
+    const data = Object.fromEntries(Object.entries(dto).filter(([, value]) => value !== undefined));
     const settings = await this.prisma.tenantSettings.upsert({
       where: { tenantId },
-      create: { tenantId, ...dto },
-      update: { ...dto },
+      create: { tenantId, ...data },
+      update: data,
     });
 
     await this.prisma.auditLog.create({
@@ -84,7 +85,7 @@ export class ClubsService {
         action: 'branding.updated',
         resource: 'tenant_settings',
         resourceId: settings.id,
-        metadata: dto,
+        metadata: data,
       },
     });
 
