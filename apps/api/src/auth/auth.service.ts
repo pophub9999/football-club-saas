@@ -15,14 +15,27 @@ export interface AuthTokens {
   user: AuthenticatedUser;
 }
 
+export interface TenantSelectionOption {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface TenantSelectionRequired {
+  selectionRequired: true;
+  clubs: TenantSelectionOption[];
+}
+
+export type LoginResult = AuthTokens | TenantSelectionRequired;
+
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async login(dto: LoginDto): Promise<AuthTokens> {
+  async login(dto: LoginDto): Promise<LoginResult> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
-      include: { userTenants: true },
+      include: { userTenants: { include: { tenant: true } } },
     });
 
     if (!user || user.status !== 'ACTIVE' || !user.email || !user.passwordHash) {
@@ -34,16 +47,21 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (!dto.tenantId && user.userTenants.length > 1) {
+      return {
+        selectionRequired: true,
+        clubs: user.userTenants
+          .filter((item) => item.tenant.status === 'ACTIVE')
+          .map((item) => ({ id: item.tenantId, slug: item.tenant.slug, name: item.tenant.name })),
+      };
+    }
+
     const membership = dto.tenantId
-      ? user.userTenants.find((item) => item.tenantId === dto.tenantId)
-      : user.userTenants.length === 1
-        ? user.userTenants[0]
-        : undefined;
+      ? user.userTenants.find((item) => item.tenantId === dto.tenantId && item.tenant.status === 'ACTIVE')
+      : user.userTenants.find((item) => item.tenant.status === 'ACTIVE');
 
     if (!membership) {
-      throw new UnauthorizedException(
-        user.userTenants.length > 1 ? 'Tenant selection is required' : 'User is not associated with a club',
-      );
+      throw new UnauthorizedException('User is not associated with an active club');
     }
 
     return this.issueTokens({
@@ -58,7 +76,7 @@ export class AuthService {
     const tokenHash = this.hashToken(refreshToken);
     const session = await this.prisma.userSession.findUnique({
       where: { refreshTokenHash: tokenHash },
-      include: { user: true },
+      include: { user: true, tenant: true },
     });
 
     if (
@@ -66,6 +84,7 @@ export class AuthService {
       session.revokedAt ||
       session.expiresAt <= new Date() ||
       session.user.status !== 'ACTIVE' ||
+      session.tenant.status !== 'ACTIVE' ||
       !session.user.email
     ) {
       throw new UnauthorizedException('Invalid refresh token');
