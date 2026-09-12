@@ -90,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _pill(String text) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(20)), child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)));
 
-  Widget _team(String name, IconData icon) => Column(children: [Container(width: 58, height: 58, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: Icon(icon, color: Color(0xFF087443), size: 30)), const SizedBox(height: 8), SizedBox(width: 85, child: Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)))]);
+  Widget _team(String name, IconData icon) => Column(children: [Container(width: 58, height: 58, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: Icon(icon, color: b.primaryColor, size: 30)), const SizedBox(height: 8), SizedBox(width: 85, child: Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)))]);
 
   Widget _sectionTitle(BuildContext context, String title) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: b.textColor)), Text('Ver todas  ›', style: TextStyle(color: b.primaryColor, fontWeight: FontWeight.w700, fontSize: 13))]);
 
