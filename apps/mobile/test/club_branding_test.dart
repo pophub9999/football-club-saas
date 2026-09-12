@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_club_mobile/core/branding/club_branding.dart';
+import 'package:football_club_app/core/branding/club_branding.dart';
 
 void main() {
   test('parses tenant branding configuration', () {
