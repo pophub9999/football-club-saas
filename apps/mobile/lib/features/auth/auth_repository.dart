@@ -68,6 +68,10 @@ class AuthRepository {
     return LoginResult.fromJson(await api.postJson('/auth/login', payload));
   }
 
+  Future<AuthSession> refresh(String refreshToken) async {
+    return AuthSession.fromJson(await api.postJson('/auth/refresh', {'refreshToken': refreshToken}));
+  }
+
   Future<ClubBranding> loadBranding(String accessToken) async {
     return ClubBranding.fromJson(await api.getJson('/clubs/current/branding', accessToken: accessToken));
   }
