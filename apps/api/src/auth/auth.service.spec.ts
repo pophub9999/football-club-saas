@@ -18,6 +18,8 @@ function createPrismaMock() {
   } as any;
 }
 
+const tenant = (id: string, name = `Club ${id}`) => ({ id, slug: id, name, status: 'active' });
+
 describe('AuthService', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -31,7 +33,7 @@ describe('AuthService', () => {
       email: 'demo@example.test',
       passwordHash,
       status: 'ACTIVE',
-      userTenants: [{ tenantId: 'tenant-1', roles: ['member'] }],
+      userTenants: [{ tenantId: 'tenant-1', roles: ['member'], tenant: tenant('tenant-1') }],
     });
     prisma.userSession.create.mockResolvedValue({ id: 'session-1' });
 
@@ -47,7 +49,7 @@ describe('AuthService', () => {
     expect(payload.tenantId).toBe('tenant-1');
   });
 
-  it('requires explicit club selection for a multi-club user', async () => {
+  it('returns the active clubs when a multi-club user has not selected one', async () => {
     const prisma = createPrismaMock();
     const service = new AuthService(prisma);
     const passwordHash = await bcrypt.hash('DemoPass123!', 4);
@@ -55,13 +57,22 @@ describe('AuthService', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1', email: 'demo@example.test', passwordHash, status: 'ACTIVE',
       userTenants: [
-        { tenantId: 'tenant-1', roles: ['member'] },
-        { tenantId: 'tenant-2', roles: ['member'] },
+        { tenantId: 'tenant-1', roles: ['member'], tenant: tenant('tenant-1', 'Clube Norte') },
+        { tenantId: 'tenant-2', roles: ['member'], tenant: tenant('tenant-2', 'Clube Sul') },
+        { tenantId: 'tenant-3', roles: ['member'], tenant: tenant('tenant-3', 'Clube Inativo', 'inactive') },
       ],
     });
 
-    await expect(service.login({ email: 'demo@example.test', password: 'DemoPass123!' }))
-      .rejects.toThrow(new UnauthorizedException('Tenant selection is required'));
+    const result = await service.login({ email: 'demo@example.test', password: 'DemoPass123!' });
+
+    expect(result).toEqual({
+      selectionRequired: true,
+      clubs: [
+        { id: 'tenant-1', slug: 'tenant-1', name: 'Clube Norte' },
+        { id: 'tenant-2', slug: 'tenant-2', name: 'Clube Sul' },
+      ],
+    });
+    expect(prisma.userSession.create).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid password without creating a session', async () => {
@@ -71,7 +82,7 @@ describe('AuthService', () => {
 
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1', email: 'demo@example.test', passwordHash, status: 'ACTIVE',
-      userTenants: [{ tenantId: 'tenant-1', roles: ['member'] }],
+      userTenants: [{ tenantId: 'tenant-1', roles: ['member'], tenant: tenant('tenant-1') }],
     });
 
     await expect(service.login({ email: 'demo@example.test', password: 'WrongPass123!' }))
@@ -88,6 +99,7 @@ describe('AuthService', () => {
       id: 'session-1', userId: 'user-1', tenantId: 'tenant-1',
       expiresAt: new Date(Date.now() + 60_000), revokedAt: null,
       user: { id: 'user-1', email: 'demo@example.test', status: 'ACTIVE' },
+      tenant: tenant('tenant-1'),
     });
     prisma.userTenant.findUnique.mockResolvedValue({ userId: 'user-1', tenantId: 'tenant-1', roles: ['member'] });
     prisma.userSession.update.mockResolvedValue({});
@@ -112,6 +124,7 @@ describe('AuthService', () => {
       id: 'session-1', userId: 'user-1', tenantId: 'tenant-1',
       expiresAt: new Date(Date.now() + 60_000), revokedAt: new Date(),
       user: { id: 'user-1', email: 'demo@example.test', status: 'ACTIVE' },
+      tenant: tenant('tenant-1'),
     });
 
     await expect(service.refresh('revoked-token')).rejects.toThrow(UnauthorizedException);
