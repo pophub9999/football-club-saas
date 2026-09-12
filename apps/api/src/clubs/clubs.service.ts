@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { UpdateBrandingDto } from './dto/update-branding.dto';
 
 const DEFAULT_FEATURES = {
   tickets: true,
@@ -60,5 +61,33 @@ export class ClubsService {
       socialLinks: settings?.socialLinks ?? {},
       legalLinks: settings?.legalLinks ?? {},
     };
+  }
+
+  async updateBranding(tenantId: string, userId: string, roles: string[], dto: UpdateBrandingDto) {
+    if (!roles.some((role) => role === 'club_owner' || role === 'club_admin')) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
+    if (!tenant) throw new NotFoundException('Club not found');
+
+    const settings = await this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, ...dto },
+      update: { ...dto },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: 'branding.updated',
+        resource: 'tenant_settings',
+        resourceId: settings.id,
+        metadata: dto,
+      },
+    });
+
+    return this.getBranding(tenantId);
   }
 }
