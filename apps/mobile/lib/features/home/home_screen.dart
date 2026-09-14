@@ -7,6 +7,7 @@ import '../clubs/club_screen.dart';
 import '../football/football_repository.dart';
 import '../football/games_screen.dart';
 import '../settings/settings_screen.dart';
+import '../tickets/tickets_screen.dart';
 import '../wallet/wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -63,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 22, 20, 0), sliver: SliverToBoxAdapter(child: _nextMatch())),
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 24, 20, 0), sliver: SliverToBoxAdapter(child: _sectionTitle(context, 'A tua quota'))),
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 10, 20, 0), sliver: SliverToBoxAdapter(child: _duesCard())),
+      SliverPadding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 0), sliver: SliverToBoxAdapter(child: _ticketsButton(context))),
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 24, 20, 0), sliver: SliverToBoxAdapter(child: _sectionTitle(context, 'Notícias'))),
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 10, 20, 24), sliver: SliverToBoxAdapter(child: _newsRow())),
     ]));
@@ -75,5 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _team(String name, String? logoUrl) => Column(children: [Container(width: 58, height: 58, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: logoUrl == null ? Icon(Icons.shield, color: b.primaryColor, size: 30) : ClipOval(child: Image.network(logoUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor)))), const SizedBox(height: 8), SizedBox(width: 100, child: Text(name, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)))]);
   Widget _sectionTitle(BuildContext context, String title) => Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: b.textColor));
   Widget _duesCard() { final nextDue = data!.dues['nextDue'] as Map<String, dynamic>?; final outstanding = data!.dues['outstandingAmount']?.toString() ?? '0.00'; final label = (nextDue?['description'] as String?)?.trim().isNotEmpty == true ? nextDue!['description'] as String : nextDue?['reference'] as String? ?? 'Sem quotas pendentes'; final status = nextDue?['status'] as String?; final statusLabel = status == 'OVERDUE' ? 'Vencida' : status == 'PARTIALLY_PAID' ? 'Parcialmente paga' : status == 'OPEN' ? 'Por pagar' : 'Em dia'; return Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(Icons.receipt_long_outlined, color: b.accentColor), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), const SizedBox(height: 5), Text('$outstanding € · $statusLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 13))]))])); }
+  Widget _ticketsButton(BuildContext context) => Material(color: b.surfaceColor, borderRadius: BorderRadius.circular(18), child: InkWell(borderRadius: BorderRadius.circular(18), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TicketsScreen(branding: b, api: widget.api, accessToken: widget.accessToken))), child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [Icon(Icons.confirmation_number_outlined, color: b.primaryColor), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Os meus bilhetes', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)), const SizedBox(height: 3), Text('Acede aos teus bilhetes digitais e QR de entrada', style: TextStyle(color: b.mutedTextColor, fontSize: 12))])), Icon(Icons.chevron_right, color: b.mutedTextColor)])));
   Widget _newsRow() => Container(height: 100, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(18)), child: Row(children: [Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 30), const SizedBox(width: 14), Expanded(child: Text('Consulta as notícias oficiais em Clube → Conteúdo do clube.', style: TextStyle(color: b.mutedTextColor, fontSize: 13)))]));
 }
