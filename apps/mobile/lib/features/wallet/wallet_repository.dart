@@ -11,20 +11,19 @@ class WalletRepository {
 
   Future<List<Map<String, dynamic>>> dues(String accessToken) async {
     final json = await api.getJson('/membership/dues', accessToken: accessToken);
-    return (json['dues'] as List<dynamic>? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList(growable: false);
+    final list = json is List ? json : (json['dues'] is List ? json['dues'] as List<dynamic> : const <dynamic>[]);
+    return list.map((item) => Map<String, dynamic>.from(item as Map)).toList(growable: false);
   }
 
   Future<List<Map<String, dynamic>>> payments(String accessToken) async {
     final json = await api.getJson('/payments/history', accessToken: accessToken);
-    final list = json['payments'] is List ? json['payments'] as List<dynamic> : const <dynamic>[];
+    final list = json is List ? json : (json['payments'] is List ? json['payments'] as List<dynamic> : const <dynamic>[]);
     return list.map((item) => Map<String, dynamic>.from(item as Map)).toList(growable: false);
   }
 
   Future<List<Map<String, dynamic>>> receipts(String accessToken) async {
     final json = await api.getJson('/receipts', accessToken: accessToken);
-    final list = json['receipts'] is List ? json['receipts'] as List<dynamic> : const <dynamic>[];
+    final list = json is List ? json : (json['receipts'] is List ? json['receipts'] as List<dynamic> : const <dynamic>[]);
     return list.map((item) => Map<String, dynamic>.from(item as Map)).toList(growable: false);
   }
 
