@@ -57,6 +57,24 @@ class LoginResult {
   }
 }
 
+class HomeData {
+  const HomeData({required this.club, required this.member, required this.dues});
+
+  final Map<String, dynamic> club;
+  final Map<String, dynamic> member;
+  final Map<String, dynamic> dues;
+
+  ClubBranding get branding => ClubBranding.fromJson(Map<String, dynamic>.from(club['branding'] as Map));
+
+  factory HomeData.fromJson(Map<String, dynamic> json) {
+    return HomeData(
+      club: Map<String, dynamic>.from(json['club'] as Map),
+      member: Map<String, dynamic>.from(json['member'] as Map),
+      dues: Map<String, dynamic>.from(json['dues'] as Map),
+    );
+  }
+}
+
 class AuthRepository {
   AuthRepository(this.api);
 
@@ -74,5 +92,9 @@ class AuthRepository {
 
   Future<ClubBranding> loadBranding(String accessToken) async {
     return ClubBranding.fromJson(await api.getJson('/clubs/current/branding', accessToken: accessToken));
+  }
+
+  Future<HomeData> loadHome(String accessToken) async {
+    return HomeData.fromJson(await api.getJson('/me/home', accessToken: accessToken));
   }
 }
