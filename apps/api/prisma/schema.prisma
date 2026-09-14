@@ -57,6 +57,9 @@ model Tenant {
   payments PaymentTransaction[]
   receipts Receipt[]
   auditLogs AuditLog[]
+  competitions Competition[]
+  teams Team[]
+  fixtures Fixture[]
   @@index([status])
   @@map("tenants")
 }
@@ -156,7 +159,7 @@ model Member {
 }
 
 model Membership {
-  id String @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @default(uuid()) @db.Uuid
   tenantId String @db.Uuid
   memberId String @db.Uuid
   planCode String @db.VarChar(80)
@@ -235,6 +238,69 @@ model Receipt {
   @@unique([tenantId, receiptNumber])
   @@index([tenantId, issuedAt])
   @@map("receipts")
+}
+
+model Competition {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  externalId String @db.VarChar(160)
+  provider String @default("mock") @db.VarChar(40)
+  name String @db.VarChar(160)
+  country String? @db.VarChar(120)
+  season String? @db.VarChar(80)
+  logoUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fixtures Fixture[]
+  @@unique([tenantId, provider, externalId])
+  @@index([tenantId, name])
+  @@map("competitions")
+}
+
+model Team {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  externalId String @db.VarChar(160)
+  provider String @default("mock") @db.VarChar(40)
+  name String @db.VarChar(160)
+  shortName String? @db.VarChar(80)
+  logoUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  homeFixtures Fixture[] @relation("FixtureHomeTeam")
+  awayFixtures Fixture[] @relation("FixtureAwayTeam")
+  @@unique([tenantId, provider, externalId])
+  @@index([tenantId, name])
+  @@map("teams")
+}
+
+model Fixture {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  externalId String @db.VarChar(160)
+  provider String @default("mock") @db.VarChar(40)
+  competitionId String? @db.Uuid
+  homeTeamId String @db.Uuid
+  awayTeamId String @db.Uuid
+  kickoffAt DateTime
+  status String @default("SCHEDULED") @db.VarChar(40)
+  venueName String? @db.VarChar(160)
+  venueCity String? @db.VarChar(120)
+  homeScore Int?
+  awayScore Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  competition Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+  homeTeam Team @relation("FixtureHomeTeam", fields: [homeTeamId], references: [id], onDelete: Restrict)
+  awayTeam Team @relation("FixtureAwayTeam", fields: [awayTeamId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, provider, externalId])
+  @@index([tenantId, kickoffAt])
+  @@index([tenantId, homeTeamId, kickoffAt])
+  @@index([tenantId, awayTeamId, kickoffAt])
+  @@map("fixtures")
 }
 
 model AuditLog {
