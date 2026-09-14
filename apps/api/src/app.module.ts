@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { ClubsModule } from './clubs/clubs.module';
 import { DatabaseModule } from './database/database.module';
 import { ErpModule } from './erp/erp.module';
+import { FootballModule } from './football/football.module';
 import { HealthModule } from './health/health.module';
 import { MembershipModule } from './membership/membership.module';
 import { MeModule } from './me/me.module';
@@ -18,6 +19,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
     AuthModule,
     ClubsModule,
     ErpModule,
+    FootballModule,
     HealthModule,
     MeModule,
     MembershipModule,
