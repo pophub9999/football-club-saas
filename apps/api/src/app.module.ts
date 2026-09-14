@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { ClubsModule } from './clubs/clubs.module';
+import { ContentModule } from './content/content.module';
 import { DatabaseModule } from './database/database.module';
 import { ErpModule } from './erp/erp.module';
 import { FootballModule } from './football/football.module';
@@ -18,6 +19,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
     TenancyModule,
     AuthModule,
     ClubsModule,
+    ContentModule,
     ErpModule,
     FootballModule,
     HealthModule,
