@@ -1,0 +1,49 @@
+import '../../core/api/api_client.dart';
+
+class WalletRepository {
+  WalletRepository(this.api);
+
+  final ApiClient api;
+
+  Future<Map<String, dynamic>> membership(String accessToken) async {
+    return api.getJson('/membership/me', accessToken: accessToken);
+  }
+
+  Future<List<Map<String, dynamic>>> dues(String accessToken) async {
+    final json = await api.getJson('/membership/dues', accessToken: accessToken);
+    return (json['dues'] as List<dynamic>? ?? const [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> payments(String accessToken) async {
+    final json = await api.getJson('/payments/history', accessToken: accessToken);
+    final list = json['payments'] is List ? json['payments'] as List<dynamic> : const <dynamic>[];
+    return list.map((item) => Map<String, dynamic>.from(item as Map)).toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> receipts(String accessToken) async {
+    final json = await api.getJson('/receipts', accessToken: accessToken);
+    final list = json['receipts'] is List ? json['receipts'] as List<dynamic> : const <dynamic>[];
+    return list.map((item) => Map<String, dynamic>.from(item as Map)).toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> createPaymentIntent({
+    required String accessToken,
+    required String dueId,
+    required String idempotencyKey,
+  }) {
+    return api.postJson('/payments/intents', {
+      'dueId': dueId,
+      'idempotencyKey': idempotencyKey,
+      'provider': 'mock',
+    }, accessToken: accessToken);
+  }
+
+  Future<Map<String, dynamic>> confirmMockPayment({
+    required String accessToken,
+    required String paymentId,
+  }) {
+    return api.postJson('/payments/mock/$paymentId/succeed', const {}, accessToken: accessToken);
+  }
+}
