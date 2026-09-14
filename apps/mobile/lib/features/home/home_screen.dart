@@ -17,6 +17,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   HomeData? data;
+  Map<String, dynamic>? nextMatch;
   Object? error;
   int selectedIndex = 0;
   ClubBranding get b => data?.branding ?? widget.branding;
@@ -28,24 +29,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _load() async {
     try {
       final home = await AuthRepository(widget.api).loadHome(widget.accessToken);
-      Map<String, dynamic>? nextMatch = home.nextMatch;
-      if (nextMatch == null) {
-        final fixtures = await FootballRepository(widget.api).upcoming(widget.accessToken, limit: 1);
-        if (fixtures.isNotEmpty) {
-          final fixture = fixtures.first;
-          nextMatch = {
-            'id': fixture.id,
-            'kickoffAt': fixture.kickoffAt.toUtc().toIso8601String(),
-            'status': fixture.status,
-            'venueName': fixture.venueName,
-            'venueCity': fixture.venueCity,
-            'competition': {'name': fixture.competitionName},
-            'homeTeam': fixture.homeTeam,
-            'awayTeam': fixture.awayTeam,
-          };
-        }
+      Map<String, dynamic>? match = null;
+      final fixtures = await FootballRepository(widget.api).upcoming(widget.accessToken, limit: 1);
+      if (fixtures.isNotEmpty) {
+        final fixture = fixtures.first;
+        match = {'id': fixture.id, 'kickoffAt': fixture.kickoffAt.toUtc().toIso8601String(), 'status': fixture.status, 'venueName': fixture.venueName, 'venueCity': fixture.venueCity, 'competition': {'name': fixture.competitionName}, 'homeTeam': fixture.homeTeam, 'awayTeam': fixture.awayTeam};
       }
-      if (mounted) setState(() => data = HomeData(club: home.club, member: home.member, dues: home.dues, nextMatch: nextMatch));
+      if (mounted) setState(() { data = home; nextMatch = match; error = null; });
     } catch (exception) {
       if (mounted) setState(() => error = exception);
     }
@@ -55,19 +45,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: b.backgroundColor,
     body: SafeArea(child: _content(context)),
-    bottomNavigationBar: NavigationBar(
-      backgroundColor: b.surfaceColor,
-      indicatorColor: b.primaryColor.withValues(alpha: .18),
-      selectedIndex: selectedIndex,
-      onDestinationSelected: (index) => setState(() => selectedIndex = index),
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
-        NavigationDestination(icon: Icon(Icons.sports_soccer_outlined), selectedIcon: Icon(Icons.sports_soccer), label: 'Jogos'),
-        NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Clube'),
-        NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Carteira'),
-        NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mais'),
-      ],
-    ),
+    bottomNavigationBar: NavigationBar(backgroundColor: b.surfaceColor, indicatorColor: b.primaryColor.withValues(alpha: .18), selectedIndex: selectedIndex, onDestinationSelected: (index) => setState(() => selectedIndex = index), destinations: const [
+      NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
+      NavigationDestination(icon: Icon(Icons.sports_soccer_outlined), selectedIcon: Icon(Icons.sports_soccer), label: 'Jogos'),
+      NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Clube'),
+      NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Carteira'),
+      NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mais'),
+    ]),
   );
 
   Widget _content(BuildContext context) {
@@ -94,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _logo({double size = 56}) { final url = b.logoDarkUrl ?? b.logoUrl; return Container(width: size, height: size, padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: b.surfaceColor, shape: BoxShape.circle), child: url == null ? Icon(Icons.shield, color: b.primaryColor, size: size * .55) : Image.network(url, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor))); }
 
   Widget _nextMatch() {
-    final match = data!.nextMatch;
+    final match = nextMatch;
     if (match == null) return Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor]), borderRadius: BorderRadius.circular(24)), child: const Center(child: Text('Ainda não existem próximos jogos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))));
     final home = Map<String, dynamic>.from(match['homeTeam'] as Map); final away = Map<String, dynamic>.from(match['awayTeam'] as Map); final kickoff = DateTime.parse(match['kickoffAt'] as String).toLocal();
     final when = '${kickoff.day.toString().padLeft(2, '0')}/${kickoff.month.toString().padLeft(2, '0')} · ${kickoff.hour.toString().padLeft(2, '0')}:${kickoff.minute.toString().padLeft(2, '0')}';
