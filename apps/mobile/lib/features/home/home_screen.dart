@@ -6,6 +6,7 @@ import '../auth/auth_repository.dart';
 import '../clubs/club_screen.dart';
 import '../football/football_repository.dart';
 import '../football/games_screen.dart';
+import '../wallet/wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.branding, required this.api, required this.accessToken});
@@ -49,11 +50,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _content(BuildContext context) {
     if (selectedIndex == 1) return GamesScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
     if (selectedIndex == 2) return ClubScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
+    if (selectedIndex == 3) return WalletScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
     if (data == null) {
       if (error != null) return Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.cloud_off_outlined, size: 48, color: b.mutedTextColor), const SizedBox(height: 14), Text('Não foi possível carregar a tua área de sócio.', textAlign: TextAlign.center, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), const SizedBox(height: 14), OutlinedButton(onPressed: _load, child: const Text('Tentar novamente'))])));
       return Center(child: CircularProgressIndicator(color: b.primaryColor));
     }
-    if (selectedIndex == 3) return _simpleSection('Carteira', 'O teu cartão de sócio, quotas, pagamentos e bilhetes.');
     if (selectedIndex == 4) return _simpleSection('Mais', 'Definições, notificações, privacidade e apoio.');
     return RefreshIndicator(onRefresh: _load, child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 0), sliver: SliverToBoxAdapter(child: _header(context))),
