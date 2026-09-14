@@ -98,7 +98,8 @@ class _FootballClubAppState extends State<FootballClubApp> {
               ? LoginScreen(branding: branding, onAuthenticated: _authenticated)
               : HomeScreen(
                   branding: branding,
-                  displayName: _session!.user['email'] as String?,
+                  api: _api,
+                  accessToken: _session!.accessToken,
                 ),
     );
   }
