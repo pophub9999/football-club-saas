@@ -59,7 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     contentPadding: EdgeInsets.zero,
     title: Text(title, style: TextStyle(color: widget.branding.textColor, fontWeight: FontWeight.w600)),
     value: value,
-    activeColor: widget.branding.primaryColor,
+    activeTrackColor: widget.branding.primaryColor,
     onChanged: onChanged,
   );
 
