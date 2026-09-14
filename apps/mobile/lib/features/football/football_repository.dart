@@ -35,7 +35,9 @@ class FixtureSummary {
   }
 
   String teamName(Map<String, dynamic> team) =>
-      (team['shortName'] as String?)?.trim().isNotEmpty == true ? team['shortName'] as String : team['name'] as String;
+      (team['shortName'] as String?)?.trim().isNotEmpty == true
+          ? team['shortName'] as String
+          : team['name'] as String;
 
   String get homeName => teamName(homeTeam);
   String get awayName => teamName(awayTeam);
@@ -48,8 +50,9 @@ class FootballRepository {
 
   Future<List<FixtureSummary>> upcoming(String accessToken, {int limit = 20}) async {
     final json = await api.getJson('/football/fixtures/upcoming?limit=$limit', accessToken: accessToken);
-    return json is List
-        ? json.map((item) => FixtureSummary.fromJson(Map<String, dynamic>.from(item as Map))).toList(growable: false)
-        : const [];
+    if (json is! List) return const [];
+    return json
+        .map<FixtureSummary>((item) => FixtureSummary.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList(growable: false);
   }
 }
