@@ -227,7 +227,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20)),
-      child: Row(children: [Icon(Icons.receipt_long_outlined, color: b.accentColor), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), const SizedBox(height: 5), Text('$outstanding € · $statusLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 13))]))]),
+      child: Row(
+        children: [
+          Icon(Icons.receipt_long_outlined, color: b.accentColor),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 5),
+                Text('$outstanding € · $statusLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -271,7 +286,13 @@ class _HomeScreenState extends State<HomeScreen> {
       height: 100,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(18)),
-      child: Row(children: [Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 30), const SizedBox(width: 14), Expanded(child: Text('Consulta as notícias oficiais em Clube → Conteúdo do clube.', style: TextStyle(color: b.mutedTextColor, fontSize: 13)))]),
+      child: Row(
+        children: [
+          Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 30),
+          const SizedBox(width: 14),
+          Expanded(child: Text('Consulta as notícias oficiais em Clube → Conteúdo do clube.', style: TextStyle(color: b.mutedTextColor, fontSize: 13))),
+        ],
+      ),
     );
   }
 }
