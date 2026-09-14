@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/branding/club_branding.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -76,7 +77,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _nextMatch(BuildContext context) => Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [b.secondaryColor, b.primaryColor]), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(blurRadius: 24, offset: const Offset(0, 10), color: b.primaryColor.withValues(alpha: .22))]),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [b.secondaryColor, b.primaryColor]),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [BoxShadow(blurRadius: 24, offset: const Offset(0, 10), color: b.primaryColor.withValues(alpha: .22))],
+        ),
         child: Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('PRÓXIMO JOGO', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, letterSpacing: 1.1, fontSize: 12)), _pill('20 SET · 20:15')]),
           const SizedBox(height: 22),
@@ -100,5 +105,21 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(children: [Container(width: 48, height: 48, decoration: BoxDecoration(color: b.accentColor.withValues(alpha: .16), borderRadius: BorderRadius.circular(14)), child: Icon(Icons.receipt_long_outlined, color: b.accentColor)), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Quota 2026/27', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), const SizedBox(height: 5), Text('25,00 € · Vencida', style: TextStyle(color: b.mutedTextColor, fontSize: 13))])), FilledButton(onPressed: () {}, style: FilledButton.styleFrom(backgroundColor: b.primaryColor), child: const Text('Pagar'))]),
       );
 
-  Widget _newsRow() => SizedBox(height: 172, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: 3, separatorBuilder: (_, __) => const SizedBox(width: 12), itemBuilder: (_, index) => Container(width: 225, decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: b.primaryColor.withValues(alpha: .12))), clipBehavior: Clip.antiAlias, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(height: 92, decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor])), child: Center(child: Icon(index == 0 ? Icons.stadium_outlined : Icons.sports_soccer, size: 34, color: Colors.white))), Padding(padding: const EdgeInsets.fromLTRB(13, 10, 13, 8), child: Text(['Bilhetes para o próximo jogo', 'Plantel prepara novo desafio', 'Toda a atualidade do clube'][index], maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700, fontSize: 13)))])));
+  Widget _newsRow() => SizedBox(
+        height: 172,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: 3,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (_, index) => Container(
+            width: 225,
+            decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: b.primaryColor.withValues(alpha: .12))),
+            clipBehavior: Clip.antiAlias,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(height: 92, decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor])), child: Center(child: Icon(index == 0 ? Icons.stadium_outlined : Icons.sports_soccer, size: 34, color: Colors.white))),
+              Padding(padding: const EdgeInsets.fromLTRB(13, 10, 13, 8), child: Text(['Bilhetes para o próximo jogo', 'Plantel prepara novo desafio', 'Toda a atualidade do clube'][index], maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700, fontSize: 13))),
+            ]),
+          ),
+        ),
+      );
 }
