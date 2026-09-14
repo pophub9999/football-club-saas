@@ -19,7 +19,7 @@ export class MeController {
   async getHome(@UserRequest() user: AuthenticatedUser) {
     const tenantId = user.tenantId;
 
-    const [tenant, member] = await Promise.all([
+    const [tenant, member, nextMatch] = await Promise.all([
       this.prisma.tenant.findFirst({
         where: { id: tenantId, status: 'active' },
         select: {
@@ -86,6 +86,15 @@ export class MeController {
           },
         },
       }),
+      this.prisma.fixture.findFirst({
+        where: { tenantId, kickoffAt: { gte: new Date() } },
+        orderBy: { kickoffAt: 'asc' },
+        include: {
+          competition: { select: { id: true, name: true, logoUrl: true } },
+          homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+          awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+        },
+      }),
     ]);
 
     if (!tenant) throw new NotFoundException('Club not found');
@@ -146,6 +155,7 @@ export class MeController {
         nextDue,
         items: dues,
       },
+      nextMatch,
     };
   }
 }
