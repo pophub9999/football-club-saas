@@ -41,6 +41,31 @@ enum PaymentStatus {
   DISPUTED
 }
 
+enum TicketStatus {
+  ISSUED
+  ACTIVE
+  USED
+  CANCELLED
+  EXPIRED
+  TRANSFERRED
+}
+
+enum TicketTransferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
+enum EntryScanResult {
+  ACCEPTED
+  REJECTED
+  ALREADY_USED
+  EXPIRED
+  CANCELLED
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
   slug String @unique @db.VarChar(80)
@@ -61,6 +86,11 @@ model Tenant {
   teams Team[]
   fixtures Fixture[]
   articles Article[]
+  ticketAccounts TicketAccount[]
+  ticketEvents TicketEvent[]
+  tickets Ticket[]
+  ticketTransfers TicketTransfer[]
+  entryScans EntryScan[]
   @@index([status])
   @@map("tenants")
 }
@@ -104,6 +134,9 @@ model User {
   member Member?
   sessions UserSession[]
   auditLogs AuditLog[]
+  tickets Ticket[]
+  ticketTransfersSent TicketTransfer[] @relation("TicketTransferSender")
+  ticketTransfersReceived TicketTransfer[] @relation("TicketTransferRecipient")
   @@index([status])
   @@map("users")
 }
@@ -153,6 +186,7 @@ model Member {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   memberships Membership[]
   dues Due[]
+  tickets Ticket[]
   @@unique([tenantId, memberNumber])
   @@index([tenantId, email])
   @@index([tenantId, phone])
@@ -321,6 +355,114 @@ model Article {
   @@unique([tenantId, slug])
   @@index([tenantId, isPublished, publishedAt])
   @@map("articles")
+}
+
+model TicketAccount {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  provider String @default("mock") @db.VarChar(40)
+  externalAccountId String @db.VarChar(160)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+  @@unique([tenantId, provider, externalAccountId])
+  @@index([tenantId])
+  @@map("ticket_accounts")
+}
+
+model TicketEvent {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  fixtureId String? @db.Uuid
+  externalId String? @db.VarChar(160)
+  name String @db.VarChar(200)
+  startsAt DateTime
+  endsAt DateTime?
+  venueName String? @db.VarChar(160)
+  venueAddress String? @db.VarChar(255)
+  status String @default("SCHEDULED") @db.VarChar(40)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fixture Fixture? @relation(fields: [fixtureId], references: [id], onDelete: SetNull)
+  tickets Ticket[]
+  @@unique([tenantId, externalId])
+  @@index([tenantId, startsAt])
+  @@map("ticket_events")
+}
+
+model Ticket {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  eventId String @db.Uuid
+  ticketAccountId String?
+  userId String?
+  memberId String?
+  provider String @default("mock") @db.VarChar(40)
+  externalTicketId String @db.VarChar(160)
+  ticketNumber String? @db.VarChar(120)
+  status TicketStatus @default(ISSUED)
+  holderName String? @db.VarChar(200)
+  section String? @db.VarChar(80)
+  row String? @db.VarChar(40)
+  seat String? @db.VarChar(40)
+  qrTokenHash String? @unique @db.VarChar(128)
+  issuedAt DateTime @default(now())
+  validFrom DateTime?
+  validUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  event TicketEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketAccount TicketAccount? @relation(fields: [ticketAccountId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  member Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  transfers TicketTransfer[]
+  scans EntryScan[]
+  @@unique([tenantId, provider, externalTicketId])
+  @@index([tenantId, userId, status])
+  @@index([tenantId, memberId, status])
+  @@index([tenantId, eventId, status])
+  @@map("tickets")
+}
+
+model TicketTransfer {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  ticketId String @db.Uuid
+  fromUserId String @db.Uuid
+  toUserId String @db.Uuid
+  status TicketTransferStatus @default(PENDING)
+  expiresAt DateTime?
+  acceptedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromUser User @relation("TicketTransferSender", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser User @relation("TicketTransferRecipient", fields: [toUserId], references: [id], onDelete: Cascade)
+  @@index([tenantId, fromUserId, status])
+  @@index([tenantId, toUserId, status])
+  @@index([tenantId, ticketId, status])
+  @@map("ticket_transfers")
+}
+
+model EntryScan {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  ticketId String @db.Uuid
+  scannerId String? @db.Uuid
+  result EntryScanResult
+  scannedAt DateTime @default(now())
+  gate String? @db.VarChar(80)
+  deviceId String? @db.VarChar(160)
+  reason String? @db.VarChar(255)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  @@index([tenantId, ticketId, scannedAt])
+  @@index([tenantId, scannedAt])
+  @@map("entry_scans")
 }
 
 model AuditLog {
