@@ -74,25 +74,29 @@ export class TicketsService {
       throw new BadRequestException('Tickets cannot be transferred after the event has started');
     }
 
-    const recipient = dto.recipientEmail
-      ? await this.prisma.user.findFirst({
-          where: {
-            email: dto.recipientEmail.trim().toLowerCase(),
-            status: 'ACTIVE',
-            userTenants: { some: { tenantId } },
-          },
-          select: { id: true },
-        })
-      : await this.prisma.member.findFirst({
-          where: {
-            tenantId,
-            memberNumber: dto.recipientMemberNumber!.trim(),
-            userId: { not: null },
-          },
-          select: { userId: true },
-        });
+    let recipientUserId: string | null = null;
+    if (dto.recipientEmail) {
+      const recipient = await this.prisma.user.findFirst({
+        where: {
+          email: dto.recipientEmail.trim().toLowerCase(),
+          status: 'ACTIVE',
+          userTenants: { some: { tenantId } },
+        },
+        select: { id: true },
+      });
+      recipientUserId = recipient?.id ?? null;
+    } else if (dto.recipientMemberNumber) {
+      const recipient = await this.prisma.member.findFirst({
+        where: {
+          tenantId,
+          memberNumber: dto.recipientMemberNumber.trim(),
+          userId: { not: null },
+        },
+        select: { userId: true },
+      });
+      recipientUserId = recipient?.userId ?? null;
+    }
 
-    const recipientUserId = recipient?.id ?? ('userId' in (recipient ?? {}) ? recipient.userId : null);
     if (!recipientUserId) throw new NotFoundException('Recipient is not an active club member');
     if (recipientUserId === fromUserId) throw new BadRequestException('A ticket cannot be transferred to yourself');
 
@@ -141,7 +145,7 @@ export class TicketsService {
         await tx.ticketTransfer.update({ where: { id: transfer.id }, data: { status: 'EXPIRED' } });
         throw new ConflictException('Transfer has expired');
       }
-      if (transfer.ticket.status !== 'ISSUED' && transfer.ticket.status !== 'ACTIVE') {
+      if (!['ISSUED', 'ACTIVE'].includes(transfer.ticket.status)) {
         throw new ConflictException('Ticket is no longer transferable');
       }
       if (transfer.ticket.event.startsAt <= now) throw new ConflictException('The event has already started');
