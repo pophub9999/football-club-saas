@@ -6,13 +6,15 @@ import '../auth/auth_repository.dart';
 import '../clubs/club_screen.dart';
 import '../football/football_repository.dart';
 import '../football/games_screen.dart';
+import '../settings/settings_screen.dart';
 import '../wallet/wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.branding, required this.api, required this.accessToken});
+  const HomeScreen({super.key, required this.branding, required this.api, required this.accessToken, required this.onLogout});
   final ClubBranding branding;
   final ApiClient api;
   final String accessToken;
+  final VoidCallback onLogout;
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 
@@ -51,11 +53,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (selectedIndex == 1) return GamesScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
     if (selectedIndex == 2) return ClubScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
     if (selectedIndex == 3) return WalletScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
+    if (selectedIndex == 4) return SettingsScreen(branding: b, api: widget.api, accessToken: widget.accessToken, onLogout: widget.onLogout);
     if (data == null) {
       if (error != null) return Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.cloud_off_outlined, size: 48, color: b.mutedTextColor), const SizedBox(height: 14), Text('Não foi possível carregar a tua área de sócio.', textAlign: TextAlign.center, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), const SizedBox(height: 14), OutlinedButton(onPressed: _load, child: const Text('Tentar novamente'))])));
       return Center(child: CircularProgressIndicator(color: b.primaryColor));
     }
-    if (selectedIndex == 4) return _simpleSection('Mais', 'Definições, notificações, privacidade e apoio.');
     return RefreshIndicator(onRefresh: _load, child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 0), sliver: SliverToBoxAdapter(child: _header(context))),
       SliverPadding(padding: const EdgeInsets.fromLTRB(20, 22, 20, 0), sliver: SliverToBoxAdapter(child: _nextMatch())),
@@ -66,7 +68,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ]));
   }
 
-  Widget _simpleSection(String title, String subtitle) => Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [_logo(size: 70), const SizedBox(height: 18), Text(title, style: TextStyle(color: b.textColor, fontSize: 24, fontWeight: FontWeight.w800)), const SizedBox(height: 8), Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor))])));
   Widget _header(BuildContext context) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Olá, $greetingName', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: b.textColor, fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text('Sócio nº ${data!.member['memberNumber']}', style: TextStyle(color: b.mutedTextColor, fontSize: 13))])), _logo(size: 46)]);
   Widget _logo({double size = 56}) { final url = b.logoDarkUrl ?? b.logoUrl; return Container(width: size, height: size, padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: b.surfaceColor, shape: BoxShape.circle), child: url == null ? Icon(Icons.shield, color: b.primaryColor, size: size * .55) : Image.network(url, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor))); }
   Widget _nextMatch() { final match = nextMatch; if (match == null) return Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor]), borderRadius: BorderRadius.circular(24)), child: const Center(child: Text('Ainda não existem próximos jogos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))); final home = Map<String, dynamic>.from(match['homeTeam'] as Map); final away = Map<String, dynamic>.from(match['awayTeam'] as Map); final kickoff = DateTime.parse(match['kickoffAt'] as String).toLocal(); final when = '${kickoff.day.toString().padLeft(2, '0')}/${kickoff.month.toString().padLeft(2, '0')} · ${kickoff.hour.toString().padLeft(2, '0')}:${kickoff.minute.toString().padLeft(2, '0')}'; return Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor]), borderRadius: BorderRadius.circular(24)), child: Column(children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('PRÓXIMO JOGO', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12)), Text(when, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12))]), const SizedBox(height: 22), Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_team(_teamName(home), home['logoUrl'] as String?), const Text('VS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800)), _team(_teamName(away), away['logoUrl'] as String?)]), if (match['venueName'] != null) ...[const SizedBox(height: 14), Text(match['venueName'] as String, style: const TextStyle(color: Colors.white70, fontSize: 12))]])); }
