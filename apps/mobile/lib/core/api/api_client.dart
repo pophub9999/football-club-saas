@@ -20,25 +20,26 @@ class ApiClient {
   final http.Client _client;
   final String baseUrl;
 
-  Future<Map<String, dynamic>> postJson(String path, Map<String, dynamic> body) async {
+  Future<T> postJson<T>(String path, Map<String, dynamic> body, {String? accessToken}) async {
+    final headers = <String, String>{'content-type': 'application/json'};
+    if (accessToken != null) headers['authorization'] = 'Bearer $accessToken';
     final response = await _client.post(
       Uri.parse('$baseUrl$path'),
-      headers: const {'content-type': 'application/json'},
+      headers: headers,
       body: jsonEncode(body),
     );
-
-    return _decode(response);
+    return _decode<T>(response);
   }
 
-  Future<Map<String, dynamic>> getJson(String path, {String? accessToken}) async {
+  Future<T> getJson<T>(String path, {String? accessToken}) async {
     final headers = <String, String>{'accept': 'application/json'};
     if (accessToken != null) headers['authorization'] = 'Bearer $accessToken';
 
     final response = await _client.get(Uri.parse('$baseUrl$path'), headers: headers);
-    return _decode(response);
+    return _decode<T>(response);
   }
 
-  Map<String, dynamic> _decode(http.Response response) {
+  T _decode<T>(http.Response response) {
     dynamic decoded;
     try {
       decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
@@ -53,10 +54,7 @@ class ApiClient {
       throw ApiException(message, statusCode: response.statusCode);
     }
 
-    if (decoded is! Map<String, dynamic>) {
-      throw ApiException('Resposta inválida do servidor.', statusCode: response.statusCode);
-    }
-    return decoded;
+    return decoded as T;
   }
 
   void dispose() => _client.close();
