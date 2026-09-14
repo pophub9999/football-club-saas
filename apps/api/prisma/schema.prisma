@@ -60,6 +60,7 @@ model Tenant {
   competitions Competition[]
   teams Team[]
   fixtures Fixture[]
+  articles Article[]
   @@index([status])
   @@map("tenants")
 }
@@ -301,6 +302,25 @@ model Fixture {
   @@index([tenantId, homeTeamId, kickoffAt])
   @@index([tenantId, awayTeamId, kickoffAt])
   @@map("fixtures")
+}
+
+model Article {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  slug String @db.VarChar(180)
+  title String @db.VarChar(255)
+  excerpt String? @db.VarChar(500)
+  body String
+  imageUrl String?
+  category String? @db.VarChar(80)
+  publishedAt DateTime?
+  isPublished Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, slug])
+  @@index([tenantId, isPublished, publishedAt])
+  @@map("articles")
 }
 
 model AuditLog {
