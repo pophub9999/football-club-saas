@@ -7,64 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-  DELETED
-}
-
-enum MembershipStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  EXPIRED
-  CANCELLED
-}
-
-enum DueStatus {
-  OPEN
-  PARTIALLY_PAID
-  PAID
-  OVERDUE
-  CANCELLED
-}
-
-enum PaymentStatus {
-  PENDING
-  REQUIRES_ACTION
-  AUTHORIZED
-  PAID
-  FAILED
-  CANCELLED
-  REFUNDED
-  PARTIALLY_REFUNDED
-  DISPUTED
-}
-
-enum TicketStatus {
-  ISSUED
-  ACTIVE
-  USED
-  CANCELLED
-  EXPIRED
-  TRANSFERRED
-}
-
-enum TicketTransferStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  CANCELLED
-  EXPIRED
-}
-
-enum EntryScanResult {
-  ACCEPTED
-  REJECTED
-  ALREADY_USED
-  EXPIRED
-  CANCELLED
-}
+enum UserStatus { ACTIVE SUSPENDED DELETED }
+enum MembershipStatus { PENDING ACTIVE SUSPENDED EXPIRED CANCELLED }
+enum DueStatus { OPEN PARTIALLY_PAID PAID OVERDUE CANCELLED }
+enum PaymentStatus { PENDING REQUIRES_ACTION AUTHORIZED PAID FAILED CANCELLED REFUNDED PARTIALLY_REFUNDED DISPUTED }
+enum TicketStatus { ISSUED ACTIVE USED CANCELLED EXPIRED TRANSFERRED }
+enum TicketTransferStatus { PENDING ACCEPTED DECLINED CANCELLED EXPIRED }
+enum EntryScanResult { ACCEPTED REJECTED ALREADY_USED EXPIRED CANCELLED }
 
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
@@ -331,6 +280,7 @@ model Fixture {
   competition Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
   homeTeam Team @relation("FixtureHomeTeam", fields: [homeTeamId], references: [id], onDelete: Restrict)
   awayTeam Team @relation("FixtureAwayTeam", fields: [awayTeamId], references: [id], onDelete: Restrict)
+  ticketEvents TicketEvent[]
   @@unique([tenantId, provider, externalId])
   @@index([tenantId, kickoffAt])
   @@index([tenantId, homeTeamId, kickoffAt])
@@ -442,9 +392,8 @@ model TicketTransfer {
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   fromUser User @relation("TicketTransferSender", fields: [fromUserId], references: [id], onDelete: Cascade)
   toUser User @relation("TicketTransferRecipient", fields: [toUserId], references: [id], onDelete: Cascade)
-  @@index([tenantId, fromUserId, status])
-  @@index([tenantId, toUserId, status])
   @@index([tenantId, ticketId, status])
+  @@index([tenantId, toUserId, status])
   @@map("ticket_transfers")
 }
 
@@ -455,13 +404,12 @@ model EntryScan {
   scannerId String? @db.Uuid
   result EntryScanResult
   scannedAt DateTime @default(now())
-  gate String? @db.VarChar(80)
   deviceId String? @db.VarChar(160)
-  reason String? @db.VarChar(255)
+  metadata Json?
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   @@index([tenantId, ticketId, scannedAt])
-  @@index([tenantId, scannedAt])
+  @@index([tenantId, result, scannedAt])
   @@map("entry_scans")
 }
 
