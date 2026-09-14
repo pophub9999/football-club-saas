@@ -64,7 +64,10 @@ class HomeData {
   final Map<String, dynamic> member;
   final Map<String, dynamic> dues;
 
-  ClubBranding get branding => ClubBranding.fromJson(Map<String, dynamic>.from(club['branding'] as Map));
+  ClubBranding get branding => ClubBranding.fromJson({
+        'club': club,
+        'branding': club['branding'],
+      });
 
   factory HomeData.fromJson(Map<String, dynamic> json) {
     return HomeData(
