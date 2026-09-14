@@ -1,4 +1,5 @@
 import { Controller, Get, NotFoundException, UseGuards } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRequest } from '../auth/user-request';
@@ -96,8 +97,14 @@ export class MeController {
       status: due.status === 'OPEN' && due.dueDate < now ? 'OVERDUE' : due.status,
       outstandingAmount: due.amount.minus(due.paidAmount),
     }));
-    const outstandingDues = dues.filter((due) => due.status === 'OPEN' || due.status === 'PARTIALLY_PAID' || due.status === 'OVERDUE');
+    const outstandingDues = dues.filter(
+      (due) => due.status === 'OPEN' || due.status === 'PARTIALLY_PAID' || due.status === 'OVERDUE',
+    );
     const nextDue = outstandingDues[0] ?? null;
+    const outstandingAmount = outstandingDues.reduce(
+      (total, due) => total.plus(due.outstandingAmount),
+      new Prisma.Decimal(0),
+    );
 
     return {
       club: {
@@ -135,7 +142,7 @@ export class MeController {
         membership: member.memberships[0] ?? null,
       },
       dues: {
-        outstandingAmount: outstandingDues.reduce((total, due) => total.plus(due.outstandingAmount), new (require('@prisma/client').Prisma.Decimal)(0)),
+        outstandingAmount,
         nextDue,
         items: dues,
       },
