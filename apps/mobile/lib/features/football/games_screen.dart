@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/branding/club_branding.dart';
 import 'football_repository.dart';
+import 'match_centre_screen.dart';
 import 'matchday_screen.dart';
 
 class GamesScreen extends StatefulWidget {
@@ -98,6 +99,7 @@ class _GamesScreenState extends State<GamesScreen> {
     final date = fixture.kickoffAt;
     final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
     final timeLabel = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    final hasScore = fixture.homeScore != null && fixture.awayScore != null;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: b.primaryColor.withValues(alpha: .12))),
@@ -109,7 +111,12 @@ class _GamesScreenState extends State<GamesScreen> {
         const SizedBox(height: 18),
         Row(children: [
           Expanded(child: _team(fixture.homeName, fixture.homeTeam['logoUrl'] as String?, b, Alignment.centerLeft)),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('VS', style: TextStyle(color: b.mutedTextColor, fontWeight: FontWeight.w800))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: hasScore
+                ? Text('${fixture.homeScore} : ${fixture.awayScore}', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w900, fontSize: 18))
+                : Text('VS', style: TextStyle(color: b.mutedTextColor, fontWeight: FontWeight.w800)),
+          ),
           Expanded(child: _team(fixture.awayName, fixture.awayTeam['logoUrl'] as String?, b, Alignment.centerRight)),
         ]),
         if (fixture.venueName != null) ...[
@@ -117,16 +124,19 @@ class _GamesScreenState extends State<GamesScreen> {
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.location_on_outlined, size: 15, color: b.mutedTextColor), const SizedBox(width: 4), Text('${fixture.venueName}${fixture.venueCity == null ? '' : ' · ${fixture.venueCity}'}', style: TextStyle(color: b.mutedTextColor, fontSize: 12))]),
         ],
         const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => MatchdayScreen(branding: b, api: widget.api, accessToken: widget.accessToken, fixture: fixture),
-            )),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MatchCentreScreen(branding: b, api: widget.api, accessToken: widget.accessToken, fixture: fixture))),
+            icon: const Icon(Icons.analytics_outlined),
+            label: const Text('Match Centre'),
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MatchdayScreen(branding: b, api: widget.api, accessToken: widget.accessToken, fixture: fixture))),
             icon: const Icon(Icons.stadium_outlined),
             label: const Text('Dia de jogo'),
-          ),
-        ),
+          )),
+        ]),
       ]),
     );
   }
