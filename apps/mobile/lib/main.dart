@@ -54,6 +54,13 @@ class _FootballClubAppState extends State<FootballClubApp> {
     setState(() { _session = null; _authenticatedBranding = null; });
   }
 
+  bool get _canScan {
+    final roles = _session?.user['roles'];
+    if (roles is! List) return false;
+    const scannerRoles = {'club_owner', 'club_admin', 'ticket_admin', 'stadium_manager'};
+    return roles.whereType<String>().any(scannerRoles.contains);
+  }
+
   @override void dispose() { _api.dispose(); super.dispose(); }
 
   @override
@@ -63,7 +70,11 @@ class _FootballClubAppState extends State<FootballClubApp> {
       debugShowCheckedModeBanner: false,
       title: branding.name,
       theme: buildAppTheme(branding),
-      home: _restoring ? _SplashScreen(branding: branding) : _session == null ? LoginScreen(branding: branding, onAuthenticated: _authenticated) : HomeScreen(branding: branding, api: _api, accessToken: _session!.accessToken, onLogout: _logout),
+      home: _restoring
+          ? _SplashScreen(branding: branding)
+          : _session == null
+              ? LoginScreen(branding: branding, onAuthenticated: _authenticated)
+              : HomeScreen(branding: branding, api: _api, accessToken: _session!.accessToken, onLogout: _logout, canScan: _canScan),
     );
   }
 }
