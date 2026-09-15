@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/branding/club_branding.dart';
 import '../tickets/tickets_screen.dart';
 import 'football_repository.dart';
+import 'player_screen.dart';
 
 class MatchdayScreen extends StatefulWidget {
   const MatchdayScreen({super.key, required this.branding, required this.api, required this.accessToken, required this.fixture});
@@ -187,9 +188,18 @@ class _MatchdayScreenState extends State<MatchdayScreen> {
 
   Widget _playerTile(Map<String, dynamic> item, ClubBranding b) {
     final player = _playerName(item['player']) ?? _string(item['player_name']) ?? 'Jogador';
+    final playerId = item['player'] is Map ? item['player']['id']?.toString() : item['player_id']?.toString();
     final jersey = item['jersey_number']?.toString() ?? item['jersey']?.toString();
     final position = _string(item['formation_position']) ?? _string(item['position']);
-    return ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: CircleAvatar(radius: 18, backgroundColor: b.primaryColor.withValues(alpha: .12), child: Text(jersey ?? '•', style: TextStyle(color: b.primaryColor, fontWeight: FontWeight.w800))), title: Text(player, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), subtitle: position == null ? null : Text(position, style: TextStyle(color: b.mutedTextColor)));
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      leading: CircleAvatar(radius: 18, backgroundColor: b.primaryColor.withValues(alpha: .12), child: Text(jersey ?? '•', style: TextStyle(color: b.primaryColor, fontWeight: FontWeight.w800))),
+      title: Text(player, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
+      subtitle: position == null ? null : Text(position, style: TextStyle(color: b.mutedTextColor)),
+      trailing: playerId == null ? null : Icon(Icons.chevron_right, color: b.mutedTextColor),
+      onTap: playerId == null ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PlayerScreen(branding: b, api: widget.api, accessToken: widget.accessToken, playerId: playerId))),
+    );
   }
 
   Widget _statsSection(List<Map<String, dynamic>> items, FixtureSummary fixture, ClubBranding b) {
