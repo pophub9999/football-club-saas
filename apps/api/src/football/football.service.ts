@@ -1,11 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { MockFootballProvider } from './mock-football.provider';
-import { FootballFixture } from './football.types';
+import { FootballFixture, FootballProvider } from './football.types';
 
 @Injectable()
 export class FootballService {
-  constructor(private readonly prisma: PrismaService, private readonly provider: MockFootballProvider) {}
+  constructor(private readonly prisma: PrismaService, private readonly provider: FootballProvider) {}
 
   async getUpcomingFixtures(tenantId: string, limit = 10, from = new Date()) {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
@@ -22,9 +21,12 @@ export class FootballService {
   async getFixture(tenantId: string, fixtureId: string) {
     const fixture = await this.prisma.fixture.findFirst({ where: { id: fixtureId, tenantId }, include: { competition: true, homeTeam: true, awayTeam: true } });
     if (!fixture) throw new NotFoundException('Fixture not found');
-    // Provider-shaped sections are exposed now so the mobile contract is stable.
-    // They remain empty until a live football provider supplies those datasets.
-    return { ...fixture, events: [], lineups: [], stats: [] };
+
+    const details = this.provider.getFixtureDetails
+      ? await this.provider.getFixtureDetails(fixture.externalId)
+      : { events: [], lineups: [], stats: [] };
+
+    return { ...fixture, ...details };
   }
 
   async syncUpcomingFixtures(tenantId: string, days = 45) {
