@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/branding/club_branding.dart';
 import 'football_repository.dart';
+import 'matchday_screen.dart';
 
 class GamesScreen extends StatefulWidget {
   const GamesScreen({super.key, required this.branding, required this.api, required this.accessToken});
@@ -115,6 +116,17 @@ class _GamesScreenState extends State<GamesScreen> {
           const SizedBox(height: 14),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.location_on_outlined, size: 15, color: b.mutedTextColor), const SizedBox(width: 4), Text('${fixture.venueName}${fixture.venueCity == null ? '' : ' · ${fixture.venueCity}'}', style: TextStyle(color: b.mutedTextColor, fontSize: 12))]),
         ],
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => MatchdayScreen(branding: b, api: widget.api, accessToken: widget.accessToken, fixture: fixture),
+            )),
+            icon: const Icon(Icons.stadium_outlined),
+            label: const Text('Dia de jogo'),
+          ),
+        ),
       ]),
     );
   }
