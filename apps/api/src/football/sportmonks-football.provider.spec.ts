@@ -149,6 +149,49 @@ describe('SportmonksFootballProvider', () => {
     );
   });
 
+  it('maps a player profile and statistics', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          id: 758,
+          name: 'James Tavernier',
+          display_name: 'J. Tavernier',
+          image_path: 'https://cdn.example/player.png',
+          date_of_birth: '1991-10-31',
+          height: 182,
+          weight: 72,
+          nationality: { name: 'England' },
+          position: { name: 'Defender' },
+          detailedPosition: { name: 'Right Back' },
+          teams: [{ team: { id: 1, name: 'Rangers' } }],
+          statistics: [{ team: { name: 'Rangers' }, season: { name: '2026/27', league: { name: 'League' } }, details: [{ type: { name: 'Goals' }, value: 4 }] }],
+        },
+      }),
+    } as Response);
+
+    const config = {
+      get: jest.fn((key: string) => key === 'SPORTMONKS_API_TOKEN' ? 'test-token' : undefined),
+    } as unknown as ConfigService;
+    const provider = new SportmonksFootballProvider(config);
+
+    await expect(provider.getPlayer('758', '19735')).resolves.toEqual(expect.objectContaining({
+      externalId: '758',
+      name: 'James Tavernier',
+      displayName: 'J. Tavernier',
+      imageUrl: 'https://cdn.example/player.png',
+      nationality: 'England',
+      position: 'Defender',
+      detailedPosition: 'Right Back',
+      teams: expect.any(Array),
+      statistics: expect.any(Array),
+    }));
+
+    const fetchMock = global.fetch as jest.Mock;
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(expect.stringContaining('/players/758'));
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(expect.stringContaining('filters=playerStatisticSeasons%3A19735'));
+  });
+
   it('fails clearly when no Sportmonks token is configured', async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock;
