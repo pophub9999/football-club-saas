@@ -9,6 +9,8 @@ jest.mock('node:crypto', () => ({
 describe('NotificationsService', () => {
   const pushProvider = { send: jest.fn().mockResolvedValue({ sent: 1, invalidTokens: [] }) };
 
+  beforeEach(() => jest.clearAllMocks());
+
   it('returns defaults when the user has no saved preferences', async () => {
     const prisma = { $queryRaw: jest.fn().mockResolvedValue([]), $executeRaw: jest.fn() } as any;
     const service = new NotificationsService(prisma, pushProvider);
@@ -76,6 +78,39 @@ describe('NotificationsService', () => {
     await expect(service.sendToUser('user-1', 'tenant-1', { title: 'Test', body: 'Hello' })).resolves.toEqual({
       sent: 0,
       skipped: true,
+      skipReason: 'notifications_disabled',
+      invalidTokens: [],
+    });
+    expect(pushProvider.send).not.toHaveBeenCalled();
+  });
+
+  it('does not send matchday notifications when matchday is disabled', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ notifications: true, matchday: false, marketing: false }]),
+      $executeRaw: jest.fn(),
+    } as any;
+    const service = new NotificationsService(prisma, pushProvider);
+
+    await expect(service.sendMatchdayNotification('user-1', 'tenant-1', { title: 'Dia de jogo', body: 'Hoje há jogo' })).resolves.toEqual({
+      sent: 0,
+      skipped: true,
+      skipReason: 'matchday_disabled',
+      invalidTokens: [],
+    });
+    expect(pushProvider.send).not.toHaveBeenCalled();
+  });
+
+  it('does not send marketing notifications when marketing is disabled', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ notifications: true, matchday: true, marketing: false }]),
+      $executeRaw: jest.fn(),
+    } as any;
+    const service = new NotificationsService(prisma, pushProvider);
+
+    await expect(service.sendMarketingNotification('user-1', 'tenant-1', { title: 'Oferta', body: 'Nova vantagem' })).resolves.toEqual({
+      sent: 0,
+      skipped: true,
+      skipReason: 'marketing_disabled',
       invalidTokens: [],
     });
     expect(pushProvider.send).not.toHaveBeenCalled();
