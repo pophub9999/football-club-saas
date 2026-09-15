@@ -44,14 +44,33 @@ class _GamesScreenState extends State<GamesScreen> {
     final b = widget.branding;
     return RefreshIndicator(
       onRefresh: _load,
-      child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
-        SliverPadding(padding: const EdgeInsets.fromLTRB(20, 22, 20, 8), sliver: SliverToBoxAdapter(child: Row(children: [Expanded(child: Text('Jogos', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: b.textColor, fontWeight: FontWeight.w800))), IconButton(onPressed: _openStandings, tooltip: 'Classificação', icon: Icon(Icons.emoji_events_outlined, color: b.primaryColor))]))),
-        SliverPadding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), sliver: SliverToBoxAdapter(child: Row(children: [Expanded(child: Text('Próximos jogos do clube', style: TextStyle(color: b.mutedTextColor))), TextButton.icon(onPressed: _openStandings, icon: const Icon(Icons.leaderboard_outlined, size: 18), label: const Text('Tabela'))])),
-        if (loading && fixtures.isEmpty) const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
-        else if (error != null && fixtures.isEmpty) SliverFillRemaining(child: _message('Não foi possível carregar os jogos.', 'Tentar novamente', _load))
-        else if (fixtures.isEmpty) SliverFillRemaining(child: _message('Ainda não existem jogos disponíveis.', 'Atualizar', _load))
-        else SliverList.builder(itemCount: fixtures.length, itemBuilder: (_, index) => Padding(padding: EdgeInsets.fromLTRB(20, index == 0 ? 0 : 8, 20, index == fixtures.length - 1 ? 24 : 0), child: _fixtureCard(fixtures[index], b))),
-      ]),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(children: [
+                Expanded(child: Text('Jogos', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: b.textColor, fontWeight: FontWeight.w800))),
+                IconButton(onPressed: _openStandings, tooltip: 'Classificação', icon: Icon(Icons.emoji_events_outlined, color: b.primaryColor)),
+              ]),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            sliver: SliverToBoxAdapter(
+              child: Row(children: [
+                Expanded(child: Text('Próximos jogos do clube', style: TextStyle(color: b.mutedTextColor))),
+                TextButton.icon(onPressed: _openStandings, icon: const Icon(Icons.leaderboard_outlined, size: 18), label: const Text('Tabela')),
+              ]),
+            ),
+          ),
+          if (loading && fixtures.isEmpty) const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+          else if (error != null && fixtures.isEmpty) SliverFillRemaining(child: _message('Não foi possível carregar os jogos.', 'Tentar novamente', _load))
+          else if (fixtures.isEmpty) SliverFillRemaining(child: _message('Ainda não existem jogos disponíveis.', 'Atualizar', _load))
+          else SliverList.builder(itemCount: fixtures.length, itemBuilder: (_, index) => Padding(padding: EdgeInsets.fromLTRB(20, index == 0 ? 0 : 8, 20, index == fixtures.length - 1 ? 24 : 0), child: _fixtureCard(fixtures[index], b))),
+        ],
+      ),
     );
   }
 
