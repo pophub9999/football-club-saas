@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FootballFixture, FootballFixtureDetails, FootballProvider, FootballStanding } from './football.types';
+import { FootballFixture, FootballFixtureDetails, FootballPlayer, FootballProvider, FootballStanding } from './football.types';
 
 interface SportmonksResponse {
   data?: Record<string, any>[] | Record<string, any>;
@@ -22,11 +22,12 @@ export class SportmonksFootballProvider implements FootballProvider {
     if (!this.token) throw new ServiceUnavailableException('Sportmonks provider is not configured');
   }
 
-  private async request(path: string, include?: string): Promise<Record<string, any> | Record<string, any>[]> {
+  private async request(path: string, include?: string, filters?: string): Promise<Record<string, any> | Record<string, any>[]> {
     this.ensureConfigured();
     const url = new URL(`${this.baseUrl}${path}`);
     url.searchParams.set('api_token', this.token);
     if (include) url.searchParams.set('include', include);
+    if (filters) url.searchParams.set('filters', filters);
 
     const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
     const payload = (await response.json()) as SportmonksResponse;
@@ -57,6 +58,32 @@ export class SportmonksFootballProvider implements FootballProvider {
     const data = await this.request(`/standings/seasons/${encodeURIComponent(seasonExternalId)}`, 'participant;league;details.type');
     if (!Array.isArray(data)) throw new ServiceUnavailableException('Invalid Sportmonks standings response');
     return data.map((item) => this.mapStanding(item));
+  }
+
+  async getPlayer(externalPlayerId: string, seasonExternalId?: string): Promise<FootballPlayer> {
+    const include = 'nationality;position;detailedPosition;teams.team;statistics.details.type;statistics.team;statistics.season.league';
+    const filters = seasonExternalId ? `playerStatisticSeasons:${encodeURIComponent(seasonExternalId)}` : undefined;
+    const data = await this.request(`/players/${encodeURIComponent(externalPlayerId)}`, include, filters);
+    if (Array.isArray(data)) throw new ServiceUnavailableException('Invalid Sportmonks player response');
+
+    const player: FootballPlayer = {
+      externalId: String(data.id ?? externalPlayerId),
+      name: String(data.name ?? data.display_name ?? data.common_name ?? 'Jogador'),
+      teams: Array.isArray(data.teams) ? data.teams : [],
+      statistics: Array.isArray(data.statistics) ? data.statistics : [],
+    };
+    if (data.display_name != null) player.displayName = String(data.display_name);
+    if (data.image_path != null) player.imageUrl = String(data.image_path);
+    const nationality = data.nationality?.name ?? data.nationality?.nationality ?? data.nationality;
+    if (nationality != null) player.nationality = String(nationality);
+    if (data.date_of_birth != null) player.birthDate = String(data.date_of_birth);
+    if (typeof data.height === 'number') player.height = data.height;
+    if (typeof data.weight === 'number') player.weight = data.weight;
+    const position = data.position?.name ?? data.position;
+    const detailedPosition = data.detailedPosition?.name ?? data.detailed_position?.name ?? data.detailedPosition;
+    if (position != null) player.position = String(position);
+    if (detailedPosition != null) player.detailedPosition = String(detailedPosition);
+    return player;
   }
 
   private mapFixture(item: Record<string, any>): FootballFixture {
