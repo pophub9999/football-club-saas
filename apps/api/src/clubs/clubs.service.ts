@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
 import { UpdateMatchdayDto } from './dto/update-matchday.dto';
@@ -55,9 +56,9 @@ export class ClubsService {
     const current = existing?.homeConfiguration && typeof existing.homeConfiguration === 'object' && !Array.isArray(existing.homeConfiguration)
       ? existing.homeConfiguration as Record<string, unknown> : {};
     const matchday = { ...DEFAULT_MATCHDAY, ...(current.matchday as Record<string, unknown> | undefined), ...dto };
-    const homeConfiguration = { ...current, matchday };
+    const homeConfiguration = JSON.parse(JSON.stringify({ ...current, matchday })) as Prisma.InputJsonValue;
     const settings = await this.prisma.tenantSettings.upsert({ where: { tenantId }, create: { tenantId, homeConfiguration }, update: { homeConfiguration } });
-    await this.prisma.auditLog.create({ data: { tenantId, userId, action: 'matchday.updated', resource: 'tenant_settings', resourceId: settings.id, metadata: { matchday } } });
+    await this.prisma.auditLog.create({ data: { tenantId, userId, action: 'matchday.updated', resource: 'tenant_settings', resourceId: settings.id, metadata: { matchday: JSON.parse(JSON.stringify(matchday)) } } });
     return matchday;
   }
 }
