@@ -143,6 +143,55 @@ class FootballStandings {
       );
 }
 
+class FootballPlayer {
+  const FootballPlayer({
+    required this.externalId,
+    required this.name,
+    required this.teams,
+    required this.statistics,
+    this.displayName,
+    this.imageUrl,
+    this.nationality,
+    this.birthDate,
+    this.height,
+    this.weight,
+    this.position,
+    this.detailedPosition,
+  });
+
+  final String externalId;
+  final String name;
+  final String? displayName;
+  final String? imageUrl;
+  final String? nationality;
+  final String? birthDate;
+  final int? height;
+  final int? weight;
+  final String? position;
+  final String? detailedPosition;
+  final List<Map<String, dynamic>> teams;
+  final List<Map<String, dynamic>> statistics;
+
+  factory FootballPlayer.fromJson(Map<String, dynamic> json) => FootballPlayer(
+        externalId: json['externalId'] as String? ?? '',
+        name: json['name'] as String? ?? 'Jogador',
+        displayName: json['displayName'] as String?,
+        imageUrl: json['imageUrl'] as String?,
+        nationality: json['nationality'] as String?,
+        birthDate: json['birthDate'] as String?,
+        height: (json['height'] as num?)?.toInt(),
+        weight: (json['weight'] as num?)?.toInt(),
+        position: json['position'] as String?,
+        detailedPosition: json['detailedPosition'] as String?,
+        teams: _list(json['teams']),
+        statistics: _list(json['statistics']),
+      );
+
+  static List<Map<String, dynamic>> _list(dynamic value) => value is List
+      ? value.map((item) => Map<String, dynamic>.from(item as Map)).toList(growable: false)
+      : const [];
+}
+
 class FootballRepository {
   FootballRepository(this.api);
 
@@ -166,5 +215,11 @@ class FootballRepository {
     final json = await api.getJson('/football/standings/current', accessToken: accessToken);
     if (json is! Map) throw const FormatException('Invalid standings response');
     return FootballStandings.fromJson(Map<String, dynamic>.from(json));
+  }
+
+  Future<FootballPlayer> player(String accessToken, String playerId) async {
+    final json = await api.getJson('/football/players/$playerId', accessToken: accessToken);
+    if (json is! Map) throw const FormatException('Invalid player response');
+    return FootballPlayer.fromJson(Map<String, dynamic>.from(json));
   }
 }
