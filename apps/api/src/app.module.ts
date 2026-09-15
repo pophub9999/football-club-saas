@@ -9,6 +9,7 @@ import { FootballModule } from './football/football.module';
 import { HealthModule } from './health/health.module';
 import { MembershipModule } from './membership/membership.module';
 import { MeModule } from './me/me.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { TenancyModule } from './tenancy/tenancy.module';
 import { TicketsModule } from './tickets/tickets.module';
@@ -26,6 +27,7 @@ import { TicketsModule } from './tickets/tickets.module';
     HealthModule,
     MeModule,
     MembershipModule,
+    NotificationsModule,
     PaymentsModule,
     TicketsModule,
   ],
