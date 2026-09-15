@@ -21,6 +21,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool notifications = true;
   bool matchday = true;
   bool marketing = false;
+  bool loadingPreferences = true;
+  String? preferencesError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final data = await widget.api.getJson<Map<String, dynamic>>('/notifications/preferences', accessToken: widget.accessToken);
+      if (!mounted) return;
+      setState(() {
+        notifications = data['notifications'] == true;
+        matchday = data['matchday'] == true;
+        marketing = data['marketing'] == true;
+        loadingPreferences = false;
+        preferencesError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        loadingPreferences = false;
+        preferencesError = 'Não foi possível carregar as preferências. Foram mantidos os valores predefinidos.';
+      });
+    }
+  }
+
+  Future<void> _setPreference(String key, bool value) async {
+    final previous = <String, bool>{
+      'notifications': notifications,
+      'matchday': matchday,
+      'marketing': marketing,
+    };
+    setState(() {
+      if (key == 'notifications') notifications = value;
+      if (key == 'matchday') matchday = value;
+      if (key == 'marketing') marketing = value;
+      preferencesError = null;
+    });
+
+    try {
+      final data = await widget.api.patchJson<Map<String, dynamic>>('/notifications/preferences', {key: value}, accessToken: widget.accessToken);
+      if (!mounted) return;
+      setState(() {
+        notifications = data['notifications'] == true;
+        matchday = data['matchday'] == true;
+        marketing = data['marketing'] == true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        notifications = previous['notifications']!;
+        matchday = previous['matchday']!;
+        marketing = previous['marketing']!;
+        preferencesError = 'Não foi possível guardar esta alteração.';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,9 +96,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _tile(Icons.qr_code_scanner, 'Scanner de entradas', 'Validar bilhetes na entrada do estádio', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScannerScreen(branding: b, api: widget.api, accessToken: widget.accessToken)))),
           ],
           _section('Notificações'),
-          _switchTile('Notificações gerais', notifications, (v) => setState(() => notifications = v)),
-          _switchTile('Jogos e resultados', matchday, (v) => setState(() => matchday = v)),
-          _switchTile('Ofertas e comunicações', marketing, (v) => setState(() => marketing = v)),
+          if (loadingPreferences)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: LinearProgressIndicator())
+          else ...[
+            _switchTile('Notificações gerais', notifications, (v) => _setPreference('notifications', v)),
+            _switchTile('Jogos e resultados', matchday, (v) => _setPreference('matchday', v)),
+            _switchTile('Ofertas e comunicações', marketing, (v) => _setPreference('marketing', v)),
+          ],
+          if (preferencesError != null)
+            Padding(padding: const EdgeInsets.only(top: 4), child: Text(preferencesError!, style: TextStyle(color: b.mutedTextColor, fontSize: 12))),
           _section('Conta e privacidade'),
           _tile(Icons.person_outline, 'Dados pessoais', 'Consultar e atualizar os teus dados'),
           _tile(Icons.privacy_tip_outlined, 'Privacidade', 'Consentimentos e utilização dos teus dados'),
