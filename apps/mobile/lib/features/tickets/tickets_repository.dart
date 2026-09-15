@@ -51,15 +51,17 @@ class Ticket {
 }
 
 class TicketQr {
-  TicketQr({required this.ticketId, required this.active, this.payload});
+  TicketQr({required this.ticketId, required this.active, this.payload, this.expiresAt});
   final String ticketId;
   final bool active;
   final String? payload;
+  final DateTime? expiresAt;
 
   factory TicketQr.fromJson(Map<String, dynamic> json) => TicketQr(
         ticketId: json['ticketId'] as String,
         active: json['active'] as bool? ?? false,
         payload: json['payload'] as String?,
+        expiresAt: json['expiresAt'] == null ? null : DateTime.parse(json['expiresAt'] as String),
       );
 }
 
