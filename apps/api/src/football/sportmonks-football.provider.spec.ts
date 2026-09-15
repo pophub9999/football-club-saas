@@ -64,7 +64,7 @@ describe('SportmonksFootballProvider', () => {
       }),
     ]);
     const fetchMock = global.fetch as jest.Mock;
-    expect(fetchMock.mock.calls[0][0]).toEqual(
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(
       expect.stringContaining('/fixtures/between/2026-09-19/2026-09-21'),
     );
   });
@@ -93,7 +93,7 @@ describe('SportmonksFootballProvider', () => {
       stats: [{ id: 3, value: 55 }],
     });
     const fetchMock = global.fetch as jest.Mock;
-    expect(fetchMock.mock.calls[0][0]).toEqual(
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(
       expect.stringContaining('/fixtures/123'),
     );
   });
