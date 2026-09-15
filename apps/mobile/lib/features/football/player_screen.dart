@@ -89,8 +89,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Card(color: b.surfaceColor, margin: EdgeInsets.zero, child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _title(b, Icons.shield_outlined, 'Equipas'),
       const SizedBox(height: 8),
-      ...names.map((name) => ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: Icon(Icons.shield_outlined, color: b.primaryColor), title: Text(name, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)))),
-    ]));
+      ...names.map((name) => ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: Icon(Icons.shield_outlined, color: b.primaryColor), title: Text(name, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700))),
+    ])));
   }
 
   Widget _statsCard(ClubBranding b, FootballPlayer p) {
@@ -99,7 +99,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _title(b, Icons.bar_chart_outlined, 'Estatísticas'),
       const SizedBox(height: 10),
       ...p.statistics.asMap().entries.map((entry) => _statBlock(b, entry.key + 1, entry.value)),
-    ]));
+    ])));
   }
 
   Widget _statBlock(ClubBranding b, int index, Map<String, dynamic> stat) {
