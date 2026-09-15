@@ -6,161 +6,24 @@ import '../tickets/tickets_screen.dart';
 import 'football_repository.dart';
 import 'matchday_screen.dart';
 
-class MatchdayModeScreen extends StatelessWidget {
-  const MatchdayModeScreen({
-    super.key,
-    required this.branding,
-    required this.api,
-    required this.accessToken,
-    required this.fixture,
-  });
+class MatchdayModeScreen extends StatefulWidget {
+  const MatchdayModeScreen({super.key,required this.branding,required this.api,required this.accessToken,required this.fixture});
+  final ClubBranding branding; final ApiClient api; final String accessToken; final FixtureSummary fixture;
+  @override State<MatchdayModeScreen> createState()=>_MatchdayModeScreenState();
+}
 
-  final ClubBranding branding;
-  final ApiClient api;
-  final String accessToken;
-  final FixtureSummary fixture;
-
-  @override
-  Widget build(BuildContext context) {
-    final b = branding;
-    final date = fixture.kickoffAt;
-    final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    final timeLabel = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    return Scaffold(
-      backgroundColor: b.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Dia de jogo'),
-        backgroundColor: b.surfaceColor,
-        foregroundColor: b.textColor,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        children: [
-          _hero(b, dateLabel, timeLabel),
-          const SizedBox(height: 16),
-          _action(
-            context,
-            b,
-            Icons.analytics_outlined,
-            'Match Centre',
-            'Resultado, eventos, equipas e estatísticas',
-            () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => MatchdayScreen(
-                branding: b,
-                api: api,
-                accessToken: accessToken,
-                fixture: fixture,
-              ),
-            )),
-          ),
-          const SizedBox(height: 10),
-          _action(
-            context,
-            b,
-            Icons.confirmation_number_outlined,
-            'Os meus bilhetes',
-            'Abrir bilhete e QR de entrada',
-            () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => TicketsScreen(
-                branding: b,
-                api: api,
-                accessToken: accessToken,
-              ),
-            )),
-          ),
-          const SizedBox(height: 10),
-          _info(b, Icons.login_outlined, 'Entradas', 'Portas, acessos e instruções serão configurados pelo clube.'),
-          const SizedBox(height: 10),
-          _info(b, Icons.local_parking_outlined, 'Estacionamento', 'Parques e recomendações de acesso serão configurados pelo clube.'),
-          const SizedBox(height: 10),
-          _info(
-            b,
-            Icons.directions_outlined,
-            'Como chegar',
-            fixture.venueName == null
-                ? 'Localização ainda não definida.'
-                : '${fixture.venueName}${fixture.venueCity == null ? '' : ' · ${fixture.venueCity}'}',
-          ),
-          const SizedBox(height: 10),
-          _info(b, Icons.notifications_active_outlined, 'Notificações do jogo', 'Preferências push serão ligadas ao sistema de notificações do clube.'),
-        ],
-      ),
-    );
-  }
-
-  Widget _hero(ClubBranding b, String date, String time) {
-    final score = fixture.homeScore != null && fixture.awayScore != null
-        ? '${fixture.homeScore}  -  ${fixture.awayScore}'
-        : 'VS';
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [b.primaryColor, b.secondaryColor]),
-        borderRadius: BorderRadius.circular(26),
-      ),
-      child: Column(
-        children: [
-          Text(fixture.competitionName ?? 'Jogo', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _team(fixture.homeName, fixture.homeTeam['logoUrl'] as String?)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Text(score, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-              ),
-              Expanded(child: _team(fixture.awayName, fixture.awayTeam['logoUrl'] as String?, right: true)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(fixture.status, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text('$date · $time', style: const TextStyle(color: Colors.white70)),
-          if (fixture.venueName != null) ...[
-            const SizedBox(height: 5),
-            Text('${fixture.venueName}${fixture.venueCity == null ? '' : ' · ${fixture.venueCity}'}', style: const TextStyle(color: Colors.white70)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _team(String name, String? logoUrl, {bool right = false}) => Column(
-        crossAxisAlignment: right ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), shape: BoxShape.circle),
-            child: logoUrl == null
-                ? const Icon(Icons.shield_outlined, color: Colors.white)
-                : ClipOval(child: Image.network(logoUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.shield_outlined, color: Colors.white))),
-          ),
-          const SizedBox(height: 8),
-          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: right ? TextAlign.right : TextAlign.left, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        ],
-      );
-
-  Widget _action(BuildContext context, ClubBranding b, IconData icon, String title, String subtitle, VoidCallback onTap) => Card(
-        color: b.surfaceColor,
-        margin: EdgeInsets.zero,
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-          leading: CircleAvatar(backgroundColor: b.primaryColor.withValues(alpha: .12), child: Icon(icon, color: b.primaryColor)),
-          title: Text(title, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
-          subtitle: Text(subtitle, style: TextStyle(color: b.mutedTextColor)),
-          trailing: Icon(Icons.chevron_right, color: b.mutedTextColor),
-          onTap: onTap,
-        ),
-      );
-
-  Widget _info(ClubBranding b, IconData icon, String title, String subtitle) => Card(
-        color: b.surfaceColor,
-        margin: EdgeInsets.zero,
-        child: ListTile(
-          leading: Icon(icon, color: b.primaryColor),
-          title: Text(title, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
-          subtitle: Text(subtitle, style: TextStyle(color: b.mutedTextColor)),
-        ),
-      );
+class _MatchdayModeScreenState extends State<MatchdayModeScreen> {
+  Map<String,dynamic> _config={}; bool _loading=true; String? _error;
+  @override void initState(){super.initState(); _load();}
+  Future<void> _load() async { try { final json=await widget.api.getJson('/clubs/current/matchday',accessToken:widget.accessToken); if(mounted)setState(()=>_config=json is Map?Map<String,dynamic>.from(json):{}); } catch(_){ if(mounted)setState(()=>_error='Não foi possível carregar as informações do dia de jogo.'); } finally { if(mounted)setState(()=>_loading=false); } }
+  List<Map<String,dynamic>> _list(String key)=>_config[key] is List?( _config[key] as List).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList(growable:false):const[];
+  @override Widget build(BuildContext context){ final b=widget.branding; final f=widget.fixture; final d=f.kickoffAt; final date='${d.day.toString().padLeft(2,'0')}/${d.month.toString().padLeft(2,'0')}/${d.year}'; final time='${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}'; final location=_config['location'] is Map?Map<String,dynamic>.from(_config['location'] as Map):{}; return Scaffold(backgroundColor:b.backgroundColor,appBar:AppBar(title:const Text('Dia de jogo'),backgroundColor:b.surfaceColor,foregroundColor:b.textColor),body:RefreshIndicator(onRefresh:_load,child:ListView(padding:const EdgeInsets.fromLTRB(20,20,20,32),children:[_hero(b,date,time),const SizedBox(height:16),_action(context,b,Icons.analytics_outlined,'Match Centre','Resultado, eventos, equipas e estatísticas',()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>MatchdayScreen(branding:b,api:widget.api,accessToken:widget.accessToken,fixture:f)))),const SizedBox(height:10),_action(context,b,Icons.confirmation_number_outlined,'Os meus bilhetes','Abrir bilhete e QR de entrada',()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>TicketsScreen(branding:b,api:widget.api,accessToken:widget.accessToken)))),if(_loading)const Padding(padding:EdgeInsets.all(24),child:Center(child:CircularProgressIndicator())),if(_error!=null)_info(b,Icons.error_outline,'Informação','$_error'),..._entrances(b),..._parking(b),_location(b,location),..._notices(b)]))); }
+  Widget _hero(ClubBranding b,String date,String time){ final f=widget.fixture; final score=f.homeScore!=null&&f.awayScore!=null?'${f.homeScore}  -  ${f.awayScore}':'VS'; return Container(padding:const EdgeInsets.all(22),decoration:BoxDecoration(gradient:LinearGradient(colors:[b.primaryColor,b.secondaryColor]),borderRadius:BorderRadius.circular(26)),child:Column(children:[Text(f.competitionName??'Jogo',style:const TextStyle(color:Colors.white70,fontWeight:FontWeight.w700)),const SizedBox(height:16),Row(children:[Expanded(child:_team(f.homeName,f.homeTeam['logoUrl'] as String?)),Padding(padding:const EdgeInsets.symmetric(horizontal:10),child:Text(score,style:const TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.w900))),Expanded(child:_team(f.awayName,f.awayTeam['logoUrl'] as String?,right:true))]),const SizedBox(height:16),Text(f.status,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w800)),const SizedBox(height:4),Text('$date · $time',style:const TextStyle(color:Colors.white70)),if(f.venueName!=null)...[const SizedBox(height:5),Text('${f.venueName}${f.venueCity==null?'':' · ${f.venueCity}'}',style:const TextStyle(color:Colors.white70))]])); }
+  Widget _team(String name,String? logoUrl,{bool right=false})=>Column(crossAxisAlignment:right?CrossAxisAlignment.end:CrossAxisAlignment.start,children:[Container(width:58,height:58,decoration:BoxDecoration(color:Colors.white.withValues(alpha:.14),shape:BoxShape.circle),child:logoUrl==null?const Icon(Icons.shield_outlined,color:Colors.white):ClipOval(child:Image.network(logoUrl,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.shield_outlined,color:Colors.white)))),const SizedBox(height:8),Text(name,maxLines:2,overflow:TextOverflow.ellipsis,textAlign:right?TextAlign.right:TextAlign.left,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w800))]);
+  List<Widget> _entrances(ClubBranding b)=>_list('entrances').isEmpty?[_info(b,Icons.login_outlined,'Entradas','O clube ainda não configurou os acessos.')]:[..._list('entrances').map((e)=>_info(b,Icons.login_outlined,e['name'] as String???'Entrada',e['instructions'] as String???''))];
+  List<Widget> _parking(ClubBranding b)=>[if(_list('parking').isNotEmpty)const SizedBox(height:10),..._list('parking').map((e)=>_info(b,Icons.local_parking_outlined,e['name'] as String???'Estacionamento',e['instructions'] as String???''))];
+  Widget _location(ClubBranding b,Map<String,dynamic> l){ final address=l['address'] as String?; final map=l['mapUrl'] as String?; final venue=widget.fixture.venueName==null?'': '${widget.fixture.venueName}${widget.fixture.venueCity==null?'':' · ${widget.fixture.venueCity}'}'; return Padding(padding:const EdgeInsets.only(top:10),child:Card(color:b.surfaceColor,margin:EdgeInsets.zero,child:ListTile(leading:Icon(Icons.directions_outlined,color:b.primaryColor),title:Text('Como chegar',style:TextStyle(color:b.textColor,fontWeight:FontWeight.w800)),subtitle:Text([if(venue.isNotEmpty)venue,if(address!=null&&address.isNotEmpty)address].join('\n').isEmpty?'Localização ainda não definida.':[if(venue.isNotEmpty)venue,if(address!=null&&address.isNotEmpty)address].join('\n'),style:TextStyle(color:b.mutedTextColor)),trailing:map==null?null:Icon(Icons.open_in_new,color:b.primaryColor)))); }
+  List<Widget> _notices(ClubBranding b)=>[if(_list('notices').isNotEmpty)const SizedBox(height:10),..._list('notices').map((e)=>_info(b,(e['important'] as bool?)==true?Icons.warning_amber_outlined:Icons.notifications_active_outlined,e['title'] as String???'Aviso',e['message'] as String???''))];
+  Widget _action(BuildContext context,ClubBranding b,IconData icon,String title,String subtitle,VoidCallback onTap)=>Card(color:b.surfaceColor,margin:EdgeInsets.zero,child:ListTile(contentPadding:const EdgeInsets.symmetric(horizontal:16,vertical:5),leading:CircleAvatar(backgroundColor:b.primaryColor.withValues(alpha:.12),child:Icon(icon,color:b.primaryColor)),title:Text(title,style:TextStyle(color:b.textColor,fontWeight:FontWeight.w800)),subtitle:Text(subtitle,style:TextStyle(color:b.mutedTextColor)),trailing:Icon(Icons.chevron_right,color:b.mutedTextColor),onTap:onTap));
+  Widget _info(ClubBranding b,IconData icon,String title,String subtitle)=>Padding(padding:const EdgeInsets.only(top:10),child:Card(color:b.surfaceColor,margin:EdgeInsets.zero,child:ListTile(leading:Icon(icon,color:b.primaryColor),title:Text(title,style:TextStyle(color:b.textColor,fontWeight:FontWeight.w800)),subtitle:Text(subtitle,style:TextStyle(color:b.mutedTextColor)))));
 }
