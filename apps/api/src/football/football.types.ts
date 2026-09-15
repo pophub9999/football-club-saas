@@ -50,9 +50,25 @@ export interface FootballStanding {
   result?: string;
 }
 
+export interface FootballPlayer {
+  externalId: string;
+  name: string;
+  displayName?: string;
+  imageUrl?: string;
+  nationality?: string;
+  birthDate?: string;
+  height?: number;
+  weight?: number;
+  position?: string;
+  detailedPosition?: string;
+  teams: Record<string, unknown>[];
+  statistics: Record<string, unknown>[];
+}
+
 export interface FootballProvider {
   readonly name: string;
   listUpcomingFixtures(tenantId: string, from: Date, to: Date): Promise<FootballFixture[]>;
   getFixtureDetails?(externalFixtureId: string): Promise<FootballFixtureDetails>;
   getStandings?(seasonExternalId: string): Promise<FootballStanding[]>;
+  getPlayer?(externalPlayerId: string, seasonExternalId?: string): Promise<FootballPlayer>;
 }
