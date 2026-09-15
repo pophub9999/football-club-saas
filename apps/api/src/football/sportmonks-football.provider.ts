@@ -60,18 +60,22 @@ export class SportmonksFootballProvider implements FootballProvider {
     const scores = Array.isArray(item.scores) ? item.scores : [];
     const homeScore = this.scoreFor(scores, home?.id);
     const awayScore = this.scoreFor(scores, away?.id);
-    return {
+
+    const fixture: FootballFixture = {
       externalId: String(item.id),
-      competitionExternalId: item.league_id == null ? undefined : String(item.league_id),
       homeTeamExternalId: String(home?.id ?? 'unknown-home'),
       awayTeamExternalId: String(away?.id ?? 'unknown-away'),
       kickoffAt: new Date(item.starting_at),
       status: String(item.state?.short_name ?? item.state?.name ?? 'SCHEDULED').toUpperCase(),
-      venueName: item.venue?.name ?? undefined,
-      venueCity: item.venue?.city ?? undefined,
-      homeScore,
-      awayScore,
     };
+
+    if (item.league_id != null) fixture.competitionExternalId = String(item.league_id);
+    if (item.venue?.name != null) fixture.venueName = String(item.venue.name);
+    if (item.venue?.city != null) fixture.venueCity = String(item.venue.city);
+    if (homeScore !== undefined) fixture.homeScore = homeScore;
+    if (awayScore !== undefined) fixture.awayScore = awayScore;
+
+    return fixture;
   }
 
   private scoreFor(scores: any[], teamId: number | undefined): number | undefined {
