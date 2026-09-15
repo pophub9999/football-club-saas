@@ -26,7 +26,14 @@ export interface FootballFixture {
   awayScore?: number;
 }
 
+export interface FootballFixtureDetails {
+  events: Record<string, unknown>[];
+  lineups: Record<string, unknown>[];
+  stats: Record<string, unknown>[];
+}
+
 export interface FootballProvider {
   readonly name: string;
   listUpcomingFixtures(tenantId: string, from: Date, to: Date): Promise<FootballFixture[]>;
+  getFixtureDetails?(externalFixtureId: string): Promise<FootballFixtureDetails>;
 }
