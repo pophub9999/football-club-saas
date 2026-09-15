@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { TransferTicketDto } from './dto/transfer-ticket.dto';
 
@@ -98,7 +98,8 @@ export class TicketsService {
     const parts = token.split('.');
     if (parts.length !== 2) throw new BadRequestException('Invalid ticket QR payload');
 
-    const [encodedBody, encodedSignature] = parts;
+    const encodedBody = parts[0]!;
+    const encodedSignature = parts[1]!;
     const expectedSignature = createHmac('sha256', this.qrSecret()).update(encodedBody).digest('base64url');
     const supplied = Buffer.from(encodedSignature, 'base64url');
     const expected = Buffer.from(expectedSignature, 'base64url');
@@ -126,8 +127,8 @@ export class TicketsService {
   }
 
   private qrSecret() {
-    const secret = this.config.get<string>('TICKET_QR_SECRET');
-    if (secret && secret.length >= 32) return secret;
+    const secret = this.config.get<string>('TICKET_QR_SECRET') ?? '';
+    if (secret.length >= 32) return secret;
     if (this.config.get<string>('NODE_ENV') === 'production') {
       throw new Error('TICKET_QR_SECRET must be configured with at least 32 characters in production');
     }
