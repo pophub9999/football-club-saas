@@ -192,6 +192,65 @@ describe('SportmonksFootballProvider', () => {
     expect(String(fetchMock.mock.calls[0][0])).toEqual(expect.stringContaining('filters=playerStatisticSeasons%3A19735'));
   });
 
+  it('maps a current team squad with player and position includes', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            player_id: 758,
+            jersey_number: 8,
+            is_captain: true,
+            in_squad: true,
+            player: { id: 758, name: 'James Tavernier', display_name: 'J. Tavernier', image_path: 'https://cdn.example/player.png' },
+            position: { name: 'Defender' },
+            detailedPosition: { name: 'Right Back' },
+          },
+          {
+            player_id: 999,
+            jersey_number: 99,
+            in_squad: false,
+            player: { id: 999, name: 'Youth Player' },
+          },
+        ],
+      }),
+    } as Response);
+
+    const config = {
+      get: jest.fn((key: string) => key === 'SPORTMONKS_API_TOKEN' ? 'test-token' : undefined),
+    } as unknown as ConfigService;
+    const provider = new SportmonksFootballProvider(config);
+
+    await expect(provider.getSquad('62')).resolves.toEqual([expect.objectContaining({
+      externalId: '758',
+      name: 'James Tavernier',
+      displayName: 'J. Tavernier',
+      imageUrl: 'https://cdn.example/player.png',
+      position: 'Defender',
+      detailedPosition: 'Right Back',
+      jerseyNumber: 8,
+      isCaptain: true,
+      inSquad: true,
+    })]);
+
+    const fetchMock = global.fetch as jest.Mock;
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(expect.stringContaining('/squads/teams/62'));
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(expect.stringContaining('include=team%3Bplayer%3Bposition%3BdetailedPosition%3Btransfer'));
+  });
+
+  it('uses the season squad endpoint when a season is supplied', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    } as Response);
+    const config = { get: jest.fn((key: string) => key === 'SPORTMONKS_API_TOKEN' ? 'test-token' : undefined) } as unknown as ConfigService;
+    const provider = new SportmonksFootballProvider(config);
+
+    await expect(provider.getSquad('62', '21646')).resolves.toEqual([]);
+    const fetchMock = global.fetch as jest.Mock;
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(expect.stringContaining('/squads/seasons/21646/teams/62'));
+  });
+
   it('fails clearly when no Sportmonks token is configured', async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock;
