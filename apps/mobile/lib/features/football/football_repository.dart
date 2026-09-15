@@ -10,6 +10,8 @@ class FixtureSummary {
     this.venueName,
     this.venueCity,
     this.competitionName,
+    this.homeScore,
+    this.awayScore,
   });
 
   final String id;
@@ -20,8 +22,12 @@ class FixtureSummary {
   final String? venueName;
   final String? venueCity;
   final String? competitionName;
+  final int? homeScore;
+  final int? awayScore;
 
   factory FixtureSummary.fromJson(Map<String, dynamic> json) {
+    final homeScore = json['homeScore'];
+    final awayScore = json['awayScore'];
     return FixtureSummary(
       id: json['id'] as String,
       kickoffAt: DateTime.parse(json['kickoffAt'] as String).toLocal(),
@@ -31,6 +37,8 @@ class FixtureSummary {
       venueName: json['venueName'] as String?,
       venueCity: json['venueCity'] as String?,
       competitionName: (json['competition'] as Map?)?['name'] as String?,
+      homeScore: homeScore is num ? homeScore.toInt() : null,
+      awayScore: awayScore is num ? awayScore.toInt() : null,
     );
   }
 
@@ -54,5 +62,11 @@ class FootballRepository {
     return json
         .map<FixtureSummary>((item) => FixtureSummary.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> fixture(String accessToken, String fixtureId) async {
+    final json = await api.getJson('/football/fixtures/$fixtureId', accessToken: accessToken);
+    if (json is! Map) throw const FormatException('Invalid fixture response');
+    return Map<String, dynamic>.from(json);
   }
 }
