@@ -34,6 +34,11 @@ export class FootballController {
     return this.footballService.getTeams(user.tenantId, limit);
   }
 
+  @Get('teams/:teamId/squad')
+  getSquad(@UserRequest() user: AuthenticatedUser, @Param('teamId') teamId: string, @Query('seasonId') seasonId?: string) {
+    return this.footballService.getSquad(user.tenantId, teamId, seasonId);
+  }
+
   @Get('players/:playerId')
   getPlayer(@UserRequest() user: AuthenticatedUser, @Param('playerId') playerId: string, @Query('seasonId') seasonId?: string) {
     return seasonId
