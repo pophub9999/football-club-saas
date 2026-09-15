@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/api/api_client.dart';
 import 'core/branding/club_branding.dart';
+import 'core/notifications/push_notifications.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/auth_storage.dart';
@@ -23,11 +24,20 @@ class _FootballClubAppState extends State<FootballClubApp> {
   late final ApiClient _api;
   late final AuthRepository _auth;
   late final AuthStorage _storage;
+  late final PushNotifications _push;
   ClubBranding? _authenticatedBranding;
   AuthSession? _session;
   bool _restoring = true;
 
-  @override void initState() { super.initState(); _api = ApiClient(); _auth = AuthRepository(_api); _storage = AuthStorage(); _restoreSession(); }
+  @override
+  void initState() {
+    super.initState();
+    _api = ApiClient();
+    _auth = AuthRepository(_api);
+    _storage = AuthStorage();
+    _push = PushNotifications(_api);
+    _restoreSession();
+  }
 
   Future<void> _restoreSession() async {
     try {
@@ -38,17 +48,24 @@ class _FootballClubAppState extends State<FootballClubApp> {
       await _storage.saveRefreshToken(session.refreshToken);
       if (!mounted) return;
       setState(() { _session = session; _authenticatedBranding = branding; });
-    } catch (_) { await _storage.clear(); }
-    finally { if (mounted) setState(() => _restoring = false); }
+      await _push.initialize(session.accessToken);
+    } catch (_) {
+      await _storage.clear();
+    } finally {
+      if (mounted) setState(() => _restoring = false);
+    }
   }
 
   Future<void> _authenticated(AuthSession session, ClubBranding branding) async {
     await _storage.saveRefreshToken(session.refreshToken);
     if (!mounted) return;
     setState(() { _session = session; _authenticatedBranding = branding; });
+    await _push.initialize(session.accessToken);
   }
 
   Future<void> _logout() async {
+    final session = _session;
+    if (session != null) await _push.unregister(session.accessToken);
     await _storage.clear();
     if (!mounted) return;
     setState(() { _session = null; _authenticatedBranding = null; });
