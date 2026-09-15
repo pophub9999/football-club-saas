@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, NotImplementedException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { FootballFixture, FootballProvider } from './football.types';
 
@@ -27,6 +27,13 @@ export class FootballService {
       : { events: [], lineups: [], stats: [] };
 
     return { ...fixture, ...details };
+  }
+
+  async getStandings(seasonExternalId: string) {
+    if (!this.provider.getStandings) {
+      throw new NotImplementedException(`Football provider ${this.provider.name} does not support standings`);
+    }
+    return this.provider.getStandings(seasonExternalId);
   }
 
   async syncUpcomingFixtures(tenantId: string, days = 45) {
