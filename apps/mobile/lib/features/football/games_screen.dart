@@ -4,6 +4,7 @@ import '../../core/api/api_client.dart';
 import '../../core/branding/club_branding.dart';
 import 'football_repository.dart';
 import 'matchday_screen.dart';
+import 'standings_screen.dart';
 
 class GamesScreen extends StatefulWidget {
   const GamesScreen({super.key, required this.branding, required this.api, required this.accessToken});
@@ -34,14 +35,18 @@ class _GamesScreenState extends State<GamesScreen> {
     finally { if (mounted) setState(() => loading = false); }
   }
 
+  void _openStandings() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => StandingsScreen(branding: widget.branding, api: widget.api, accessToken: widget.accessToken)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final b = widget.branding;
     return RefreshIndicator(
       onRefresh: _load,
       child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
-        SliverPadding(padding: const EdgeInsets.fromLTRB(20, 22, 20, 8), sliver: SliverToBoxAdapter(child: Text('Jogos', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: b.textColor, fontWeight: FontWeight.w800)))),
-        SliverPadding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), sliver: SliverToBoxAdapter(child: Text('Próximos jogos do clube', style: TextStyle(color: b.mutedTextColor)))),
+        SliverPadding(padding: const EdgeInsets.fromLTRB(20, 22, 20, 8), sliver: SliverToBoxAdapter(child: Row(children: [Expanded(child: Text('Jogos', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: b.textColor, fontWeight: FontWeight.w800))), IconButton(onPressed: _openStandings, tooltip: 'Classificação', icon: Icon(Icons.emoji_events_outlined, color: b.primaryColor))]))),
+        SliverPadding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), sliver: SliverToBoxAdapter(child: Row(children: [Expanded(child: Text('Próximos jogos do clube', style: TextStyle(color: b.mutedTextColor))), TextButton.icon(onPressed: _openStandings, icon: const Icon(Icons.leaderboard_outlined, size: 18), label: const Text('Tabela'))])),
         if (loading && fixtures.isEmpty) const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
         else if (error != null && fixtures.isEmpty) SliverFillRemaining(child: _message('Não foi possível carregar os jogos.', 'Tentar novamente', _load))
         else if (fixtures.isEmpty) SliverFillRemaining(child: _message('Ainda não existem jogos disponíveis.', 'Atualizar', _load))
