@@ -51,6 +51,28 @@ class FixtureSummary {
   String get awayName => teamName(awayTeam);
 }
 
+class FixtureDetail {
+  const FixtureDetail({required this.fixture, this.events = const [], this.lineups = const [], this.stats = const []});
+
+  final FixtureSummary fixture;
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> lineups;
+  final List<Map<String, dynamic>> stats;
+
+  factory FixtureDetail.fromJson(Map<String, dynamic> json) {
+    return FixtureDetail(
+      fixture: FixtureSummary.fromJson(json),
+      events: _list(json['events']),
+      lineups: _list(json['lineups']),
+      stats: _list(json['stats']),
+    );
+  }
+
+  static List<Map<String, dynamic>> _list(dynamic value) => value is List
+      ? value.map((item) => Map<String, dynamic>.from(item as Map)).toList(growable: false)
+      : const [];
+}
+
 class FootballRepository {
   FootballRepository(this.api);
 
@@ -64,9 +86,9 @@ class FootballRepository {
         .toList(growable: false);
   }
 
-  Future<Map<String, dynamic>> fixture(String accessToken, String fixtureId) async {
+  Future<FixtureDetail> detail(String accessToken, String fixtureId) async {
     final json = await api.getJson('/football/fixtures/$fixtureId', accessToken: accessToken);
     if (json is! Map) throw const FormatException('Invalid fixture response');
-    return Map<String, dynamic>.from(json);
+    return FixtureDetail.fromJson(Map<String, dynamic>.from(json));
   }
 }
