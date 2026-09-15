@@ -57,6 +57,29 @@ export class FootballService {
     });
   }
 
+  async getSquad(tenantId: string, teamId: string, seasonExternalId?: string) {
+    if (!this.provider.getSquad) throw new NotImplementedException(`Football provider ${this.provider.name} does not support team squads`);
+    const team = await this.prisma.team.findFirst({
+      where: { id: teamId, tenantId },
+      select: { id: true, externalId: true, provider: true, name: true },
+    });
+    if (!team) throw new NotFoundException('Team not found');
+
+    let seasonId = seasonExternalId?.trim() || undefined;
+    if (!seasonId) {
+      const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId }, select: { homeConfiguration: true } });
+      const homeConfiguration = settings?.homeConfiguration;
+      if (homeConfiguration && typeof homeConfiguration === 'object' && !Array.isArray(homeConfiguration)) {
+        const configured = (homeConfiguration as Record<string, unknown>).footballSeasonId;
+        if (typeof configured === 'string' && configured.trim()) seasonId = configured.trim();
+        if (typeof configured === 'number') seasonId = String(configured);
+      }
+    }
+
+    const players = await this.provider.getSquad(team.externalId, seasonId);
+    return { teamId: team.id, teamExternalId: team.externalId, teamName: team.name, seasonId: seasonId ?? null, provider: this.provider.name, players };
+  }
+
   async getPlayer(externalPlayerId: string, seasonExternalId?: string) {
     if (!this.provider.getPlayer) throw new NotImplementedException(`Football provider ${this.provider.name} does not support player profiles`);
     return this.provider.getPlayer(externalPlayerId, seasonExternalId);
