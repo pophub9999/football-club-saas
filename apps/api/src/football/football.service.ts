@@ -36,6 +36,23 @@ export class FootballService {
     return this.provider.getStandings(seasonExternalId);
   }
 
+  async getCurrentStandings(tenantId: string) {
+    let seasonExternalId: string | undefined;
+    const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId }, select: { homeConfiguration: true } });
+    const homeConfiguration = settings?.homeConfiguration;
+    if (homeConfiguration && typeof homeConfiguration === 'object' && !Array.isArray(homeConfiguration)) {
+      const configured = (homeConfiguration as Record<string, unknown>).footballSeasonId;
+      if (typeof configured === 'string' && configured.trim()) seasonExternalId = configured.trim();
+      if (typeof configured === 'number') seasonExternalId = String(configured);
+    }
+    if (!seasonExternalId && this.provider.name === 'mock') seasonExternalId = 'mock-season';
+    if (!seasonExternalId) {
+      throw new NotFoundException('No football season configured for this club');
+    }
+    const standings = await this.getStandings(seasonExternalId);
+    return { seasonId: seasonExternalId, provider: this.provider.name, standings };
+  }
+
   async syncUpcomingFixtures(tenantId: string, days = 45) {
     const from = new Date();
     const to = new Date(from.getTime() + Math.min(Math.max(days, 1), 180) * 24 * 60 * 60 * 1000);
