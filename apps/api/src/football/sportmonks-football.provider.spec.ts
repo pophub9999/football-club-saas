@@ -98,6 +98,57 @@ describe('SportmonksFootballProvider', () => {
     );
   });
 
+  it('maps season standings and includes participant details', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{
+          id: 42,
+          participant_id: 53,
+          position: 1,
+          points: 73,
+          result: 'up',
+          participant: { id: 53, name: 'Clube A', short_code: 'AFC', image_path: 'https://cdn.example/a.png' },
+          details: [
+            { type: { name: 'Overall Matched Played' }, value: 30 },
+            { type: { name: 'Overall Won' }, value: 22 },
+            { type: { name: 'Overall Drawn' }, value: 7 },
+            { type: { name: 'Overall Lost' }, value: 1 },
+            { type: { name: 'Overall Goals For' }, value: 68 },
+            { type: { name: 'Overall Goals Against' }, value: 20 },
+          ],
+        }],
+      }),
+    } as Response);
+
+    const config = {
+      get: jest.fn((key: string) => key === 'SPORTMONKS_API_TOKEN' ? 'test-token' : undefined),
+    } as unknown as ConfigService;
+    const provider = new SportmonksFootballProvider(config);
+
+    await expect(provider.getStandings('19735')).resolves.toEqual([expect.objectContaining({
+      externalId: '42',
+      position: 1,
+      teamExternalId: '53',
+      teamName: 'Clube A',
+      teamShortName: 'AFC',
+      points: 73,
+      played: 30,
+      won: 22,
+      drawn: 7,
+      lost: 1,
+      goalsFor: 68,
+      goalsAgainst: 20,
+      goalDifference: 48,
+      result: 'up',
+    })]);
+
+    const fetchMock = global.fetch as jest.Mock;
+    expect(String(fetchMock.mock.calls[0][0])).toEqual(
+      expect.stringContaining('/standings/seasons/19735'),
+    );
+  });
+
   it('fails clearly when no Sportmonks token is configured', async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock;
