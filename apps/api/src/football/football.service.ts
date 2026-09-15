@@ -53,6 +53,25 @@ export class FootballService {
     return { seasonId: seasonExternalId, provider: this.provider.name, standings };
   }
 
+  async getPlayer(externalPlayerId: string, seasonExternalId?: string) {
+    if (!this.provider.getPlayer) {
+      throw new NotImplementedException(`Football provider ${this.provider.name} does not support player profiles`);
+    }
+    return this.provider.getPlayer(externalPlayerId, seasonExternalId);
+  }
+
+  async getCurrentPlayer(tenantId: string, externalPlayerId: string) {
+    let seasonExternalId: string | undefined;
+    const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId }, select: { homeConfiguration: true } });
+    const homeConfiguration = settings?.homeConfiguration;
+    if (homeConfiguration && typeof homeConfiguration === 'object' && !Array.isArray(homeConfiguration)) {
+      const configured = (homeConfiguration as Record<string, unknown>).footballSeasonId;
+      if (typeof configured === 'string' && configured.trim()) seasonExternalId = configured.trim();
+      if (typeof configured === 'number') seasonExternalId = String(configured);
+    }
+    return this.getPlayer(externalPlayerId, seasonExternalId);
+  }
+
   async syncUpcomingFixtures(tenantId: string, days = 45) {
     const from = new Date();
     const to = new Date(from.getTime() + Math.min(Math.max(days, 1), 180) * 24 * 60 * 60 * 1000);
