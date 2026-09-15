@@ -13,6 +13,7 @@ dependencies:
   http: ^1.5.0
   flutter_secure_storage: ^9.2.4
   qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.2
 
 dev_dependencies:
   flutter_test:
