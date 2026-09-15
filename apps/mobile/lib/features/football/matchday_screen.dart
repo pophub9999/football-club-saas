@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
@@ -22,23 +24,38 @@ class _MatchdayScreenState extends State<MatchdayScreen> {
   FixtureDetail? detail;
   Object? error;
   bool loading = true;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     repository = FootballRepository(widget.api);
     _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_isLive && mounted) _load(silent: true);
+    });
   }
 
-  Future<void> _load() async {
-    setState(() { loading = true; error = null; });
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  bool get _isLive {
+    final status = (detail?.fixture.status ?? widget.fixture.status).toUpperCase();
+    return status == 'LIVE' || status == '1H' || status == '2H' || status == 'HT' || status == 'ET' || status == 'PEN';
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() { loading = true; error = null; });
     try {
       final result = await repository.detail(widget.accessToken, widget.fixture.id);
-      if (mounted) setState(() => detail = result);
+      if (mounted) setState(() { detail = result; error = null; });
     } catch (exception) {
-      if (mounted) setState(() => error = exception);
+      if (mounted && !silent) setState(() => error = exception);
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && !silent) setState(() => loading = false);
     }
   }
 
@@ -62,6 +79,7 @@ class _MatchdayScreenState extends State<MatchdayScreen> {
             else if (error != null && detail == null)
               _errorCard(b)
             else ...[
+              if (_isLive) _liveIndicator(b),
               _eventsSection(detail?.events ?? const [], b),
               _lineupsSection(detail?.lineups ?? const [], fixture, b),
               _statsSection(detail?.stats ?? const [], fixture, b),
@@ -85,6 +103,13 @@ class _MatchdayScreenState extends State<MatchdayScreen> {
       ),
     );
   }
+
+  Widget _liveIndicator(ClubBranding b) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(color: b.primaryColor.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)),
+    child: Row(children: [Icon(Icons.circle, size: 10, color: b.primaryColor), const SizedBox(width: 8), Text('Em direto · atualização automática a cada 30 s', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700))]),
+  );
 
   Widget _hero(FixtureSummary f, ClubBranding b) {
     final d = f.kickoffAt;
