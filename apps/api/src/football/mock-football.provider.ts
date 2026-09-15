@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { FootballFixture, FootballPlayer, FootballProvider, FootballStanding } from './football.types';
+import { FootballFixture, FootballPlayer, FootballProvider, FootballSquadPlayer, FootballStanding } from './football.types';
 
 @Injectable()
 export class MockFootballProvider implements FootballProvider {
@@ -65,5 +65,14 @@ export class MockFootballProvider implements FootballProvider {
     };
     if (externalPlayerId === 'mock-player-001') player.displayName = 'J. Silva';
     return player;
+  }
+
+  async getSquad(_teamExternalId: string, _seasonExternalId?: string): Promise<FootballSquadPlayer[]> {
+    return [
+      { externalId: 'mock-player-001', name: 'João Silva', displayName: 'J. Silva', imageUrl: 'https://cdn.sportmonks.com/images/soccer/players/1/1.png', position: 'Midfielder', detailedPosition: 'Central Midfielder', jerseyNumber: 8, isCaptain: true, inSquad: true },
+      { externalId: 'mock-player-002', name: 'Miguel Costa', displayName: 'M. Costa', position: 'Goalkeeper', detailedPosition: 'Goalkeeper', jerseyNumber: 1, inSquad: true },
+      { externalId: 'mock-player-003', name: 'Rui Santos', displayName: 'R. Santos', position: 'Defender', detailedPosition: 'Centre Back', jerseyNumber: 4, inSquad: true },
+      { externalId: 'mock-player-004', name: 'Pedro Martins', displayName: 'P. Martins', position: 'Forward', detailedPosition: 'Centre Forward', jerseyNumber: 9, inSquad: true },
+    ];
   }
 }
