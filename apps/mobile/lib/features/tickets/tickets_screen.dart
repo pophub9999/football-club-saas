@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -148,17 +150,25 @@ class TicketDetailScreen extends StatefulWidget {
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   TicketQr? qr;
   Object? error;
+  Timer? _qrTimer;
 
   @override
   void initState() {
     super.initState();
     _loadQr();
+    _qrTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadQr());
+  }
+
+  @override
+  void dispose() {
+    _qrTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadQr() async {
     try {
       final result = await widget.repository.qr(widget.accessToken, widget.ticket.id);
-      if (mounted) setState(() => qr = result);
+      if (mounted) setState(() { qr = result; error = null; });
     } catch (e) {
       if (mounted) setState(() => error = e);
     }
@@ -191,10 +201,17 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               if (qr?.active == true && qr?.payload != null)
                 Container(padding: const EdgeInsets.all(14), color: Colors.white, child: QrImageView(data: qr!.payload!, version: QrVersions.auto, size: 220))
               else if (error != null)
-                Text('Não foi possível gerar o código de entrada.', textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor))
+                Column(children: [
+                  Text('Não foi possível gerar o código de entrada.', textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor)),
+                  const SizedBox(height: 10),
+                  OutlinedButton(onPressed: _loadQr, child: const Text('Atualizar código')),
+                ])
               else
                 SizedBox(width: 220, height: 220, child: Center(child: CircularProgressIndicator(color: b.primaryColor))),
-              const SizedBox(height: 22),
+              const SizedBox(height: 14),
+              if (qr?.expiresAt != null)
+                Text('Código temporário · atualiza automaticamente', style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
+              const SizedBox(height: 8),
               _info('Titular', ticket.holderName ?? 'Sócio'),
               _info('Bilhete', ticket.ticketNumber ?? ticket.externalTicketId),
               _info('Lugar', place),
@@ -202,7 +219,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ]),
           ),
           const SizedBox(height: 16),
-          Text('Apresenta este código à entrada. Em produção, o código será assinado/rotativo para reduzir risco de cópia.', textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
+          Text('O código muda automaticamente e não contém nenhum segredo da aplicação.', textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
         ],
       ),
     );
