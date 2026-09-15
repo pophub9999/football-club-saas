@@ -63,9 +63,9 @@ describe('SportmonksFootballProvider', () => {
         awayScore: 1,
       }),
     ]);
-    expect(global.fetch).toHaveBeenCalledWith(
+    const fetchMock = global.fetch as jest.Mock;
+    expect(fetchMock.mock.calls[0][0]).toEqual(
       expect.stringContaining('/fixtures/between/2026-09-19/2026-09-21'),
-      expect.any(Object),
     );
   });
 
@@ -92,17 +92,19 @@ describe('SportmonksFootballProvider', () => {
       lineups: [{ id: 2, formation_position: 9 }],
       stats: [{ id: 3, value: 55 }],
     });
-    expect(global.fetch).toHaveBeenCalledWith(
+    const fetchMock = global.fetch as jest.Mock;
+    expect(fetchMock.mock.calls[0][0]).toEqual(
       expect.stringContaining('/fixtures/123'),
-      expect.any(Object),
     );
   });
 
   it('fails clearly when no Sportmonks token is configured', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
     const config = { get: jest.fn(() => undefined) } as unknown as ConfigService;
     const provider = new SportmonksFootballProvider(config);
 
     await expect(provider.listUpcomingFixtures('tenant-a', new Date(), new Date())).rejects.toBeInstanceOf(ServiceUnavailableException);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
