@@ -17,6 +17,7 @@ export type NotificationPreferencePatch = {
 };
 
 export type NotificationDevicePlatform = 'android' | 'ios';
+export type NotificationCategory = 'general' | 'matchday' | 'marketing';
 
 export interface RegisterNotificationDeviceInput {
   token: string;
@@ -109,9 +110,22 @@ export class NotificationsService {
     return { removed: removed > 0 };
   }
 
-  async sendToUser(userId: string, tenantId: string, message: PushNotificationMessage) {
+  async sendToUser(
+    userId: string,
+    tenantId: string,
+    message: PushNotificationMessage,
+    category: NotificationCategory = 'general',
+  ) {
     const preferences = await this.getPreferences(userId, tenantId);
-    if (!preferences.notifications) return { sent: 0, skipped: true, invalidTokens: [] as string[] };
+    if (!preferences.notifications) {
+      return { sent: 0, skipped: true, skipReason: 'notifications_disabled' as const, invalidTokens: [] as string[] };
+    }
+    if (category === 'matchday' && !preferences.matchday) {
+      return { sent: 0, skipped: true, skipReason: 'matchday_disabled' as const, invalidTokens: [] as string[] };
+    }
+    if (category === 'marketing' && !preferences.marketing) {
+      return { sent: 0, skipped: true, skipReason: 'marketing_disabled' as const, invalidTokens: [] as string[] };
+    }
 
     const devices = await this.prisma.$queryRaw<Array<{ token: string; platform: NotificationDevicePlatform }>>(
       Prisma.sql`SELECT token, platform
@@ -132,5 +146,17 @@ export class NotificationsService {
     }
 
     return { sent: result.sent, skipped: false, invalidTokens: result.invalidTokens };
+  }
+
+  sendGeneralNotification(userId: string, tenantId: string, message: PushNotificationMessage) {
+    return this.sendToUser(userId, tenantId, message, 'general');
+  }
+
+  sendMatchdayNotification(userId: string, tenantId: string, message: PushNotificationMessage) {
+    return this.sendToUser(userId, tenantId, message, 'matchday');
+  }
+
+  sendMarketingNotification(userId: string, tenantId: string, message: PushNotificationMessage) {
+    return this.sendToUser(userId, tenantId, message, 'marketing');
   }
 }
