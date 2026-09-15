@@ -32,8 +32,27 @@ export interface FootballFixtureDetails {
   stats: Record<string, unknown>[];
 }
 
+export interface FootballStanding {
+  externalId: string;
+  position: number;
+  teamExternalId: string;
+  teamName?: string;
+  teamShortName?: string;
+  teamLogoUrl?: string;
+  points: number;
+  played?: number;
+  won?: number;
+  drawn?: number;
+  lost?: number;
+  goalsFor?: number;
+  goalsAgainst?: number;
+  goalDifference?: number;
+  result?: string;
+}
+
 export interface FootballProvider {
   readonly name: string;
   listUpcomingFixtures(tenantId: string, from: Date, to: Date): Promise<FootballFixture[]>;
   getFixtureDetails?(externalFixtureId: string): Promise<FootballFixtureDetails>;
+  getStandings?(seasonExternalId: string): Promise<FootballStanding[]>;
 }
