@@ -12,7 +12,7 @@ interface GoogleAccessTokenResponse {
 @Injectable()
 export class FcmPushProvider implements PushProvider {
   private readonly logger = new Logger(FcmPushProvider.name);
-  private cachedToken?: { value: string; expiresAt: number };
+  private cachedToken: { value: string; expiresAt: number } | undefined;
 
   constructor(private readonly config: ConfigService) {}
 
