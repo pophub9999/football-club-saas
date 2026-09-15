@@ -33,11 +33,13 @@ export class NotificationsController {
       throw new BadRequestException('token and platform (android|ios) are required');
     }
 
-    return this.notifications.registerDevice(user.id, user.tenantId, {
+    const input: { token: string; platform: 'android' | 'ios'; appVersion?: string } = {
       token,
       platform,
-      appVersion,
-    });
+    };
+    if (appVersion) input.appVersion = appVersion;
+
+    return this.notifications.registerDevice(user.id, user.tenantId, input);
   }
 
   @Delete('devices')
