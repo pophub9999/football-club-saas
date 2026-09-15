@@ -65,10 +65,23 @@ export interface FootballPlayer {
   statistics: Record<string, unknown>[];
 }
 
+export interface FootballSquadPlayer {
+  externalId: string;
+  name: string;
+  displayName?: string;
+  imageUrl?: string;
+  position?: string;
+  detailedPosition?: string;
+  jerseyNumber?: number;
+  isCaptain?: boolean;
+  inSquad?: boolean;
+}
+
 export interface FootballProvider {
   readonly name: string;
   listUpcomingFixtures(tenantId: string, from: Date, to: Date): Promise<FootballFixture[]>;
   getFixtureDetails?(externalFixtureId: string): Promise<FootballFixtureDetails>;
   getStandings?(seasonExternalId: string): Promise<FootballStanding[]>;
   getPlayer?(externalPlayerId: string, seasonExternalId?: string): Promise<FootballPlayer>;
+  getSquad?(teamExternalId: string, seasonExternalId?: string): Promise<FootballSquadPlayer[]>;
 }
