@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { FootballFixture, FootballProvider, FootballStanding } from './football.types';
+import { FootballFixture, FootballPlayer, FootballProvider, FootballStanding } from './football.types';
 
 @Injectable()
 export class MockFootballProvider implements FootballProvider {
@@ -43,5 +43,26 @@ export class MockFootballProvider implements FootballProvider {
       { externalId: 'mock-standing-2', position: 2, teamExternalId: 'mock-away', teamName: 'Próximo Adversário', teamShortName: 'Adversário', points: 4, played: 3, won: 1, drawn: 1, lost: 1, goalsFor: 4, goalsAgainst: 4, goalDifference: 0, result: 'equal' },
       { externalId: 'mock-standing-3', position: 3, teamExternalId: 'mock-third', teamName: 'Clube Visitante', teamShortName: 'Visitante', points: 1, played: 3, won: 0, drawn: 1, lost: 2, goalsFor: 2, goalsAgainst: 7, goalDifference: -5, result: 'down' },
     ];
+  }
+
+  async getPlayer(externalPlayerId: string, _seasonExternalId?: string): Promise<FootballPlayer> {
+    return {
+      externalId: externalPlayerId,
+      name: externalPlayerId === 'mock-player-001' ? 'João Silva' : 'Jogador de demonstração',
+      displayName: externalPlayerId === 'mock-player-001' ? 'J. Silva' : undefined,
+      nationality: 'Portugal',
+      birthDate: '2000-01-15',
+      height: 181,
+      weight: 76,
+      position: 'Midfielder',
+      detailedPosition: 'Central Midfielder',
+      teams: [{ team: { id: 'mock-home', name: 'Clube da Casa' } }],
+      statistics: [{ team: { name: 'Clube da Casa' }, season: { name: '2026/27', league: { name: 'Competição de demonstração' } }, details: [
+        { type: { name: 'Appearances' }, value: 3 },
+        { type: { name: 'Minutes Played' }, value: 245 },
+        { type: { name: 'Goals' }, value: 1 },
+        { type: { name: 'Assists' }, value: 2 },
+      ] }],
+    };
   }
 }
