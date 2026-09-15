@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FootballFixture, FootballFixtureDetails, FootballProvider } from './football.types';
+import { FootballFixture, FootballFixtureDetails, FootballProvider, FootballStanding } from './football.types';
 
 interface SportmonksResponse {
   data?: Record<string, any>[] | Record<string, any>;
@@ -53,6 +53,12 @@ export class SportmonksFootballProvider implements FootballProvider {
     };
   }
 
+  async getStandings(seasonExternalId: string): Promise<FootballStanding[]> {
+    const data = await this.request(`/standings/seasons/${encodeURIComponent(seasonExternalId)}`, 'participant;league;details.type');
+    if (!Array.isArray(data)) throw new ServiceUnavailableException('Invalid Sportmonks standings response');
+    return data.map((item) => this.mapStanding(item));
+  }
+
   private mapFixture(item: Record<string, any>): FootballFixture {
     const participants = Array.isArray(item.participants) ? item.participants : [];
     const home = participants.find((team: any) => team.meta?.location === 'home') ?? participants[0];
@@ -76,6 +82,40 @@ export class SportmonksFootballProvider implements FootballProvider {
     if (awayScore !== undefined) fixture.awayScore = awayScore;
 
     return fixture;
+  }
+
+  private mapStanding(item: Record<string, any>): FootballStanding {
+    const participant = item.participant ?? {};
+    const details = Array.isArray(item.details) ? item.details : [];
+    const value = (names: string[]) => {
+      const detail = details.find((entry: any) => names.includes(String(entry.type?.name ?? '').toLowerCase()));
+      return typeof detail?.value === 'number' ? detail.value : undefined;
+    };
+    const played = value(['overall matched played', 'overall matches played']);
+    const won = value(['overall won']);
+    const drawn = value(['overall drawn', 'overall draws']);
+    const lost = value(['overall lost']);
+    const goalsFor = value(['overall goals for']);
+    const goalsAgainst = value(['overall goals against']);
+
+    const standing: FootballStanding = {
+      externalId: String(item.id),
+      position: Number(item.position ?? 0),
+      teamExternalId: String(item.participant_id ?? participant.id ?? 'unknown'),
+      points: Number(item.points ?? 0),
+    };
+    if (participant.name != null) standing.teamName = String(participant.name);
+    if (participant.short_code != null) standing.teamShortName = String(participant.short_code);
+    if (participant.image_path != null) standing.teamLogoUrl = String(participant.image_path);
+    if (played !== undefined) standing.played = played;
+    if (won !== undefined) standing.won = won;
+    if (drawn !== undefined) standing.drawn = drawn;
+    if (lost !== undefined) standing.lost = lost;
+    if (goalsFor !== undefined) standing.goalsFor = goalsFor;
+    if (goalsAgainst !== undefined) standing.goalsAgainst = goalsAgainst;
+    if (goalsFor !== undefined && goalsAgainst !== undefined) standing.goalDifference = goalsFor - goalsAgainst;
+    if (item.result != null) standing.result = String(item.result);
+    return standing;
   }
 
   private scoreFor(scores: any[], teamId: number | undefined): number | undefined {
