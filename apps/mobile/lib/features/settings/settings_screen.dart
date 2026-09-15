@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/branding/club_branding.dart';
+import '../scanner/scanner_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.branding, required this.api, required this.accessToken, required this.onLogout});
+  const SettingsScreen({super.key, required this.branding, required this.api, required this.accessToken, required this.onLogout, this.canScan = false});
 
   final ClubBranding branding;
   final ApiClient api;
   final String accessToken;
   final VoidCallback onLogout;
+  final bool canScan;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -29,6 +31,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
+          if (widget.canScan) ...[
+            _section('Operação de jogo'),
+            _tile(Icons.qr_code_scanner, 'Scanner de entradas', 'Validar bilhetes na entrada do estádio', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScannerScreen(branding: b, api: widget.api, accessToken: widget.accessToken)))),
+          ],
           _section('Notificações'),
           _switchTile('Notificações gerais', notifications, (v) => setState(() => notifications = v)),
           _switchTile('Jogos e resultados', matchday, (v) => setState(() => matchday = v)),
@@ -63,13 +69,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     onChanged: onChanged,
   );
 
-  Widget _tile(IconData icon, String title, String subtitle) => ListTile(
+  Widget _tile(IconData icon, String title, String subtitle, {VoidCallback? onTap}) => ListTile(
     contentPadding: EdgeInsets.zero,
     leading: Icon(icon, color: widget.branding.primaryColor),
     title: Text(title, style: TextStyle(color: widget.branding.textColor, fontWeight: FontWeight.w700)),
     subtitle: Text(subtitle, style: TextStyle(color: widget.branding.mutedTextColor)),
     trailing: Icon(Icons.chevron_right, color: widget.branding.mutedTextColor),
-    onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$title será disponibilizado nesta área.'))),
+    onTap: onTap ?? () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$title será disponibilizado nesta área.'))),
   );
 
   Future<void> _confirmLogout(BuildContext context) async {
