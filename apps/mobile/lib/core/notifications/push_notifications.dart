@@ -14,7 +14,6 @@ class PushNotifications {
   PushNotifications(this.api);
 
   final ApiClient api;
-  FirebaseMessaging? _messaging;
   String? _registeredToken;
 
   Future<bool> initialize(String accessToken) async {
@@ -25,7 +24,6 @@ class PushNotifications {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
       final messaging = FirebaseMessaging.instance;
-      _messaging = messaging;
       await messaging.requestPermission(alert: true, badge: true, sound: true, provisional: false);
 
       final token = await messaging.getToken();
