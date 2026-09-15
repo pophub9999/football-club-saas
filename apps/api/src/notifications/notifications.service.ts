@@ -8,6 +8,12 @@ export interface NotificationPreferences {
   marketing: boolean;
 }
 
+export type NotificationPreferencePatch = {
+  notifications?: boolean | undefined;
+  matchday?: boolean | undefined;
+  marketing?: boolean | undefined;
+};
+
 const DEFAULT_PREFERENCES: NotificationPreferences = {
   notifications: true,
   matchday: true,
@@ -28,7 +34,7 @@ export class NotificationsService {
     return rows[0] ? { notifications: rows[0].notifications, matchday: rows[0].matchday, marketing: rows[0].marketing } : { ...DEFAULT_PREFERENCES };
   }
 
-  async updatePreferences(userId: string, tenantId: string, input: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
+  async updatePreferences(userId: string, tenantId: string, input: NotificationPreferencePatch): Promise<NotificationPreferences> {
     const current = await this.getPreferences(userId, tenantId);
     const next: NotificationPreferences = {
       notifications: typeof input.notifications === 'boolean' ? input.notifications : current.notifications,
