@@ -27,11 +27,17 @@ export class TicketScannerService {
       let result: 'ACCEPTED' | 'ALREADY_USED' | 'EXPIRED' | 'CANCELLED' = 'ACCEPTED';
       if (ticket.status === 'USED') result = 'ALREADY_USED';
       else if (ticket.status === 'CANCELLED') result = 'CANCELLED';
-      else if (ticket.status === 'EXPIRED' || (ticket.validUntil && ticket.validUntil <= now) || ticket.event.endsAt <= now) result = 'EXPIRED';
+      else if (
+        ticket.status === 'EXPIRED' ||
+        (ticket.validUntil && ticket.validUntil <= now) ||
+        (ticket.event.endsAt && ticket.event.endsAt <= now)
+      ) result = 'EXPIRED';
       else if (ticket.validFrom && ticket.validFrom > now) result = 'EXPIRED';
 
       if (result !== 'ACCEPTED') {
-        await tx.entryScan.create({ data: { tenantId, ticketId: ticket.id, scannerId, result, deviceId: dto.deviceId } });
+        await tx.entryScan.create({
+          data: { tenantId, ticketId: ticket.id, scannerId, result, deviceId: dto.deviceId ?? null },
+        });
         return { accepted: false, result, ticketId: ticket.id, eventId: ticket.eventId };
       }
 
@@ -40,11 +46,15 @@ export class TicketScannerService {
         data: { status: 'USED' },
       });
       if (updated.count !== 1) {
-        await tx.entryScan.create({ data: { tenantId, ticketId: ticket.id, scannerId, result: 'ALREADY_USED', deviceId: dto.deviceId } });
+        await tx.entryScan.create({
+          data: { tenantId, ticketId: ticket.id, scannerId, result: 'ALREADY_USED', deviceId: dto.deviceId ?? null },
+        });
         return { accepted: false, result: 'ALREADY_USED', ticketId: ticket.id, eventId: ticket.eventId };
       }
 
-      await tx.entryScan.create({ data: { tenantId, ticketId: ticket.id, scannerId, result: 'ACCEPTED', deviceId: dto.deviceId } });
+      await tx.entryScan.create({
+        data: { tenantId, ticketId: ticket.id, scannerId, result: 'ACCEPTED', deviceId: dto.deviceId ?? null },
+      });
       return { accepted: true, result: 'ACCEPTED', ticketId: ticket.id, eventId: ticket.eventId };
     });
   }
@@ -60,9 +70,23 @@ export class TicketScannerService {
     const supplied = Buffer.from(signaturePart, 'base64url');
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw new BadRequestException('Invalid ticket QR signature');
     let body: TicketQr;
-    try { body = JSON.parse(Buffer.from(bodyPart, 'base64url').toString('utf8')); } catch { throw new BadRequestException('Invalid ticket QR payload'); }
+    try {
+      body = JSON.parse(Buffer.from(bodyPart, 'base64url').toString('utf8'));
+    } catch {
+      throw new BadRequestException('Invalid ticket QR payload');
+    }
     const now = Math.floor(Date.now() / 1000);
-    if (body.v !== 1 || !body.tid || !body.eid || !body.ticket || !Number.isInteger(body.iat) || !Number.isInteger(body.exp) || body.exp <= now || body.iat > now + 10 || body.exp - body.iat > QR_TTL_SECONDS) {
+    if (
+      body.v !== 1 ||
+      !body.tid ||
+      !body.eid ||
+      !body.ticket ||
+      !Number.isInteger(body.iat) ||
+      !Number.isInteger(body.exp) ||
+      body.exp <= now ||
+      body.iat > now + 10 ||
+      body.exp - body.iat > QR_TTL_SECONDS
+    ) {
       throw new BadRequestException('Expired or invalid ticket QR payload');
     }
     return body;
@@ -71,7 +95,9 @@ export class TicketScannerService {
   private secret(): string {
     const secret = this.config.get<string>('TICKET_QR_SECRET') ?? '';
     if (secret.length >= 32) return secret;
-    if (this.config.get<string>('NODE_ENV') === 'production') throw new Error('TICKET_QR_SECRET must be configured with at least 32 characters in production');
+    if (this.config.get<string>('NODE_ENV') === 'production') {
+      throw new Error('TICKET_QR_SECRET must be configured with at least 32 characters in production');
+    }
     return 'development-only-ticket-qr-secret-change-before-production-2026';
   }
 }
