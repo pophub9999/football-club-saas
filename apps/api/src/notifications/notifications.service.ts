@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { PUSH_PROVIDER, PushNotificationMessage, PushProvider } from './push-provider';
 
 export interface NotificationPreferences {
   notifications: boolean;
@@ -31,7 +32,10 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(PUSH_PROVIDER) private readonly pushProvider: PushProvider,
+  ) {}
 
   async getPreferences(userId: string, tenantId: string): Promise<NotificationPreferences> {
     const rows = await this.prisma.$queryRaw<Array<{ notifications: boolean; matchday: boolean; marketing: boolean }>>(
@@ -103,5 +107,30 @@ export class NotificationsService {
     );
 
     return { removed: removed > 0 };
+  }
+
+  async sendToUser(userId: string, tenantId: string, message: PushNotificationMessage) {
+    const preferences = await this.getPreferences(userId, tenantId);
+    if (!preferences.notifications) return { sent: 0, skipped: true, invalidTokens: [] as string[] };
+
+    const devices = await this.prisma.$queryRaw<Array<{ token: string; platform: NotificationDevicePlatform }>>(
+      Prisma.sql`SELECT token, platform
+                 FROM user_notification_devices
+                 WHERE user_id = ${userId}::uuid AND tenant_id = ${tenantId}::uuid`,
+    );
+
+    if (devices.length === 0) return { sent: 0, skipped: false, invalidTokens: [] as string[] };
+
+    const result = await this.pushProvider.send(devices, message);
+    if (result.invalidTokens.length > 0) {
+      const hashes = result.invalidTokens.map((token) => createHash('sha256').update(token).digest('hex'));
+      await this.prisma.$executeRaw(
+        Prisma.sql`DELETE FROM user_notification_devices
+                   WHERE tenant_id = ${tenantId}::uuid
+                     AND token_hash IN (${Prisma.join(hashes)})`,
+      );
+    }
+
+    return { sent: result.sent, skipped: false, invalidTokens: result.invalidTokens };
   }
 }
