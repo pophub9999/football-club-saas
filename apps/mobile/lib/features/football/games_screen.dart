@@ -9,11 +9,9 @@ import 'standings_screen.dart';
 
 class GamesScreen extends StatefulWidget {
   const GamesScreen({super.key, required this.branding, required this.api, required this.accessToken});
-
   final ClubBranding branding;
   final ApiClient api;
   final String accessToken;
-
   @override
   State<GamesScreen> createState() => _GamesScreenState();
 }
@@ -36,13 +34,8 @@ class _GamesScreenState extends State<GamesScreen> {
     finally { if (mounted) setState(() => loading = false); }
   }
 
-  void _openStandings() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => StandingsScreen(branding: widget.branding, api: widget.api, accessToken: widget.accessToken)));
-  }
-
-  void _openMatchday(FixtureSummary fixture) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => MatchdayModeScreen(branding: widget.branding, api: widget.api, accessToken: widget.accessToken, fixture: fixture)));
-  }
+  void _openStandings() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StandingsScreen(branding: widget.branding, api: widget.api, accessToken: widget.accessToken)));
+  void _openMatchday(FixtureSummary fixture) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MatchdayModeScreen(branding: widget.branding, api: widget.api, accessToken: widget.accessToken, fixture: fixture)));
 
   @override
   Widget build(BuildContext context) {
@@ -52,24 +45,8 @@ class _GamesScreenState extends State<GamesScreen> {
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
-            sliver: SliverToBoxAdapter(
-              child: Row(children: [
-                Expanded(child: Text('Jogos', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: b.textColor, fontWeight: FontWeight.w800))),
-                IconButton(onPressed: _openStandings, tooltip: 'Classificação', icon: Icon(Icons.emoji_events_outlined, color: b.primaryColor)),
-              ]),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            sliver: SliverToBoxAdapter(
-              child: Row(children: [
-                Expanded(child: Text('Próximos jogos do clube', style: TextStyle(color: b.mutedTextColor))),
-                TextButton.icon(onPressed: _openStandings, icon: const Icon(Icons.leaderboard_outlined, size: 18), label: const Text('Tabela')),
-              ]),
-            ),
-          ),
+          SliverPadding(padding: const EdgeInsets.fromLTRB(20, 22, 20, 8), sliver: SliverToBoxAdapter(child: Row(children: [Expanded(child: Text('Jogos', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: b.textColor, fontWeight: FontWeight.w800))), IconButton(onPressed: _openStandings, tooltip: 'Classificação', icon: Icon(Icons.emoji_events_outlined, color: b.primaryColor))]))),
+          SliverPadding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), sliver: SliverToBoxAdapter(child: Row(children: [Expanded(child: Text('Próximos jogos do clube', style: TextStyle(color: b.mutedTextColor))), TextButton.icon(onPressed: _openStandings, icon: const Icon(Icons.leaderboard_outlined, size: 18), label: const Text('Tabela'))]))),
           if (loading && fixtures.isEmpty) const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
           else if (error != null && fixtures.isEmpty) SliverFillRemaining(child: _message('Não foi possível carregar os jogos.', 'Tentar novamente', _load))
           else if (fixtures.isEmpty) SliverFillRemaining(child: _message('Ainda não existem jogos disponíveis.', 'Atualizar', _load))
@@ -86,18 +63,22 @@ class _GamesScreenState extends State<GamesScreen> {
     final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
     final timeLabel = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     final hasScore = fixture.homeScore != null && fixture.awayScore != null;
-    return Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: b.primaryColor.withValues(alpha: .12))), child: Column(children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(fixture.competitionName ?? 'Jogo', style: TextStyle(color: b.primaryColor, fontWeight: FontWeight.w700, fontSize: 12)), Text('$dateLabel · $timeLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 12))]),
-      const SizedBox(height: 18),
-      Row(children: [Expanded(child: _team(fixture.homeName, fixture.homeTeam['logoUrl'] as String?, b, Alignment.centerLeft)), Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: hasScore ? Text('${fixture.homeScore} : ${fixture.awayScore}', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w900, fontSize: 18)) : Text('VS', style: TextStyle(color: b.mutedTextColor, fontWeight: FontWeight.w800))), Expanded(child: _team(fixture.awayName, fixture.awayTeam['logoUrl'] as String?, b, Alignment.centerRight))]),
-      if (fixture.venueName != null) ...[const SizedBox(height: 14), Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.location_on_outlined, size: 15, color: b.mutedTextColor), const SizedBox(width: 4), Text('${fixture.venueName}${fixture.venueCity == null ? '' : ' · ${fixture.venueCity}'}', style: TextStyle(color: b.mutedTextColor, fontSize: 12))])],
-      const SizedBox(height: 16),
-      Row(children: [
-        Expanded(child: ElevatedButton.icon(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MatchdayScreen(branding: b, api: widget.api, accessToken: widget.accessToken, fixture: fixture))), icon: const Icon(Icons.analytics_outlined), label: const Text('Match Centre')),
-        const SizedBox(width: 8),
-        IconButton.filled(onPressed: () => _openMatchday(fixture), tooltip: 'Dia de jogo', icon: const Icon(Icons.event_available_outlined)),
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: b.primaryColor.withValues(alpha: .12))),
+      child: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(fixture.competitionName ?? 'Jogo', style: TextStyle(color: b.primaryColor, fontWeight: FontWeight.w700, fontSize: 12)), Text('$dateLabel · $timeLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 12))]),
+        const SizedBox(height: 18),
+        Row(children: [Expanded(child: _team(fixture.homeName, fixture.homeTeam['logoUrl'] as String?, b, Alignment.centerLeft)), Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: hasScore ? Text('${fixture.homeScore} : ${fixture.awayScore}', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w900, fontSize: 18)) : Text('VS', style: TextStyle(color: b.mutedTextColor, fontWeight: FontWeight.w800))), Expanded(child: _team(fixture.awayName, fixture.awayTeam['logoUrl'] as String?, b, Alignment.centerRight))]),
+        if (fixture.venueName != null) ...[const SizedBox(height: 14), Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.location_on_outlined, size: 15, color: b.mutedTextColor), const SizedBox(width: 4), Text('${fixture.venueName}${fixture.venueCity == null ? '' : ' · ${fixture.venueCity}'}', style: TextStyle(color: b.mutedTextColor, fontSize: 12))])],
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: ElevatedButton.icon(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MatchdayScreen(branding: b, api: widget.api, accessToken: widget.accessToken, fixture: fixture))), icon: const Icon(Icons.analytics_outlined), label: const Text('Match Centre')),
+          const SizedBox(width: 8),
+          IconButton.filled(onPressed: () => _openMatchday(fixture), tooltip: 'Dia de jogo', icon: const Icon(Icons.event_available_outlined)),
+        ]),
       ]),
-    ]));
+    );
   }
 
   Widget _team(String name, String? logoUrl, ClubBranding b, Alignment alignment) => Column(crossAxisAlignment: alignment == Alignment.centerRight ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [Container(width: 52, height: 52, decoration: BoxDecoration(color: b.backgroundColor, shape: BoxShape.circle), child: logoUrl == null ? Icon(Icons.shield_outlined, color: b.primaryColor) : ClipOval(child: Image.network(logoUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield_outlined, color: b.primaryColor)))), const SizedBox(height: 8), Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: alignment == Alignment.centerRight ? TextAlign.right : TextAlign.left, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700, fontSize: 13))]);
