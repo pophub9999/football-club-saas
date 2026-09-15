@@ -21,4 +21,9 @@ export class FootballController {
   getFixture(@UserRequest() user: AuthenticatedUser, @Param('fixtureId') fixtureId: string) {
     return this.footballService.getFixture(user.tenantId, fixtureId);
   }
+
+  @Get('standings/:seasonId')
+  getStandings(@Param('seasonId') seasonId: string) {
+    return this.footballService.getStandings(seasonId);
+  }
 }
