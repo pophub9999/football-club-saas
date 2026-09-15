@@ -22,22 +22,15 @@ class _StandingsScreenState extends State<StandingsScreen> {
   bool loading = true;
 
   @override
-  void initState() {
-    super.initState();
-    repository = FootballRepository(widget.api);
-    _load();
-  }
+  void initState() { super.initState(); repository = FootballRepository(widget.api); _load(); }
 
   Future<void> _load() async {
     setState(() { loading = true; error = null; });
     try {
       final result = await repository.currentStandings(widget.accessToken);
       if (mounted) setState(() => data = result);
-    } catch (exception) {
-      if (mounted) setState(() => error = exception);
-    } finally {
-      if (mounted) setState(() => loading = false);
-    }
+    } catch (exception) { if (mounted) setState(() => error = exception); }
+    finally { if (mounted) setState(() => loading = false); }
   }
 
   @override
@@ -49,7 +42,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: loading && data == null
-            ? ListView(children: const [SizedBox(height: 280), Center(child: CircularProgressIndicator())])
+            ? ListView(children: [const SizedBox(height: 280), Center(child: CircularProgressIndicator(color: b.primaryColor))])
             : error != null && data == null
                 ? ListView(children: [_message(b, 'Não foi possível carregar a classificação.', 'Tentar novamente', _load)])
                 : data!.rows.isEmpty
