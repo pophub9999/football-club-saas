@@ -21,18 +21,14 @@ export class FootballService {
   async getFixture(tenantId: string, fixtureId: string) {
     const fixture = await this.prisma.fixture.findFirst({ where: { id: fixtureId, tenantId }, include: { competition: true, homeTeam: true, awayTeam: true } });
     if (!fixture) throw new NotFoundException('Fixture not found');
-
     const details = this.provider.getFixtureDetails
       ? await this.provider.getFixtureDetails(fixture.externalId)
       : { events: [], lineups: [], stats: [] };
-
     return { ...fixture, ...details };
   }
 
   async getStandings(seasonExternalId: string) {
-    if (!this.provider.getStandings) {
-      throw new NotImplementedException(`Football provider ${this.provider.name} does not support standings`);
-    }
+    if (!this.provider.getStandings) throw new NotImplementedException(`Football provider ${this.provider.name} does not support standings`);
     return this.provider.getStandings(seasonExternalId);
   }
 
@@ -46,17 +42,23 @@ export class FootballService {
       if (typeof configured === 'number') seasonExternalId = String(configured);
     }
     if (!seasonExternalId && this.provider.name === 'mock') seasonExternalId = 'mock-season';
-    if (!seasonExternalId) {
-      throw new NotFoundException('No football season configured for this club');
-    }
+    if (!seasonExternalId) throw new NotFoundException('No football season configured for this club');
     const standings = await this.getStandings(seasonExternalId);
     return { seasonId: seasonExternalId, provider: this.provider.name, standings };
   }
 
+  async getTeams(tenantId: string, limit = 50) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    return this.prisma.team.findMany({
+      where: { tenantId },
+      orderBy: { name: 'asc' },
+      take: safeLimit,
+      select: { id: true, externalId: true, provider: true, name: true, shortName: true, logoUrl: true },
+    });
+  }
+
   async getPlayer(externalPlayerId: string, seasonExternalId?: string) {
-    if (!this.provider.getPlayer) {
-      throw new NotImplementedException(`Football provider ${this.provider.name} does not support player profiles`);
-    }
+    if (!this.provider.getPlayer) throw new NotImplementedException(`Football provider ${this.provider.name} does not support player profiles`);
     return this.provider.getPlayer(externalPlayerId, seasonExternalId);
   }
 
