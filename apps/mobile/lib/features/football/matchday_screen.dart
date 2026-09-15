@@ -57,12 +57,14 @@ class _MatchdayScreenState extends State<MatchdayScreen> {
           children: [
             _hero(fixture, b),
             const SizedBox(height: 16),
-            if (loading && detail == null) const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()))
-            else if (error != null && detail == null) _errorCard(b)
+            if (loading && detail == null)
+              const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()))
+            else if (error != null && detail == null)
+              _errorCard(b)
             else ...[
-              _dataSection('Eventos', detail?.events ?? const [], Icons.timeline, b),
-              _dataSection('Equipas', detail?.lineups ?? const [], Icons.groups_outlined, b),
-              _dataSection('Estatísticas', detail?.stats ?? const [], Icons.bar_chart_outlined, b),
+              _eventsSection(detail?.events ?? const [], b),
+              _lineupsSection(detail?.lineups ?? const [], fixture, b),
+              _statsSection(detail?.stats ?? const [], fixture, b),
               const SizedBox(height: 6),
               Card(color: b.surfaceColor, margin: EdgeInsets.zero, child: ListTile(
                 leading: CircleAvatar(backgroundColor: b.primaryColor.withValues(alpha: .14), child: Icon(Icons.confirmation_number_outlined, color: b.primaryColor)),
@@ -115,11 +117,104 @@ class _MatchdayScreenState extends State<MatchdayScreen> {
     Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: right ? TextAlign.right : TextAlign.left, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
   ]);
 
-  Widget _dataSection(String title, List<Map<String, dynamic>> items, IconData icon, ClubBranding b) {
-    if (items.isEmpty) return Card(color: b.surfaceColor, margin: const EdgeInsets.only(bottom: 10), child: ListTile(leading: Icon(icon, color: b.primaryColor), title: Text(title, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)), subtitle: Text('Dados ainda não disponibilizados pelo fornecedor.', style: TextStyle(color: b.mutedTextColor))));
-    return Card(color: b.surfaceColor, margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(color: b.textColor, fontSize: 17, fontWeight: FontWeight.w800)), const SizedBox(height: 8), ...items.map((item) => ListTile(contentPadding: EdgeInsets.zero, leading: Icon(icon, color: b.primaryColor), title: Text('${item['name'] ?? item['type'] ?? item['player'] ?? 'Informação'}', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), subtitle: Text('${item['minute'] ?? item['team'] ?? item['label'] ?? ''}', style: TextStyle(color: b.mutedTextColor))))])));
+  Widget _eventsSection(List<Map<String, dynamic>> items, ClubBranding b) {
+    if (items.isEmpty) return _emptySection('Eventos', Icons.timeline, b);
+    return _cardSection('Eventos', Icons.timeline, b, items.map((item) {
+      final minute = _eventMinute(item);
+      final type = _string(item['type']?['name']) ?? _string(item['type_name']) ?? _string(item['type']) ?? 'Evento';
+      final player = _playerName(item['player']);
+      final related = _playerName(item['related_player']);
+      final detailText = [if (player != null) player, if (related != null) '↔ $related', if (_string(item['result']) != null) _string(item['result'])!].join(' · ');
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: SizedBox(width: 48, child: Text(minute == null ? '—' : '$minute\'', textAlign: TextAlign.center, style: TextStyle(color: b.primaryColor, fontWeight: FontWeight.w900))),
+        title: Text(type, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
+        subtitle: detailText.isEmpty ? null : Text(detailText, style: TextStyle(color: b.mutedTextColor)),
+      );
+    }).toList());
   }
 
+  Widget _lineupsSection(List<Map<String, dynamic>> items, FixtureSummary fixture, ClubBranding b) {
+    if (items.isEmpty) return _emptySection('Equipas', Icons.groups_outlined, b);
+    final homeId = fixture.homeTeam['externalId']?.toString();
+    final awayId = fixture.awayTeam['externalId']?.toString();
+    final home = items.where((item) => _teamId(item) == homeId).toList();
+    final away = items.where((item) => _teamId(item) == awayId).toList();
+    final unknown = items.where((item) => _teamId(item) != homeId && _teamId(item) != awayId).toList();
+    return Card(color: b.surfaceColor, margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle('Equipas', Icons.groups_outlined, b),
+      if (home.isNotEmpty) _lineupTeam(fixture.homeName, home, b),
+      if (away.isNotEmpty) _lineupTeam(fixture.awayName, away, b),
+      if (unknown.isNotEmpty) _lineupTeam('Jogadores', unknown, b),
+    ])));
+  }
+
+  Widget _lineupTeam(String team, List<Map<String, dynamic>> players, ClubBranding b) {
+    final starters = players.where((p) => _isStarter(p)).toList();
+    final subs = players.where((p) => !_isStarter(p)).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: 8),
+      Text(team, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w900)),
+      if (starters.isNotEmpty) ...[_lineupLabel('Titulares', b), ...starters.map((p) => _playerTile(p, b))],
+      if (subs.isNotEmpty) ...[_lineupLabel('Suplentes', b), ...subs.map((p) => _playerTile(p, b))],
+    ]);
+  }
+
+  Widget _playerTile(Map<String, dynamic> item, ClubBranding b) {
+    final player = _playerName(item['player']) ?? _string(item['player_name']) ?? 'Jogador';
+    final jersey = item['jersey_number']?.toString() ?? item['jersey']?.toString();
+    final position = _string(item['formation_position']) ?? _string(item['position']);
+    return ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: CircleAvatar(radius: 18, backgroundColor: b.primaryColor.withValues(alpha: .12), child: Text(jersey ?? '•', style: TextStyle(color: b.primaryColor, fontWeight: FontWeight.w800))), title: Text(player, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), subtitle: position == null ? null : Text(position, style: TextStyle(color: b.mutedTextColor)));
+  }
+
+  Widget _statsSection(List<Map<String, dynamic>> items, FixtureSummary fixture, ClubBranding b) {
+    if (items.isEmpty) return _emptySection('Estatísticas', Icons.bar_chart_outlined, b);
+    final homeId = fixture.homeTeam['externalId']?.toString();
+    final awayId = fixture.awayTeam['externalId']?.toString();
+    final grouped = <String, Map<String, dynamic>>{};
+    for (final item in items) {
+      final name = _statName(item);
+      final team = _teamId(item);
+      final key = '$name|${team ?? 'unknown'}';
+      grouped[key] = item;
+    }
+    final names = grouped.values.map(_statName).whereType<String>().toSet().toList();
+    return Card(color: b.surfaceColor, margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: Column(children: [
+      _sectionTitle('Estatísticas', Icons.bar_chart_outlined, b),
+      ...names.map((name) {
+        final home = _statValue(grouped['$name|$homeId']);
+        final away = _statValue(grouped['$name|$awayId']);
+        return Padding(padding: const EdgeInsets.symmetric(vertical: 7), child: Row(children: [
+          Expanded(child: Text(home ?? '—', textAlign: TextAlign.center, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800))),
+          Expanded(flex: 2, child: Text(name, textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor, fontSize: 12, fontWeight: FontWeight.w700))),
+          Expanded(child: Text(away ?? '—', textAlign: TextAlign.center, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800))),
+        ]));
+      }),
+    ])));
+  }
+
+  Widget _cardSection(String title, IconData icon, ClubBranding b, List<Widget> children) => Card(color: b.surfaceColor, margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_sectionTitle(title, icon, b), ...children])));
+  Widget _sectionTitle(String title, IconData icon, ClubBranding b) => Row(children: [Icon(icon, color: b.primaryColor), const SizedBox(width: 10), Text(title, style: TextStyle(color: b.textColor, fontSize: 17, fontWeight: FontWeight.w900))]);
+  Widget _lineupLabel(String title, ClubBranding b) => Padding(padding: const EdgeInsets.only(top: 8, bottom: 2), child: Text(title, style: TextStyle(color: b.mutedTextColor, fontSize: 12, fontWeight: FontWeight.w800)));
+  Widget _emptySection(String title, IconData icon, ClubBranding b) => Card(color: b.surfaceColor, margin: const EdgeInsets.only(bottom: 10), child: ListTile(leading: Icon(icon, color: b.primaryColor), title: Text(title, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)), subtitle: Text('Dados ainda não disponibilizados pelo fornecedor.', style: TextStyle(color: b.mutedTextColor))));
   Widget _infoCard(IconData icon, String title, String subtitle, ClubBranding b) => Card(color: b.surfaceColor, margin: EdgeInsets.zero, child: ListTile(leading: Icon(icon, color: b.primaryColor), title: Text(title, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)), subtitle: Text(subtitle, style: TextStyle(color: b.mutedTextColor))));
   Widget _errorCard(ClubBranding b) => Card(color: b.surfaceColor, child: ListTile(leading: Icon(Icons.error_outline, color: b.primaryColor), title: Text('Não foi possível carregar o jogo.', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)), trailing: TextButton(onPressed: _load, child: const Text('Tentar'))));
+
+  String? _eventMinute(Map<String, dynamic> item) {
+    final minute = item['minute'] ?? item['time']?['minute'];
+    final extra = item['extra_minute'] ?? item['time']?['extra_minute'];
+    if (minute == null) return null;
+    return extra == null ? minute.toString() : '${minute}+${extra}';
+  }
+
+  String? _teamId(Map<String, dynamic> item) => item['participant_id']?.toString() ?? item['team_id']?.toString();
+  String? _statName(Map<String, dynamic> item) => _string(item['type']?['name']) ?? _string(item['type_name']) ?? _string(item['name']);
+  String? _statValue(Map<String, dynamic>? item) {
+    if (item == null) return null;
+    final value = item['data']?['value'] ?? item['value'] ?? item['result'];
+    return value?.toString();
+  }
+  String? _playerName(dynamic player) => player is Map ? _string(player['display_name']) ?? _string(player['name']) ?? _string(player['common_name']) : player?.toString();
+  String? _string(dynamic value) => value == null || value.toString().trim().isEmpty ? null : value.toString();
+  bool _isStarter(Map<String, dynamic> item) => item['starter'] == true || item['formation_field'] != null || item['formation_position'] != null;
 }
