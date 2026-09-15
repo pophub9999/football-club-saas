@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FootballFixture, FootballFixtureDetails, FootballPlayer, FootballProvider, FootballStanding } from './football.types';
+import { FootballFixture, FootballFixtureDetails, FootballPlayer, FootballProvider, FootballSquadPlayer, FootballStanding } from './football.types';
 
 interface SportmonksResponse {
   data?: Record<string, any>[] | Record<string, any>;
@@ -84,6 +84,37 @@ export class SportmonksFootballProvider implements FootballProvider {
     if (position != null) player.position = String(position);
     if (detailedPosition != null) player.detailedPosition = String(detailedPosition);
     return player;
+  }
+
+  async getSquad(teamExternalId: string, seasonExternalId?: string): Promise<FootballSquadPlayer[]> {
+    const path = seasonExternalId
+      ? `/squads/seasons/${encodeURIComponent(seasonExternalId)}/teams/${encodeURIComponent(teamExternalId)}`
+      : `/squads/teams/${encodeURIComponent(teamExternalId)}`;
+    const data = await this.request(path, 'team;player;position;detailedPosition;transfer');
+    if (!Array.isArray(data)) throw new ServiceUnavailableException('Invalid Sportmonks squad response');
+
+    return data
+      .map((item) => this.mapSquadPlayer(item))
+      .filter((player) => player.inSquad !== false);
+  }
+
+  private mapSquadPlayer(item: Record<string, any>): FootballSquadPlayer {
+    const player = item.player ?? item;
+    const result: FootballSquadPlayer = {
+      externalId: String(item.player_id ?? player.id),
+      name: String(player.name ?? player.display_name ?? player.common_name ?? 'Jogador'),
+    };
+    if (player.display_name != null) result.displayName = String(player.display_name);
+    if (player.image_path != null) result.imageUrl = String(player.image_path);
+    const position = item.position?.name ?? player.position?.name ?? player.position;
+    const detailedPosition = item.detailedPosition?.name ?? player.detailedPosition?.name ?? player.detailed_position?.name;
+    if (position != null) result.position = String(position);
+    if (detailedPosition != null) result.detailedPosition = String(detailedPosition);
+    if (typeof item.jersey_number === 'number') result.jerseyNumber = item.jersey_number;
+    const captain = item.is_captain ?? item.captain;
+    if (typeof captain === 'boolean') result.isCaptain = captain;
+    if (typeof item.in_squad === 'boolean') result.inSquad = item.in_squad;
+    return result;
   }
 
   private mapFixture(item: Record<string, any>): FootballFixture {
