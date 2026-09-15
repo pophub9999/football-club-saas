@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
@@ -13,6 +14,14 @@ export type NotificationPreferencePatch = {
   matchday?: boolean | undefined;
   marketing?: boolean | undefined;
 };
+
+export type NotificationDevicePlatform = 'android' | 'ios';
+
+export interface RegisterNotificationDeviceInput {
+  token: string;
+  platform: NotificationDevicePlatform;
+  appVersion?: string;
+}
 
 const DEFAULT_PREFERENCES: NotificationPreferences = {
   notifications: true,
@@ -54,5 +63,45 @@ export class NotificationsService {
     );
 
     return next;
+  }
+
+  async registerDevice(userId: string, tenantId: string, input: RegisterNotificationDeviceInput) {
+    const token = input.token.trim();
+    if (token.length < 20 || token.length > 4096) {
+      throw new Error('Invalid notification device token');
+    }
+
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const appVersion = input.appVersion?.trim().slice(0, 40) || null;
+
+    await this.prisma.$executeRaw(
+      Prisma.sql`INSERT INTO user_notification_devices
+                   (user_id, tenant_id, token, token_hash, platform, app_version, last_seen_at, created_at, updated_at)
+                 VALUES (${userId}::uuid, ${tenantId}::uuid, ${token}, ${tokenHash}, ${input.platform}, ${appVersion}, NOW(), NOW(), NOW())
+                 ON CONFLICT (token_hash)
+                 DO UPDATE SET user_id = EXCLUDED.user_id,
+                               tenant_id = EXCLUDED.tenant_id,
+                               platform = EXCLUDED.platform,
+                               app_version = EXCLUDED.app_version,
+                               last_seen_at = NOW(),
+                               updated_at = NOW()`,
+    );
+
+    return { registered: true, platform: input.platform };
+  }
+
+  async unregisterDevice(userId: string, tenantId: string, token: string) {
+    const normalizedToken = token.trim();
+    if (!normalizedToken) return { removed: false };
+
+    const tokenHash = createHash('sha256').update(normalizedToken).digest('hex');
+    const removed = await this.prisma.$executeRaw(
+      Prisma.sql`DELETE FROM user_notification_devices
+                 WHERE token_hash = ${tokenHash}
+                   AND user_id = ${userId}::uuid
+                   AND tenant_id = ${tenantId}::uuid`,
+    );
+
+    return { removed: removed > 0 };
   }
 }
