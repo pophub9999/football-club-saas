@@ -34,6 +34,13 @@ class ApiClient {
     return _decode<T>(response);
   }
 
+  Future<T> deleteJson<T>(String path, Map<String, dynamic> body, {String? accessToken}) async {
+    final headers = <String, String>{'content-type': 'application/json'};
+    if (accessToken != null) headers['authorization'] = 'Bearer $accessToken';
+    final response = await _client.delete(Uri.parse('$baseUrl$path'), headers: headers, body: jsonEncode(body));
+    return _decode<T>(response);
+  }
+
   Future<T> getJson<T>(String path, {String? accessToken}) async {
     final headers = <String, String>{'accept': 'application/json'};
     if (accessToken != null) headers['authorization'] = 'Bearer $accessToken';
