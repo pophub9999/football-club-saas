@@ -10,10 +10,7 @@ export class FootballController {
   constructor(private readonly footballService: FootballService) {}
 
   @Get('fixtures/upcoming')
-  upcoming(
-    @UserRequest() user: AuthenticatedUser,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-  ) {
+  upcoming(@UserRequest() user: AuthenticatedUser, @Query('limit', new ParseIntPipe({ optional: true })) limit?: number) {
     return this.footballService.getUpcomingFixtures(user.tenantId, limit);
   }
 
@@ -32,12 +29,13 @@ export class FootballController {
     return this.footballService.getStandings(seasonId);
   }
 
+  @Get('teams')
+  getTeams(@UserRequest() user: AuthenticatedUser, @Query('limit', new ParseIntPipe({ optional: true })) limit?: number) {
+    return this.footballService.getTeams(user.tenantId, limit);
+  }
+
   @Get('players/:playerId')
-  getPlayer(
-    @UserRequest() user: AuthenticatedUser,
-    @Param('playerId') playerId: string,
-    @Query('seasonId') seasonId?: string,
-  ) {
+  getPlayer(@UserRequest() user: AuthenticatedUser, @Param('playerId') playerId: string, @Query('seasonId') seasonId?: string) {
     return seasonId
       ? this.footballService.getPlayer(playerId, seasonId)
       : this.footballService.getCurrentPlayer(user.tenantId, playerId);
