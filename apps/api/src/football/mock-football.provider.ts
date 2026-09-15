@@ -46,10 +46,9 @@ export class MockFootballProvider implements FootballProvider {
   }
 
   async getPlayer(externalPlayerId: string, _seasonExternalId?: string): Promise<FootballPlayer> {
-    return {
+    const player: FootballPlayer = {
       externalId: externalPlayerId,
       name: externalPlayerId === 'mock-player-001' ? 'João Silva' : 'Jogador de demonstração',
-      displayName: externalPlayerId === 'mock-player-001' ? 'J. Silva' : undefined,
       nationality: 'Portugal',
       birthDate: '2000-01-15',
       height: 181,
@@ -64,5 +63,7 @@ export class MockFootballProvider implements FootballProvider {
         { type: { name: 'Assists' }, value: 2 },
       ] }],
     };
+    if (externalPlayerId === 'mock-player-001') player.displayName = 'J. Silva';
+    return player;
   }
 }
