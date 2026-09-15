@@ -22,6 +22,11 @@ export class FootballController {
     return this.footballService.getFixture(user.tenantId, fixtureId);
   }
 
+  @Get('standings/current')
+  getCurrentStandings(@UserRequest() user: AuthenticatedUser) {
+    return this.footballService.getCurrentStandings(user.tenantId);
+  }
+
   @Get('standings/:seasonId')
   getStandings(@Param('seasonId') seasonId: string) {
     return this.footballService.getStandings(seasonId);
