@@ -2,7 +2,6 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { PrismaService } from '../prisma/prisma.service';
 
 const ADMIN_ROLES = ['club_owner', 'club_admin'];
-const ALLOWED = ['shortName', 'slogan', 'primary', 'secondary', 'accent', 'background', 'surface', 'logoUrl', 'logoDarkUrl', 'heroImageUrl', 'appIconUrl', 'textColor', 'mutedTextColor'];
 
 @Injectable()
 export class AdminBrandingService {
@@ -28,29 +27,22 @@ export class AdminBrandingService {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
     if (!tenant) throw new BadRequestException('Tenant not found');
 
-    const value = (key: string) => typeof body[key] === 'string' ? String(body[key]).trim() : undefined;
-    const data = {
-      shortName: value('shortName'),
-      slogan: value('slogan'),
-      primaryColor: value('primary'),
-      secondaryColor: value('secondary'),
-      accentColor: value('accent'),
-      backgroundColor: value('background'),
-      surfaceColor: value('surface'),
-      logoUrl: value('logoUrl'),
-      logoDarkUrl: value('logoDarkUrl'),
-      heroImageUrl: value('heroImageUrl'),
-      appIconUrl: value('appIconUrl'),
-      textColor: value('textColor'),
-      mutedTextColor: value('mutedTextColor'),
-    };
+    const text = (key: string) => typeof body[key] === 'string' ? String(body[key]).trim() : undefined;
+    const name = text('name');
+    const settingsData = Object.fromEntries(Object.entries({
+      shortName: text('shortName'),
+      slogan: text('slogan'),
+      primaryColor: text('primary'),
+      secondaryColor: text('secondary'),
+      accentColor: text('accent'),
+      backgroundColor: text('background'),
+      surfaceColor: text('surface'),
+    }).filter(([, value]) => value !== undefined));
 
-    const cleaned = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
-    const settings = await this.prisma.tenantSettings.upsert({
-      where: { tenantId },
-      create: { tenantId, ...cleaned },
-      update: cleaned,
-    });
-    return { tenantId, branding: settings, persisted: true };
+    const [updatedTenant, settings] = await this.prisma.$transaction([
+      ...(name !== undefined ? [this.prisma.tenant.update({ where: { id: tenantId }, data: { name } })] : [this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })]),
+      this.prisma.tenantSettings.upsert({ where: { tenantId }, create: { tenantId, ...settingsData }, update: settingsData }),
+    ]);
+    return { tenantId: updatedTenant.id, branding: settings, persisted: true };
   }
 }
