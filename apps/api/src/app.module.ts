@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { ClubsModule } from './clubs/clubs.module';
 import { ContentModule } from './content/content.module';
@@ -20,6 +21,7 @@ import { TicketsModule } from './tickets/tickets.module';
     DatabaseModule,
     TenancyModule,
     AuthModule,
+    AdminModule,
     ClubsModule,
     ContentModule,
     ErpModule,
