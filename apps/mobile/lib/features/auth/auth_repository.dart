@@ -3,45 +3,33 @@ import '../../core/branding/club_branding.dart';
 
 class AuthSession {
   const AuthSession({required this.accessToken, required this.refreshToken, required this.user});
-
   final String accessToken;
   final String refreshToken;
   final Map<String, dynamic> user;
 
-  factory AuthSession.fromJson(Map<String, dynamic> json) {
-    return AuthSession(
-      accessToken: json['accessToken'] as String,
-      refreshToken: json['refreshToken'] as String,
-      user: Map<String, dynamic>.from(json['user'] as Map),
-    );
-  }
+  factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
+    accessToken: json['accessToken'] as String,
+    refreshToken: json['refreshToken'] as String,
+    user: Map<String, dynamic>.from(json['user'] as Map),
+  );
 }
 
 class ClubOption {
   const ClubOption({required this.id, required this.name, required this.slug});
-
   final String id;
   final String name;
   final String slug;
 
-  factory ClubOption.fromJson(Map<String, dynamic> json) {
-    return ClubOption(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      slug: json['slug'] as String,
-    );
-  }
+  factory ClubOption.fromJson(Map<String, dynamic> json) => ClubOption(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    slug: json['slug'] as String,
+  );
 }
 
 class LoginResult {
-  const LoginResult.authenticated(this.session)
-      : selectionRequired = false,
-        clubs = const [];
-
-  const LoginResult.selection(this.clubs)
-      : selectionRequired = true,
-        session = null;
-
+  const LoginResult.authenticated(this.session) : selectionRequired = false, clubs = const [];
+  const LoginResult.selection(this.clubs) : selectionRequired = true, session = null;
   final bool selectionRequired;
   final AuthSession? session;
   final List<ClubOption> clubs;
@@ -58,29 +46,29 @@ class LoginResult {
 }
 
 class HomeData {
-  const HomeData({required this.club, required this.member, required this.dues});
-
+  const HomeData({required this.club, required this.member, required this.dues, this.nextMatch, this.news = const []});
   final Map<String, dynamic> club;
   final Map<String, dynamic> member;
   final Map<String, dynamic> dues;
+  final Map<String, dynamic>? nextMatch;
+  final List<Map<String, dynamic>> news;
 
-  ClubBranding get branding => ClubBranding.fromJson({
-        'club': club,
-        'branding': club['branding'],
-      });
+  ClubBranding get branding => ClubBranding.fromJson({'club': club, 'branding': club['branding']});
 
-  factory HomeData.fromJson(Map<String, dynamic> json) {
-    return HomeData(
-      club: Map<String, dynamic>.from(json['club'] as Map),
-      member: Map<String, dynamic>.from(json['member'] as Map),
-      dues: Map<String, dynamic>.from(json['dues'] as Map),
-    );
-  }
+  factory HomeData.fromJson(Map<String, dynamic> json) => HomeData(
+    club: Map<String, dynamic>.from(json['club'] as Map),
+    member: Map<String, dynamic>.from(json['member'] as Map),
+    dues: Map<String, dynamic>.from(json['dues'] as Map),
+    nextMatch: json['nextMatch'] is Map ? Map<String, dynamic>.from(json['nextMatch'] as Map) : null,
+    news: (json['news'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false),
+  );
 }
 
 class AuthRepository {
   AuthRepository(this.api);
-
   final ApiClient api;
 
   Future<LoginResult> login({required String email, required String password, String? tenantId}) async {
@@ -89,15 +77,15 @@ class AuthRepository {
     return LoginResult.fromJson(await api.postJson('/auth/login', payload));
   }
 
-  Future<AuthSession> refresh(String refreshToken) async {
-    return AuthSession.fromJson(await api.postJson('/auth/refresh', {'refreshToken': refreshToken}));
-  }
+  Future<AuthSession> refresh(String refreshToken) async => AuthSession.fromJson(
+    await api.postJson('/auth/refresh', {'refreshToken': refreshToken}),
+  );
 
-  Future<ClubBranding> loadBranding(String accessToken) async {
-    return ClubBranding.fromJson(await api.getJson('/clubs/current/branding', accessToken: accessToken));
-  }
+  Future<ClubBranding> loadBranding(String accessToken) async => ClubBranding.fromJson(
+    await api.getJson('/clubs/current/branding', accessToken: accessToken),
+  );
 
-  Future<HomeData> loadHome(String accessToken) async {
-    return HomeData.fromJson(await api.getJson('/me/home', accessToken: accessToken));
-  }
+  Future<HomeData> loadHome(String accessToken) async => HomeData.fromJson(
+    await api.getJson('/me/home', accessToken: accessToken),
+  );
 }
