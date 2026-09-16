@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, foundation-clean]
+    branches: [main, foundation-clean, backoffice-v2-games-content-tickets]
   pull_request:
     branches: [main]
 
