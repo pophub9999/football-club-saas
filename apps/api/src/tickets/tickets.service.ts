@@ -7,13 +7,18 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { TransferTicketDto } from './dto/transfer-ticket.dto';
 
 const QR_TTL_SECONDS = 45;
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly prisma: PrismaService, private readonly config: ConfigService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async listMyTickets(tenantId: string, userId: string) {
     return this.prisma.ticket.findMany({ where: { tenantId, userId }, orderBy: { event: { startsAt: 'asc' } }, include: { event: { select: { id: true, name: true, startsAt: true, endsAt: true, venueName: true, venueAddress: true, status: true } } } });
@@ -88,7 +93,7 @@ export class TicketsService {
   }
 
   async requestTransfer(tenantId: string, fromUserId: string, ticketId: string, dto: TransferTicketDto) {
-    const ticket = await this.prisma.ticket.findFirst({ where: { id: ticketId, tenantId, userId: fromUserId }, include: { event: { select: { startsAt: true } } } });
+    const ticket = await this.prisma.ticket.findFirst({ where: { id: ticketId, tenantId, userId: fromUserId }, include: { event: { select: { startsAt: true, name: true } } } });
     if (!ticket) throw new NotFoundException('Ticket not found');
     if (!['ISSUED', 'ACTIVE'].includes(ticket.status)) throw new BadRequestException('Only issued or active tickets can be transferred');
     if (ticket.event.startsAt <= new Date()) throw new BadRequestException('Tickets cannot be transferred after the event has started');
@@ -105,17 +110,25 @@ export class TicketsService {
     const existing = await this.prisma.ticketTransfer.findFirst({ where: { ticketId, status: 'PENDING', expiresAt: { gt: new Date() } }, select: { id: true } });
     if (existing) throw new ConflictException('This ticket already has a pending transfer');
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    return this.prisma.$transaction(async (tx) => {
-      const transfer = await tx.ticketTransfer.create({ data: { tenantId, ticketId, fromUserId, toUserId: recipientUserId, status: 'PENDING', expiresAt } });
-      await tx.auditLog.create({ data: { tenantId, userId: fromUserId, action: 'TICKET_TRANSFER_REQUESTED', resource: 'TicketTransfer', resourceId: transfer.id, metadata: { ticketId, toUserId: recipientUserId, expiresAt: expiresAt.toISOString() } } });
-      return transfer;
+    const transfer = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.ticketTransfer.create({ data: { tenantId, ticketId, fromUserId, toUserId: recipientUserId!, status: 'PENDING', expiresAt } });
+      await tx.auditLog.create({ data: { tenantId, userId: fromUserId, action: 'TICKET_TRANSFER_REQUESTED', resource: 'TicketTransfer', resourceId: created.id, metadata: { ticketId, toUserId: recipientUserId, expiresAt: expiresAt.toISOString() } } });
+      return created;
     });
+
+    await this.notifications.sendGeneralNotification(recipientUserId, tenantId, {
+      title: 'Novo bilhete recebido',
+      body: `Recebeste uma transferência para ${ticket.event.name}. Abre a app para aceitar o bilhete.`,
+      data: { type: 'ticket_transfer', transferId: transfer.id, ticketId },
+    });
+
+    return transfer;
   }
 
   async acceptTransfer(tenantId: string, recipientUserId: string, transferId: string) {
     const now = new Date();
-    return this.prisma.$transaction(async (tx) => {
-      const transfer = await tx.ticketTransfer.findFirst({ where: { id: transferId, tenantId, toUserId: recipientUserId }, include: { ticket: { select: { id: true, status: true, userId: true, event: { select: { startsAt: true } } } } } });
+    const result = await this.prisma.$transaction(async (tx) => {
+      const transfer = await tx.ticketTransfer.findFirst({ where: { id: transferId, tenantId, toUserId: recipientUserId }, include: { ticket: { select: { id: true, status: true, userId: true, event: { select: { startsAt: true, name: true } } } } } });
       if (!transfer) throw new NotFoundException('Transfer not found');
       if (transfer.status !== 'PENDING') throw new ConflictException('Transfer is no longer pending');
       if (transfer.expiresAt && transfer.expiresAt <= now) { await tx.ticketTransfer.update({ where: { id: transfer.id }, data: { status: 'EXPIRED' } }); throw new ConflictException('Transfer has expired'); }
@@ -126,7 +139,15 @@ export class TicketsService {
       if (updatedTicket.count !== 1) throw new ConflictException('Ticket ownership changed during transfer');
       const accepted = await tx.ticketTransfer.update({ where: { id: transfer.id }, data: { status: 'ACCEPTED', acceptedAt: now } });
       await tx.auditLog.create({ data: { tenantId, userId: recipientUserId, action: 'TICKET_TRANSFER_ACCEPTED', resource: 'TicketTransfer', resourceId: transfer.id, metadata: { ticketId: transfer.ticketId, fromUserId: transfer.fromUserId } } });
-      return accepted;
+      return { accepted, fromUserId: transfer.fromUserId, eventName: transfer.ticket.event.name, ticketId: transfer.ticketId };
     });
+
+    await this.notifications.sendGeneralNotification(result.fromUserId, tenantId, {
+      title: 'Transferência aceite',
+      body: `A transferência do bilhete para ${result.eventName} foi aceite.`,
+      data: { type: 'ticket_transfer_accepted', transferId, ticketId: result.ticketId },
+    });
+
+    return result.accepted;
   }
 }
