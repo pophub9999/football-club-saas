@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/auth.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
@@ -15,13 +15,13 @@ export class AdminRewardsController {
 
   @Get()
   list(@CurrentUser() user: AuthenticatedUser) {
-    if (!isClubAdmin(user)) throw new Error('Forbidden');
+    if (!isClubAdmin(user)) throw new ForbiddenException();
     return this.rewards.adminList(user.tenantId);
   }
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: Record<string, unknown>) {
-    if (!isClubAdmin(user)) throw new Error('Forbidden');
+    if (!isClubAdmin(user)) throw new ForbiddenException();
     return this.rewards.adminCreate(user.tenantId, {
       name: typeof body.name === 'string' ? body.name : '',
       description: typeof body.description === 'string' ? body.description : undefined,
@@ -32,13 +32,13 @@ export class AdminRewardsController {
 
   @Patch(':rewardId')
   setActive(@CurrentUser() user: AuthenticatedUser, @Param('rewardId') rewardId: string, @Body() body: Record<string, unknown>) {
-    if (!isClubAdmin(user)) throw new Error('Forbidden');
+    if (!isClubAdmin(user)) throw new ForbiddenException();
     return this.rewards.adminSetActive(user.tenantId, rewardId, body.isActive === true);
   }
 
   @Post('/award')
   award(@CurrentUser() user: AuthenticatedUser, @Body() body: Record<string, unknown>) {
-    if (!isClubAdmin(user)) throw new Error('Forbidden');
+    if (!isClubAdmin(user)) throw new ForbiddenException();
     return this.rewards.adminAward(user.tenantId, String(body.userId ?? ''), Number(body.points), String(body.reason ?? ''));
   }
 }
