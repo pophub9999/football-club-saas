@@ -17,6 +17,7 @@ class HomeScreen extends StatefulWidget {
   final String accessToken;
   final VoidCallback onLogout;
   final bool canScan;
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -28,14 +29,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool loading = true;
 
   ClubBranding get b => data?.branding ?? widget.branding;
-
-  String get greetingName {
-    final firstName = data?.member['firstName'];
-    if (firstName is String && firstName.trim().isNotEmpty) return firstName.trim();
-    final displayName = data?.member['displayName'];
-    if (displayName is String && displayName.trim().isNotEmpty) return displayName.trim().split(' ').first;
-    return 'Adepto';
-  }
 
   @override
   void initState() {
@@ -57,9 +50,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Widget content;
+    switch (selectedIndex) {
+      case 1:
+        content = GamesScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
+        break;
+      case 2:
+        content = ClubScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
+        break;
+      case 3:
+        content = WalletScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
+        break;
+      case 4:
+        content = SettingsScreen(branding: b, api: widget.api, accessToken: widget.accessToken, onLogout: widget.onLogout, canScan: widget.canScan);
+        break;
+      default:
+        content = _homeContent(context);
+    }
     return Scaffold(
       backgroundColor: b.backgroundColor,
-      body: SafeArea(child: _content(context)),
+      body: SafeArea(child: content),
       bottomNavigationBar: NavigationBar(
         backgroundColor: b.surfaceColor,
         indicatorColor: b.primaryColor.withValues(alpha: 0.18),
@@ -76,16 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _content(BuildContext context) {
-    if (selectedIndex == 1) return GamesScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
-    if (selectedIndex == 2) return ClubScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
-    if (selectedIndex == 3) return WalletScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
-    if (selectedIndex == 4) {
-      return SettingsScreen(branding: b, api: widget.api, accessToken: widget.accessToken, onLogout: widget.onLogout, canScan: widget.canScan);
-    }
+  Widget _homeContent(BuildContext context) {
     if (loading && data == null) return Center(child: CircularProgressIndicator(color: b.primaryColor));
     if (data == null) return _errorState();
-
     return RefreshIndicator(
       color: b.primaryColor,
       onRefresh: _load,
@@ -117,50 +120,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _errorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.cloud_off_outlined, size: 48, color: b.mutedTextColor),
-            const SizedBox(height: 14),
-            Text('Não foi possível carregar a tua área de sócio.', textAlign: TextAlign.center, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 14),
-            OutlinedButton(onPressed: loading ? null : _load, child: const Text('Tentar novamente')),
-            if (error != null) ...[
-              const SizedBox(height: 8),
-              Text(error.toString(), textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor, fontSize: 11)),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _errorState() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.cloud_off_outlined, size: 48, color: b.mutedTextColor),
+        const SizedBox(height: 14),
+        Text('Não foi possível carregar a tua área de sócio.', textAlign: TextAlign.center, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 14),
+        OutlinedButton(onPressed: loading ? null : _load, child: const Text('Tentar novamente')),
+      ]),
+    ),
+  );
 
   void _openNews() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => NewsScreen(branding: b, api: widget.api, accessToken: widget.accessToken)));
   }
 
   Widget _header(BuildContext context) {
-    final memberNumber = data!.member['memberNumber']?.toString();
-    final clubLabel = b.shortName ?? 'Área de sócio';
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Olá, $greetingName', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: b.textColor, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Text(memberNumber == null || memberNumber.isEmpty ? clubLabel : 'Sócio nº $memberNumber', style: TextStyle(color: b.mutedTextColor, fontSize: 13)),
-            ],
-          ),
-        ),
-        _logo(),
-      ],
-    );
+    final firstName = data!.member['firstName'];
+    final displayName = data!.member['displayName'];
+    final name = firstName is String && firstName.trim().isNotEmpty ? firstName.trim() : displayName is String && displayName.trim().isNotEmpty ? displayName.trim().split(' ').first : 'Adepto';
+    final number = data!.member['memberNumber']?.toString();
+    return Row(children: [
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Olá, $name', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: b.textColor, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(number == null || number.isEmpty ? (b.shortName ?? 'Área de sócio') : 'Sócio nº $number', style: TextStyle(color: b.mutedTextColor, fontSize: 13)),
+      ])),
+      _logo(),
+    ]);
   }
 
   Widget _logo() {
@@ -170,91 +159,71 @@ class _HomeScreenState extends State<HomeScreen> {
       height: 46,
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(color: b.surfaceColor, shape: BoxShape.circle),
-      child: url == null || url.trim().isEmpty
-          ? Icon(Icons.shield, color: b.primaryColor)
-          : Image.network(url, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor)),
+      child: url == null || url.trim().isEmpty ? Icon(Icons.shield, color: b.primaryColor) : Image.network(url, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor)),
     );
   }
 
   Widget _nextMatch() {
     final match = data!.nextMatch;
     if (match == null) {
-      return _gradientCard(child: const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Center(child: Text('Ainda não existem próximos jogos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))));
+      return _gradientCard(const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Center(child: Text('Ainda não existem próximos jogos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))));
     }
-    final home = _map(match['homeTeam']);
-    final away = _map(match['awayTeam']);
+    final home = _asMap(match['homeTeam']);
+    final away = _asMap(match['awayTeam']);
     final kickoff = _parseDate(match['kickoffAt']);
     final when = kickoff == null ? 'Data a confirmar' : '${kickoff.day.toString().padLeft(2, '0')}/${kickoff.month.toString().padLeft(2, '0')} · ${kickoff.hour.toString().padLeft(2, '0')}:${kickoff.minute.toString().padLeft(2, '0')}';
-    return _gradientCard(
-      child: Column(
-        children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('PRÓXIMO JOGO', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12)),
-            Text(when, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-          ]),
-          const SizedBox(height: 22),
-          Row(children: [
-            Expanded(child: _team(home)),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('VS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800))),
-            Expanded(child: _team(away)),
-          ]),
-          if (match['venueName'] is String && (match['venueName'] as String).trim().isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Text((match['venueName'] as String).trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-          ],
-        ],
-      ),
-    );
+    return _gradientCard(Column(children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('PRÓXIMO JOGO', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text(when, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+      ]),
+      const SizedBox(height: 22),
+      Row(children: [
+        Expanded(child: _team(home)),
+        const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('VS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800))),
+        Expanded(child: _team(away)),
+      ]),
+      if (match['venueName'] is String && (match['venueName'] as String).trim().isNotEmpty) ...[
+        const SizedBox(height: 14),
+        Text((match['venueName'] as String).trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+      ],
+    ]));
   }
 
-  Widget _gradientCard({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor]), borderRadius: BorderRadius.circular(24)),
-      child: child,
-    );
-  }
+  Widget _gradientCard(Widget child) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor]), borderRadius: BorderRadius.circular(24)),
+    child: child,
+  );
 
   Widget _team(Map<String, dynamic> team) {
-    final shortName = team['shortName'];
-    final fullName = team['name'];
-    final name = shortName is String && shortName.trim().isNotEmpty ? shortName.trim() : fullName is String && fullName.trim().isNotEmpty ? fullName.trim() : 'Equipa';
+    final short = team['shortName'];
+    final full = team['name'];
+    final name = short is String && short.trim().isNotEmpty ? short.trim() : full is String && full.trim().isNotEmpty ? full.trim() : 'Equipa';
     final logo = team['logoUrl'];
-    return Column(
-      children: [
-        Container(
-          width: 58,
-          height: 58,
-          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-          child: logo is String && logo.trim().isNotEmpty
-              ? ClipOval(child: Image.network(logo, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor, size: 30)))
-              : Icon(Icons.shield, color: b.primaryColor, size: 30),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(width: 100, child: Text(name, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12))),
-      ],
-    );
+    return Column(children: [
+      Container(
+        width: 58,
+        height: 58,
+        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        child: logo is String && logo.trim().isNotEmpty ? ClipOval(child: Image.network(logo, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor, size: 30))) : Icon(Icons.shield, color: b.primaryColor, size: 30),
+      ),
+      const SizedBox(height: 8),
+      SizedBox(width: 100, child: Text(name, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12))),
+    ]);
   }
 
-  Widget _sectionTitle(BuildContext context, String title) {
-    return Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: b.textColor));
-  }
+  Widget _sectionTitle(BuildContext context, String title) => Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: b.textColor));
 
   Widget _duesCard() {
-    final rawNextDue = data!.dues['nextDue'];
-    final due = rawNextDue is Map ? Map<String, dynamic>.from(rawNextDue) : null;
+    final raw = data!.dues['nextDue'];
+    final due = raw is Map ? Map<String, dynamic>.from(raw) : null;
     final amount = _formatAmount(data!.dues['outstandingAmount']);
     final description = due?['description'];
     final reference = due?['reference'];
     final label = description is String && description.trim().isNotEmpty ? description.trim() : reference is String && reference.trim().isNotEmpty ? reference.trim() : 'Sem quotas pendentes';
     final status = due?['status']?.toString().toUpperCase();
-    String statusLabel;
-    switch (status) {
-      case 'OVERDUE': statusLabel = 'Vencida'; break;
-      case 'PARTIALLY_PAID': statusLabel = 'Parcialmente paga'; break;
-      case 'OPEN': statusLabel = 'Por pagar'; break;
-      default: statusLabel = 'Em dia';
-    }
+    final statusLabel = status == 'OVERDUE' ? 'Vencida' : status == 'PARTIALLY_PAID' ? 'Parcialmente paga' : status == 'OPEN' ? 'Por pagar' : 'Em dia';
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20)),
@@ -270,38 +239,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _ticketsButton() {
-    return Material(
-      color: b.surfaceColor,
+  Widget _ticketsButton() => Material(
+    color: b.surfaceColor,
+    borderRadius: BorderRadius.circular(18),
+    child: InkWell(
       borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TicketsScreen(branding: b, api: widget.api, accessToken: widget.accessToken))),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(children: [
-            Icon(Icons.confirmation_number_outlined, color: b.primaryColor),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Os meus bilhetes', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 3),
-              Text('Acede aos teus bilhetes digitais e QR de entrada', style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
-            ])),
-            Icon(Icons.chevron_right, color: b.mutedTextColor),
-          ]),
-        ),
-      ),
-    );
-  }
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TicketsScreen(branding: b, api: widget.api, accessToken: widget.accessToken))),
+      child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [
+        Icon(Icons.confirmation_number_outlined, color: b.primaryColor),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Os meus bilhetes', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 3),
+          Text('Acede aos teus bilhetes digitais e QR de entrada', style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
+        ])),
+        Icon(Icons.chevron_right, color: b.mutedTextColor),
+      ])),
+    ),
+  );
 
   Widget _newsRow() {
     final news = data!.news.take(3).toList(growable: false);
     if (news.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(18)),
-        child: Text('Ainda não existem notícias.', style: TextStyle(color: b.mutedTextColor)),
-      );
+      return Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(18)), child: Text('Ainda não existem notícias.', style: TextStyle(color: b.mutedTextColor)));
     }
     return SizedBox(
       height: 150,
@@ -313,17 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
           final item = news[index];
           final title = item['title']?.toString() ?? 'Notícia';
           final imageUrl = item['imageUrl']?.toString();
-          final image = imageUrl == null || imageUrl.isEmpty
-              ? const SizedBox.shrink()
-              : SizedBox(
-                  width: 90,
-                  height: double.infinity,
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: b.primaryColor.withValues(alpha: 0.12)),
-                  ),
-                );
           return SizedBox(
             width: 250,
             child: Material(
@@ -332,12 +281,11 @@ class _HomeScreenState extends State<HomeScreen> {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _openNews,
-                child: Row(children: [
-                  image,
-                  Expanded(child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(title, maxLines: 5, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
-                  )),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: imageUrl == null || imageUrl.isEmpty
+                    ? Container(color: b.secondaryColor, child: Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 36))
+                    : Image.network(imageUrl, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: b.secondaryColor, child: Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 36)))),
+                  Padding(padding: const EdgeInsets.all(12), child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700))),
                 ]),
               ),
             ),
@@ -347,17 +295,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Map<String, dynamic> _map(dynamic value) => value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+  Map<String, dynamic> _asMap(dynamic value) => value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
 
-  DateTime? _parseDate(dynamic value) {
-    if (value is! String || value.isEmpty) return null;
-    return DateTime.tryParse(value)?.toLocal();
-  }
+  DateTime? _parseDate(dynamic value) => value is String ? DateTime.tryParse(value)?.toLocal() : null;
 
   String _formatAmount(dynamic value) {
     if (value == null) return '0,00';
     final parsed = double.tryParse(value.toString().replaceAll(',', '.'));
-    if (parsed == null) return value.toString();
-    return parsed.toStringAsFixed(2).replaceAll('.', ',');
+    return parsed == null ? value.toString() : parsed.toStringAsFixed(2).replaceAll('.', ',');
   }
 }
