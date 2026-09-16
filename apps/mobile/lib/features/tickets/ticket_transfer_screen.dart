@@ -23,7 +23,7 @@ class _TicketTransferScreenState extends State<TicketTransferScreen> {
     setState(() => sending = true);
     try {
       await widget.repository.transfer(accessToken: widget.accessToken, ticketId: widget.ticket.id, recipientEmail: e.isEmpty ? null : e, recipientMemberNumber: m.isEmpty ? null : m);
-      if (mounted) { Navigator.of(context).pop(true); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pedido de transferência enviado.'))); }
+      if (mounted) Navigator.of(context).pop(true);
     } catch (err) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível transferir: $err'))); }
     finally { if (mounted) setState(() => sending = false); }
   }
