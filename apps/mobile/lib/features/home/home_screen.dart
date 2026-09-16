@@ -282,9 +282,22 @@ class _HomeScreenState extends State<HomeScreen> {
               child: InkWell(
                 onTap: _openNews,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: imageUrl == null || imageUrl.isEmpty
-                    ? Container(color: b.secondaryColor, child: Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 36))
-                    : Image.network(imageUrl, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: b.secondaryColor, child: Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 36)))),
+                  Expanded(
+                    child: imageUrl == null || imageUrl.isEmpty
+                        ? Container(
+                            color: b.secondaryColor,
+                            child: Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 36),
+                          )
+                        : Image.network(
+                            imageUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: b.secondaryColor,
+                              child: Icon(Icons.newspaper_outlined, color: b.primaryColor, size: 36),
+                            ),
+                          ),
+                  ),
                   Padding(padding: const EdgeInsets.all(12), child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700))),
                 ]),
               ),
