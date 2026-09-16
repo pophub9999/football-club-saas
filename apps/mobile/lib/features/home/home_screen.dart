@@ -40,13 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String get greetingName {
     final firstName = data?.member['firstName'];
-    if (firstName is String && firstName.trim().isNotEmpty) {
-      return firstName.trim();
-    }
+    if (firstName is String && firstName.trim().isNotEmpty) return firstName.trim();
     final displayName = data?.member['displayName'];
-    if (displayName is String && displayName.trim().isNotEmpty) {
-      return displayName.trim().split(' ').first;
-    }
+    if (displayName is String && displayName.trim().isNotEmpty) return displayName.trim().split(' ').first;
     return 'Adepto';
   }
 
@@ -59,10 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _load() async {
     if (mounted) setState(() => loading = true);
     try {
-      final home = await AuthRepository(widget.api).loadHome(widget.accessToken);
+      final result = await AuthRepository(widget.api).loadHome(widget.accessToken);
       if (!mounted) return;
       setState(() {
-        data = home;
+        data = result;
         error = null;
         loading = false;
       });
@@ -84,62 +80,22 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: b.surfaceColor,
         indicatorColor: b.primaryColor.withValues(alpha: 0.18),
         selectedIndex: selectedIndex,
-        onDestinationSelected: (index) {
-          if (mounted) setState(() => selectedIndex = index);
-        },
+        onDestinationSelected: (index) => setState(() => selectedIndex = index),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Início',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.sports_soccer_outlined),
-            selectedIcon: Icon(Icons.sports_soccer),
-            label: 'Jogos',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.shield_outlined),
-            selectedIcon: Icon(Icons.shield),
-            label: 'Clube',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Carteira',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: 'Mais',
-          ),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
+          NavigationDestination(icon: Icon(Icons.sports_soccer_outlined), selectedIcon: Icon(Icons.sports_soccer), label: 'Jogos'),
+          NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Clube'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Carteira'),
+          NavigationDestination(icon: Icon(Icons.more_horiz), selectedIcon: Icon(Icons.more_horiz), label: 'Mais'),
         ],
       ),
     );
   }
 
   Widget _content(BuildContext context) {
-    if (selectedIndex == 1) {
-      return GamesScreen(
-        branding: b,
-        api: widget.api,
-        accessToken: widget.accessToken,
-      );
-    }
-    if (selectedIndex == 2) {
-      return ClubScreen(
-        branding: b,
-        api: widget.api,
-        accessToken: widget.accessToken,
-      );
-    }
-    if (selectedIndex == 3) {
-      return WalletScreen(
-        branding: b,
-        api: widget.api,
-        accessToken: widget.accessToken,
-      );
-    }
+    if (selectedIndex == 1) return GamesScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
+    if (selectedIndex == 2) return ClubScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
+    if (selectedIndex == 3) return WalletScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
     if (selectedIndex == 4) {
       return SettingsScreen(
         branding: b,
@@ -149,14 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
         canScan: widget.canScan,
       );
     }
-
-    if (loading && data == null) {
-      return Center(child: CircularProgressIndicator(color: b.primaryColor));
-    }
-
-    if (data == null) {
-      return _errorState();
-    }
+    if (loading && data == null) return Center(child: CircularProgressIndicator(color: b.primaryColor));
+    if (data == null) return _errorState();
 
     return RefreshIndicator(
       color: b.primaryColor,
@@ -177,16 +127,9 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(child: _sectionTitle(context, 'Notícias')),
-              TextButton(
-                onPressed: () => _openNews(),
-                child: Text(
-                  'Ver todas',
-                  style: TextStyle(color: b.primaryColor),
-                ),
-              ),
+              _sectionTitle(context, 'Notícias'),
+              TextButton(onPressed: _openNews, child: Text('Ver todas', style: TextStyle(color: b.primaryColor))),
             ],
           ),
           const SizedBox(height: 10),
@@ -205,19 +148,13 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(Icons.cloud_off_outlined, size: 48, color: b.mutedTextColor),
             const SizedBox(height: 14),
-            Text(
-              'Não foi possível carregar a tua área de sócio.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: b.textColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('Não foi possível carregar a tua área de sócio.', textAlign: TextAlign.center, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
-            OutlinedButton(
-              onPressed: loading ? null : _load,
-              child: const Text('Tentar novamente'),
-            ),
+            OutlinedButton(onPressed: loading ? null : _load, child: const Text('Tentar novamente')),
+            if (error != null) ...[
+              const SizedBox(height: 8),
+              Text(error.toString(), textAlign: TextAlign.center, style: TextStyle(color: b.mutedTextColor, fontSize: 11)),
+            ],
           ],
         ),
       ),
@@ -225,41 +162,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openNews() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => NewsScreen(
-          branding: b,
-          api: widget.api,
-          accessToken: widget.accessToken,
-        ),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => NewsScreen(branding: b, api: widget.api, accessToken: widget.accessToken)));
   }
 
   Widget _header(BuildContext context) {
     final memberNumber = data!.member['memberNumber']?.toString();
-    final shortName = b.shortName?.trim();
-
+    final clubLabel = b.shortName ?? 'Área de sócio';
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Olá, $greetingName',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: b.textColor,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              Text('Olá, $greetingName', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: b.textColor, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text(
-                memberNumber == null || memberNumber.isEmpty
-                    ? (shortName ?? 'Área de sócio')
-                    : 'Sócio nº $memberNumber',
-                style: TextStyle(color: b.mutedTextColor, fontSize: 13),
-              ),
+              Text(memberNumber == null || memberNumber.isEmpty ? clubLabel : 'Sócio nº $memberNumber', style: TextStyle(color: b.mutedTextColor, fontSize: 13)),
             ],
           ),
         ),
@@ -274,20 +191,10 @@ class _HomeScreenState extends State<HomeScreen> {
       width: 46,
       height: 46,
       padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: b.surfaceColor,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: b.surfaceColor, shape: BoxShape.circle),
       child: url == null || url.trim().isEmpty
           ? Icon(Icons.shield, color: b.primaryColor)
-          : Image.network(
-              url,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.shield,
-                color: b.primaryColor,
-              ),
-            ),
+          : Image.network(url, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor)),
     );
   }
 
@@ -295,79 +202,37 @@ class _HomeScreenState extends State<HomeScreen> {
     final match = data!.nextMatch;
     if (match == null) {
       return _gradientCard(
-        child: const Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Text(
-              'Ainda não existem próximos jogos',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 10),
+          child: Center(child: Text('Ainda não existem próximos jogos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
         ),
       );
     }
-
     final home = _map(match['homeTeam']);
     final away = _map(match['awayTeam']);
     final kickoff = _parseDate(match['kickoffAt']);
-    final when = kickoff == null
-        ? 'Data a confirmar'
-        : '${kickoff.day.toString().padLeft(2, '0')}/${kickoff.month.toString().padLeft(2, '0')} · ${kickoff.hour.toString().padLeft(2, '0')}:${kickoff.minute.toString().padLeft(2, '0')}';
-
+    final when = kickoff == null ? 'Data a confirmar' : '${kickoff.day.toString().padLeft(2, '0')}/${kickoff.month.toString().padLeft(2, '0')} · ${kickoff.hour.toString().padLeft(2, '0')}:${kickoff.minute.toString().padLeft(2, '0')}';
     return _gradientCard(
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'PRÓXIMO JOGO',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                when,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
+              const Text('PRÓXIMO JOGO', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12)),
+              Text(when, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 22),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Expanded(child: _team(home)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  'VS',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
+              const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('VS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800))),
               Expanded(child: _team(away)),
             ],
           ),
-          if (match['venueName'] is String &&
-              (match['venueName'] as String).trim().isNotEmpty) ...[
+          if (match['venueName'] is String && (match['venueName'] as String).trim().isNotEmpty) ...[
             const SizedBox(height: 14),
-            Text(
-              (match['venueName'] as String).trim(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
+            Text((match['venueName'] as String).trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
           ],
         ],
       ),
@@ -377,12 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _gradientCard({required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [b.secondaryColor, b.primaryColor],
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
+      decoration: BoxDecoration(gradient: LinearGradient(colors: [b.secondaryColor, b.primaryColor]), borderRadius: BorderRadius.circular(24)),
       child: child,
     );
   }
@@ -390,79 +250,35 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _team(Map<String, dynamic> team) {
     final shortName = team['shortName'];
     final fullName = team['name'];
-    final name = shortName is String && shortName.trim().isNotEmpty
-        ? shortName.trim()
-        : fullName is String && fullName.trim().isNotEmpty
-            ? fullName.trim()
-            : 'Equipa';
+    final name = shortName is String && shortName.trim().isNotEmpty ? shortName.trim() : fullName is String && fullName.trim().isNotEmpty ? fullName.trim() : 'Equipa';
     final logo = team['logoUrl'];
-
     return Column(
       children: [
         Container(
           width: 58,
           height: 58,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
+          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
           child: logo is String && logo.trim().isNotEmpty
-              ? ClipOval(
-                  child: Image.network(
-                    logo,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(
-                      Icons.shield,
-                      color: b.primaryColor,
-                      size: 30,
-                    ),
-                  ),
-                )
+              ? ClipOval(child: Image.network(logo, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.shield, color: b.primaryColor, size: 30)))
               : Icon(Icons.shield, color: b.primaryColor, size: 30),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          width: 100,
-          child: Text(
-            name,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ),
+        SizedBox(width: 100, child: Text(name, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12))),
       ],
     );
   }
 
   Widget _sectionTitle(BuildContext context, String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.w800,
-        color: b.textColor,
-      ),
-    );
+    return Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: b.textColor));
   }
 
   Widget _duesCard() {
     final rawNextDue = data!.dues['nextDue'];
-    final due = rawNextDue is Map
-        ? Map<String, dynamic>.from(rawNextDue)
-        : null;
-    final rawAmount = data!.dues['outstandingAmount'];
-    final amount = _formatAmount(rawAmount);
+    final due = rawNextDue is Map ? Map<String, dynamic>.from(rawNextDue) : null;
+    final amount = _formatAmount(data!.dues['outstandingAmount']);
     final description = due?['description'];
     final reference = due?['reference'];
-    final label = description is String && description.trim().isNotEmpty
-        ? description.trim()
-        : reference is String && reference.trim().isNotEmpty
-            ? reference.trim()
-            : 'Sem quotas pendentes';
+    final label = description is String && description.trim().isNotEmpty ? description.trim() : reference is String && reference.trim().isNotEmpty ? reference.trim() : 'Sem quotas pendentes';
     final status = due?['status']?.toString().toUpperCase();
     final statusLabel = switch (status) {
       'OVERDUE' => 'Vencida',
@@ -470,13 +286,9 @@ class _HomeScreenState extends State<HomeScreen> {
       'OPEN' => 'Por pagar',
       _ => 'Em dia',
     };
-
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: b.surfaceColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20)),
       child: Row(
         children: [
           Icon(Icons.receipt_long_outlined, color: b.accentColor),
@@ -485,20 +297,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: b.textColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 5),
-                Text(
-                  '$amount € · $statusLabel',
-                  style: TextStyle(color: b.mutedTextColor, fontSize: 13),
-                ),
+                Text('$amount € · $statusLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 13)),
               ],
             ),
           ),
@@ -513,15 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TicketsScreen(
-              branding: b,
-              api: widget.api,
-              accessToken: widget.accessToken,
-            ),
-          ),
-        ),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TicketsScreen(branding: b, api: widget.api, accessToken: widget.accessToken))),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -532,18 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Os meus bilhetes',
-                      style: TextStyle(
-                        color: b.textColor,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    Text('Os meus bilhetes', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 3),
-                    Text(
-                      'Acede aos teus bilhetes digitais e QR de entrada',
-                      style: TextStyle(color: b.mutedTextColor, fontSize: 12),
-                    ),
+                    Text('Acede aos teus bilhetes digitais e QR de entrada', style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
                   ],
                 ),
               ),
@@ -556,66 +340,37 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _newsRow() {
-    if (data!.news.isEmpty) {
+    final news = data!.news.take(3).toList(growable: false);
+    if (news.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: b.surfaceColor,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Text(
-          'Ainda não existem notícias publicadas.',
-          style: TextStyle(color: b.mutedTextColor),
-        ),
+        decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(18)),
+        child: Text('Ainda não existem notícias.', style: TextStyle(color: b.mutedTextColor)),
       );
     }
-
     return SizedBox(
-      height: 170,
+      height: 150,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: data!.news.length,
+        itemCount: news.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, index) {
-          final article = data!.news[index];
-          final title = article['title']?.toString().trim();
-          final image = article['imageUrl'];
-
+          final item = news[index];
+          final title = item['title']?.toString() ?? 'Notícia';
+          final imageUrl = item['imageUrl']?.toString();
           return SizedBox(
-            width: 245,
+            width: 250,
             child: Material(
               color: b.surfaceColor,
               borderRadius: BorderRadius.circular(18),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _openNews,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Expanded(
-                      child: image is String && image.trim().isNotEmpty
-                          ? Image.network(
-                              image,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _newsPlaceholder(),
-                            )
-                          : _newsPlaceholder(),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        title == null || title.isEmpty
-                            ? 'Notícia'
-                            : title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: b.textColor,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                    if (imageUrl != null && imageUrl.isNotEmpty)
+                      SizedBox(width: 90, height: double.infinity, child: Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: b.primaryColor.withValues(alpha: 0.12)))),
+                    Expanded(child: Padding(padding: const EdgeInsets.all(12), child: Text(title, maxLines: 5, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)))),
                   ],
                 ),
               ),
@@ -626,31 +381,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _newsPlaceholder() {
-    return Container(
-      color: b.secondaryColor,
-      child: Icon(
-        Icons.newspaper_outlined,
-        color: b.primaryColor,
-        size: 36,
-      ),
-    );
-  }
+  Map<String, dynamic> _map(dynamic value) => value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
 
-  Map<String, dynamic> _map(Object? value) {
-    if (value is Map) return Map<String, dynamic>.from(value);
-    return <String, dynamic>{};
-  }
-
-  DateTime? _parseDate(Object? value) {
+  DateTime? _parseDate(dynamic value) {
     if (value is! String || value.isEmpty) return null;
     return DateTime.tryParse(value)?.toLocal();
   }
 
-  String _formatAmount(Object? value) {
-    if (value == null) return '0.00';
-    final number = double.tryParse(value.toString());
-    if (number == null) return value.toString();
-    return number.toStringAsFixed(2).replaceAll('.', ',');
+  String _formatAmount(dynamic value) {
+    if (value == null) return '0,00';
+    final parsed = double.tryParse(value.toString().replaceAll(',', '.'));
+    if (parsed == null) return value.toString();
+    return parsed.toStringAsFixed(2).replaceAll('.', ',');
   }
 }
