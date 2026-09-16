@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
 import { MembersModule } from './members/members.module';
 import { BillingModule } from './billing/billing.module';
 import { FootballModule } from './football/football.module';
