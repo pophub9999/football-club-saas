@@ -63,6 +63,32 @@ jobs:
       - name: Build
         run: pnpm --filter @football/api build
 
+  admin:
+    name: Admin checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @football/admin typecheck
+
+      - name: Build
+        run: pnpm --filter @football/admin build
+
   mobile:
     name: Flutter mobile checks
     runs-on: ubuntu-latest
