@@ -11,21 +11,12 @@ import '../tickets/tickets_screen.dart';
 import '../wallet/wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({
-    super.key,
-    required this.branding,
-    required this.api,
-    required this.accessToken,
-    required this.onLogout,
-    this.canScan = false,
-  });
-
+  const HomeScreen({super.key, required this.branding, required this.api, required this.accessToken, required this.onLogout, this.canScan = false});
   final ClubBranding branding;
   final ApiClient api;
   final String accessToken;
   final VoidCallback onLogout;
   final bool canScan;
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -57,17 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final result = await AuthRepository(widget.api).loadHome(widget.accessToken);
       if (!mounted) return;
-      setState(() {
-        data = result;
-        error = null;
-        loading = false;
-      });
+      setState(() { data = result; error = null; loading = false; });
     } catch (exception) {
       if (!mounted) return;
-      setState(() {
-        error = exception;
-        loading = false;
-      });
+      setState(() { error = exception; loading = false; });
     }
   }
 
@@ -97,13 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (selectedIndex == 2) return ClubScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
     if (selectedIndex == 3) return WalletScreen(branding: b, api: widget.api, accessToken: widget.accessToken);
     if (selectedIndex == 4) {
-      return SettingsScreen(
-        branding: b,
-        api: widget.api,
-        accessToken: widget.accessToken,
-        onLogout: widget.onLogout,
-        canScan: widget.canScan,
-      );
+      return SettingsScreen(branding: b, api: widget.api, accessToken: widget.accessToken, onLogout: widget.onLogout, canScan: widget.canScan);
     }
     if (loading && data == null) return Center(child: CircularProgressIndicator(color: b.primaryColor));
     if (data == null) return _errorState();
@@ -201,12 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _nextMatch() {
     final match = data!.nextMatch;
     if (match == null) {
-      return _gradientCard(
-        child: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 10),
-          child: Center(child: Text('Ainda não existem próximos jogos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
-        ),
-      );
+      return _gradientCard(child: const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Center(child: Text('Ainda não existem próximos jogos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))));
     }
     final home = _map(match['homeTeam']);
     final away = _map(match['awayTeam']);
@@ -215,21 +188,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return _gradientCard(
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('PRÓXIMO JOGO', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12)),
-              Text(when, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-            ],
-          ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text('PRÓXIMO JOGO', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12)),
+            Text(when, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+          ]),
           const SizedBox(height: 22),
-          Row(
-            children: [
-              Expanded(child: _team(home)),
-              const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('VS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800))),
-              Expanded(child: _team(away)),
-            ],
-          ),
+          Row(children: [
+            Expanded(child: _team(home)),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('VS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800))),
+            Expanded(child: _team(away)),
+          ]),
           if (match['venueName'] is String && (match['venueName'] as String).trim().isNotEmpty) ...[
             const SizedBox(height: 14),
             Text((match['venueName'] as String).trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -280,31 +248,25 @@ class _HomeScreenState extends State<HomeScreen> {
     final reference = due?['reference'];
     final label = description is String && description.trim().isNotEmpty ? description.trim() : reference is String && reference.trim().isNotEmpty ? reference.trim() : 'Sem quotas pendentes';
     final status = due?['status']?.toString().toUpperCase();
-    final statusLabel = switch (status) {
-      'OVERDUE' => 'Vencida',
-      'PARTIALLY_PAID' => 'Parcialmente paga',
-      'OPEN' => 'Por pagar',
-      _ => 'Em dia',
-    };
+    String statusLabel;
+    switch (status) {
+      case 'OVERDUE': statusLabel = 'Vencida'; break;
+      case 'PARTIALLY_PAID': statusLabel = 'Parcialmente paga'; break;
+      case 'OPEN': statusLabel = 'Por pagar'; break;
+      default: statusLabel = 'Em dia';
+    }
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(color: b.surfaceColor, borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        children: [
-          Icon(Icons.receipt_long_outlined, color: b.accentColor),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 5),
-                Text('$amount € · $statusLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 13)),
-              ],
-            ),
-          ),
-        ],
-      ),
+      child: Row(children: [
+        Icon(Icons.receipt_long_outlined, color: b.accentColor),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 5),
+          Text('$amount € · $statusLabel', style: TextStyle(color: b.mutedTextColor, fontSize: 13)),
+        ])),
+      ]),
     );
   }
 
@@ -317,23 +279,16 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TicketsScreen(branding: b, api: widget.api, accessToken: widget.accessToken))),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.confirmation_number_outlined, color: b.primaryColor),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Os meus bilhetes', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 3),
-                    Text('Acede aos teus bilhetes digitais e QR de entrada', style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: b.mutedTextColor),
-            ],
-          ),
+          child: Row(children: [
+            Icon(Icons.confirmation_number_outlined, color: b.primaryColor),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Os meus bilhetes', style: TextStyle(color: b.textColor, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text('Acede aos teus bilhetes digitais e QR de entrada', style: TextStyle(color: b.mutedTextColor, fontSize: 12)),
+            ])),
+            Icon(Icons.chevron_right, color: b.mutedTextColor),
+          ]),
         ),
       ),
     );
@@ -358,6 +313,17 @@ class _HomeScreenState extends State<HomeScreen> {
           final item = news[index];
           final title = item['title']?.toString() ?? 'Notícia';
           final imageUrl = item['imageUrl']?.toString();
+          final image = imageUrl == null || imageUrl.isEmpty
+              ? const SizedBox.shrink()
+              : SizedBox(
+                  width: 90,
+                  height: double.infinity,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(color: b.primaryColor.withValues(alpha: 0.12)),
+                  ),
+                );
           return SizedBox(
             width: 250,
             child: Material(
@@ -366,13 +332,13 @@ class _HomeScreenState extends State<HomeScreen> {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _openNews,
-                child: Row(
-                  children: [
-                    if (imageUrl != null && imageUrl.isNotEmpty)
-                      SizedBox(width: 90, height: double.infinity, child: Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: b.primaryColor.withValues(alpha: 0.12)))),
-                    Expanded(child: Padding(padding: const EdgeInsets.all(12), child: Text(title, maxLines: 5, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)))),
-                  ],
-                ),
+                child: Row(children: [
+                  image,
+                  Expanded(child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(title, maxLines: 5, overflow: TextOverflow.ellipsis, style: TextStyle(color: b.textColor, fontWeight: FontWeight.w700)),
+                  )),
+                ]),
               ),
             ),
           );
