@@ -15,24 +15,19 @@ export class TicketsController {
   constructor(private readonly ticketsService: TicketsService, private readonly scannerService: TicketScannerService) {}
 
   @Get()
-  list(@UserRequest() user: AuthenticatedUser) {
-    return this.ticketsService.listMyTickets(user.tenantId, user.id);
-  }
+  list(@UserRequest() user: AuthenticatedUser) { return this.ticketsService.listMyTickets(user.tenantId, user.id); }
 
   @Get('events')
-  events(@UserRequest() user: AuthenticatedUser) {
-    return this.ticketsService.listEvents(user.tenantId);
-  }
+  events(@UserRequest() user: AuthenticatedUser) { return this.ticketsService.listEvents(user.tenantId); }
+
+  @Get('transfers/incoming')
+  incomingTransfers(@UserRequest() user: AuthenticatedUser) { return this.ticketsService.listIncomingTransfers(user.tenantId, user.id); }
 
   @Post(':ticketId/transfer')
-  transfer(@UserRequest() user: AuthenticatedUser, @Param('ticketId') ticketId: string, @Body() dto: TransferTicketDto) {
-    return this.ticketsService.requestTransfer(user.tenantId, user.id, ticketId, dto);
-  }
+  transfer(@UserRequest() user: AuthenticatedUser, @Param('ticketId') ticketId: string, @Body() dto: TransferTicketDto) { return this.ticketsService.requestTransfer(user.tenantId, user.id, ticketId, dto); }
 
   @Post('transfers/:transferId/accept')
-  acceptTransfer(@UserRequest() user: AuthenticatedUser, @Param('transferId') transferId: string) {
-    return this.ticketsService.acceptTransfer(user.tenantId, user.id, transferId);
-  }
+  acceptTransfer(@UserRequest() user: AuthenticatedUser, @Param('transferId') transferId: string) { return this.ticketsService.acceptTransfer(user.tenantId, user.id, transferId); }
 
   @Post('scan')
   scan(@UserRequest() user: AuthenticatedUser, @Body() dto: ScanTicketDto) {
@@ -41,12 +36,8 @@ export class TicketsController {
   }
 
   @Get(':ticketId/qr')
-  qr(@UserRequest() user: AuthenticatedUser, @Param('ticketId') ticketId: string) {
-    return this.ticketsService.getQrPayload(user.tenantId, user.id, ticketId);
-  }
+  qr(@UserRequest() user: AuthenticatedUser, @Param('ticketId') ticketId: string) { return this.ticketsService.getQrPayload(user.tenantId, user.id, ticketId); }
 
   @Get(':ticketId')
-  get(@UserRequest() user: AuthenticatedUser, @Param('ticketId') ticketId: string) {
-    return this.ticketsService.getMyTicket(user.tenantId, user.id, ticketId);
-  }
+  get(@UserRequest() user: AuthenticatedUser, @Param('ticketId') ticketId: string) { return this.ticketsService.getMyTicket(user.tenantId, user.id, ticketId); }
 }
