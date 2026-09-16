@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { PrismaService } from '../prisma/prisma.service';
 
 const ADMIN_ROLES = ['club_owner', 'club_admin'];
-const ALLOWED = ['name', 'shortName', 'slogan', 'primary', 'secondary', 'accent', 'background', 'surface'];
+const ALLOWED = ['shortName', 'slogan', 'primary', 'secondary', 'accent', 'background', 'surface', 'logoUrl', 'logoDarkUrl', 'heroImageUrl', 'appIconUrl', 'textColor', 'mutedTextColor'];
 
 @Injectable()
 export class AdminBrandingService {
@@ -14,14 +14,43 @@ export class AdminBrandingService {
 
   async get(tenantId: string, roles: string[]) {
     this.assertAdmin(roles);
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true, name: true } });
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, slug: true, name: true, settings: true },
+    });
     if (!tenant) throw new BadRequestException('Tenant not found');
-    return { tenant, branding: {} };
+    const settings = tenant.settings ?? await this.prisma.tenantSettings.create({ data: { tenantId } });
+    return { tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name }, branding: settings };
   }
 
   async update(tenantId: string, roles: string[], body: Record<string, unknown>) {
     this.assertAdmin(roles);
-    const branding = Object.fromEntries(Object.entries(body).filter(([key]) => ALLOWED.includes(key)));
-    return { tenantId, branding, persisted: false, message: 'Branding persistence requires the tenant branding fields/migration.' };
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
+    if (!tenant) throw new BadRequestException('Tenant not found');
+
+    const value = (key: string) => typeof body[key] === 'string' ? String(body[key]).trim() : undefined;
+    const data = {
+      shortName: value('shortName'),
+      slogan: value('slogan'),
+      primaryColor: value('primary'),
+      secondaryColor: value('secondary'),
+      accentColor: value('accent'),
+      backgroundColor: value('background'),
+      surfaceColor: value('surface'),
+      logoUrl: value('logoUrl'),
+      logoDarkUrl: value('logoDarkUrl'),
+      heroImageUrl: value('heroImageUrl'),
+      appIconUrl: value('appIconUrl'),
+      textColor: value('textColor'),
+      mutedTextColor: value('mutedTextColor'),
+    };
+
+    const cleaned = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    const settings = await this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, ...cleaned },
+      update: cleaned,
+    });
+    return { tenantId, branding: settings, persisted: true };
   }
 }
