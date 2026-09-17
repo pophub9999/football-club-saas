@@ -2,6 +2,12 @@ name: Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'API base URL (include /v1)'
+        required: false
+        default: 'http://10.0.2.2:3000/v1'
+        type: string
   push:
     branches: [backoffice-v2-games-content-tickets]
 
@@ -44,7 +50,9 @@ jobs:
         run: flutter test
 
       - name: Build debug APK
-        run: flutter build apk --debug
+        env:
+          API_BASE_URL: ${{ inputs.api_base_url || 'http://10.0.2.2:3000/v1' }}
+        run: flutter build apk --debug --dart-define=API_BASE_URL="$API_BASE_URL"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
