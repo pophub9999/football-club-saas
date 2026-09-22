@@ -1,0 +1,10 @@
+name: V2 Web Preview
+
+on:
+  push:
+    branches: ['v2-visual-first']
+
+jobs:
+  deploy_web:
+    name: Deploy V2 web preview
+    type: deploy
