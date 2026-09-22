@@ -1,12 +1,25 @@
 {
   "expo": {
-    "name": "Fan OS",
-    "slug": "football-club-saas-v2",
+    "name": "SaaS team",
+    "slug": "saas-team",
+    "owner": "nextits-team",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "web": { "bundler": "metro", "output": "single" },
-    "android": { "package": "com.torreense.app" },
-    "ios": { "bundleIdentifier": "com.torreense.app" }
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "android": {
+      "package": "com.torreense.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.torreense.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b5c19b30-0c77-4d4c-8755-2fbfbf54c8bd"
+      }
+    }
   }
 }
