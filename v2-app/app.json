@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Fan OS",
+    "slug": "football-club-saas-v2",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "web": { "bundler": "metro", "output": "single" },
+    "android": { "package": "com.torreense.app" },
+    "ios": { "bundleIdentifier": "com.torreense.app" }
+  }
+}
