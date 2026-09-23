@@ -74,17 +74,38 @@ def article(url):
     m=re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',doc,re.I)
     if m:img=h.unescape(m.group(1))
 
-    # Prefer the article/main content instead of the whole page. Keep its HTML
-    # so the app can retain paragraphs, headings, lists and inline images.
-    art=re.search(r"<article\\b[\\s\\S]*?</article>",doc,re.I)
-    if not art: art=re.search(r"<main\\b[\\s\\S]*?</main>",doc,re.I)
-    section=art.group(0) if art else doc
-    section=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>","",section,flags=re.I)
+    # Extract only the article payload. Never fall back to the complete page,
+    # otherwise header/navigation/footer get stored as article content.
+    candidates=[]
+    for pat in [
+        r"<article\\b[\\s\\S]*?</article>",
+        r'<div[^>]+(?:class|id)=["\'][^"\']*(?:blog-post|post-content|article-content|entry-content|blog-content)[^"\']*["\'][^>]*>[\\s\\S]*?</div>',
+    ]:
+        mm=re.search(pat,doc,re.I)
+        if mm:candidates.append(mm.group(0))
+    section=max(candidates,key=len) if candidates else ""
+
+    if not section:
+        # JSON-LD often contains the clean article body on CMS sites.
+        jm=re.search(r'"articleBody"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"',doc,re.I)
+        if jm:
+            try:
+                body=json.loads('"'+jm.group(1)+'"')
+                section='<p>'+h.escape(body).replace('\\n\\n','</p><p>').replace('\\n','<br>')+'</p>'
+            except: section=""
+
+    if not section:
+        print("ARTICLE_CONTENT_NOT_FOUND",url)
+        return None
+
+    section=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>","",section,flags=re.I)
     text=clean(section)
+    if len(text)<40:
+        print("ARTICLE_CONTENT_TOO_SHORT",url,len(text))
+        return None
 
     category="FUTEBOL" if re.search(r">\\s*Futebol\\s*<",section,re.I) else ("CLUBE" if re.search(r">\\s*Clube\\s*<",section,re.I) else "TORREENSE")
     published=None
-    # Prefer explicit metadata, then visible Portuguese date.
     dm=re.search(r'<meta[^>]+(?:property|name)=["\'](?:article:published_time|datePublished)["\'][^>]+content=["\']([^"\']+)',doc,re.I)
     if dm:
         try: published=datetime.fromisoformat(dm.group(1).replace("Z","+00:00")).isoformat()
@@ -92,8 +113,7 @@ def article(url):
     if not published:
         months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
         dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",text,re.I)
-        if dm:
-            published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
+        if dm: published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
 
     return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":section[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
 
@@ -101,7 +121,9 @@ def main():
     urls=discover_news()
     rows=[]
     for u in urls:
-        try:rows.append(article(u))
+        try:
+            item=article(u)
+            if item: rows.append(item)
         except Exception as e:print("article failed",u,e)
     if not rows:
         raise RuntimeError("No Torreense news discovered/imported; failing sync instead of reporting false success")
