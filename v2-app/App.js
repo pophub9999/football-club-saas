@@ -7,7 +7,7 @@ export default function App() {
     <View style={styles.root}>
       <StatusBar hidden />
       <Image
-        source={require('./home-background.png')}
+        source={require('./assets/home-background.png')}
         style={styles.background}
         resizeMode="contain"
       />
@@ -18,7 +18,7 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#00142d',
+    backgroundColor: '#00142c',
     alignItems: 'center',
     justifyContent: 'flex-start',
     overflow: 'hidden',
