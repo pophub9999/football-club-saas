@@ -12,6 +12,28 @@ function RemoteLogo({uri,style,alt}) {
     ? React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt})
     : <Image source={{uri}} style={style} resizeMode="contain"/>;
 }
+function ShortcutIcon({type}) {
+  const gold='#f1b94f';
+  if (Platform.OS==='web') {
+    const paths={
+      calendar:'<rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v6M16 3v6M4 10h16"/>',
+      news:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4v4H7zM14 9h4M14 12h4M7 16h11"/>',
+      shop:'<path d="M6 8h12l1 12H5L6 8zM9 9V7a3 3 0 0 1 6 0v2"/>',
+      members:'<circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 6a3 3 0 0 1 0 6M17 14c2.5.4 4 2.3 4 5"/>',
+      star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3z"/>'
+    };
+    return React.createElement('svg',{
+      width:28,height:28,viewBox:'0 0 24 24',fill:'none',stroke:gold,
+      strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round',
+      dangerouslySetInnerHTML:{__html:paths[type]}
+    });
+  }
+
+  // Native fallback keeps the same gold outline language without external assets.
+  const glyph={calendar:'▣',news:'▤',shop:'♧',members:'♙',star:'☆'}[type];
+  return <Text style={s.quickIconFallback}>{glyph}</Text>;
+}
+
 function fmtDate(iso){
   if(!iso)return '';
   const d=new Date(iso);
@@ -90,11 +112,11 @@ export default function App(){
 
    <View style={s.quickSection}>
     <View style={s.quickRow}>
-     <Pressable style={s.quickCard}><Text style={s.quickIcon}>▣</Text><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
-     <Pressable style={s.quickCard}><Text style={s.quickIcon}>▤</Text><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
-     <Pressable style={s.quickCard}><Text style={s.quickIcon}>♧</Text><Text style={s.quickText}>LOJA</Text></Pressable>
-     <Pressable style={s.quickCard}><Text style={s.quickIcon}>♙</Text><Text style={s.quickText}>SÓCIOS</Text></Pressable>
-     <Pressable style={s.quickCard}><Text style={s.quickIcon}>☆</Text><Text style={s.quickText}>VANTAGENS</Text></Pressable>
+     <Pressable style={s.quickCard}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
+     <Pressable style={s.quickCard}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
+     <Pressable style={s.quickCard}><ShortcutIcon type="shop"/><Text style={s.quickText}>LOJA</Text></Pressable>
+     <Pressable style={s.quickCard}><ShortcutIcon type="members"/><Text style={s.quickText}>SÓCIOS</Text></Pressable>
+     <Pressable style={s.quickCard}><ShortcutIcon type="star"/><Text style={s.quickText}>VANTAGENS</Text></Pressable>
     </View>
    </View>
   </View>
@@ -118,6 +140,6 @@ const s=StyleSheet.create({
  quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},
  quickRow:{flexDirection:'row',justifyContent:'space-between'},
  quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},
- quickIcon:{color:'#f1b94f',fontSize:17,fontWeight:'700',lineHeight:19},
+ quickIconFallback:{color:'#f1b94f',fontSize:22,fontWeight:'400',lineHeight:26},
  quickText:{color:'#fff',fontSize:5.9,fontWeight:'900',letterSpacing:.18,marginTop:5,textAlign:'center'}
 });
