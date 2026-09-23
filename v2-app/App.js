@@ -1,203 +1,92 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable } from 'react-native';
+import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator } from 'react-native';
 
-const LOGO_URL =
-  'https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
+const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
+const API='https://v3.football.api-sports.io';
+const API_KEY='983501ee4a4a6f41ea11b88ae30c3c92';
 
-export default function App() {
-  const { width, height } = useWindowDimensions();
-
-  const canvasWidth = Math.min(width, height / 2);
-  const canvasHeight = canvasWidth * 2;
-  const canvasLeft = (width - canvasWidth) / 2;
-  const canvasTop = (height - canvasHeight) / 2;
-
-  const logoStyle = {
-    position: 'absolute',
-    left: canvasLeft + canvasWidth * 0.055,
-    top: canvasTop + canvasHeight * 0.04,
-    width: canvasWidth * 0.135,
-    height: canvasHeight * 0.105,
-    objectFit: 'contain',
-  };
-
-  const contentStyle = {
-    position: 'absolute',
-    left: canvasLeft + canvasWidth * 0.055,
-    top: canvasTop + canvasHeight * 0.185,
-    width: canvasWidth * 0.89,
-  };
-
-  return (
-    <View style={styles.root}>
-      <StatusBar hidden />
-
-      <Image
-        source={require('./assets/home-background.png')}
-        style={styles.background}
-        resizeMode="contain"
-      />
-
-      {Platform.OS === 'web' ? (
-        React.createElement('img', {
-          src: LOGO_URL,
-          style: logoStyle,
-          alt: 'SCU Torreense',
-        })
-      ) : (
-        <Image source={{ uri: LOGO_URL }} style={logoStyle} resizeMode="contain" />
-      )}
-
-      <View style={contentStyle}>
-        <View style={styles.matchCard}>
-          <View style={styles.matchHeader}>
-            <View>
-              <Text style={styles.competition}>LIGA PORTUGAL MEU SUPER</Text>
-              <Text style={styles.round}>Próximo jogo</Text>
-            </View>
-            <Text style={styles.date}>DATA · HORA</Text>
-          </View>
-
-          <View style={styles.teams}>
-            <View style={styles.team}>
-              <View style={styles.teamBadge}><Text style={styles.badgeText}>CASA</Text></View>
-              <Text style={styles.teamName}>ADVERSÁRIO</Text>
-            </View>
-
-            <Text style={styles.vs}>VS</Text>
-
-            <View style={styles.team}>
-              {Platform.OS === 'web' ? (
-                React.createElement('img', {
-                  src: LOGO_URL,
-                  style: { width: 54, height: 72, objectFit: 'contain' },
-                  alt: 'SCU Torreense',
-                })
-              ) : (
-                <Image source={{ uri: LOGO_URL }} style={styles.teamLogo} resizeMode="contain" />
-              )}
-              <Text style={styles.teamName}>SCU TORREENSE</Text>
-            </View>
-          </View>
-
-          <Text style={styles.stadium}>⌖  Estádio / Local</Text>
-
-          <Pressable style={styles.matchButton}>
-            <Text style={styles.matchButtonText}>VER JOGO</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
+function RemoteLogo({uri,style,alt}) {
+  if (!uri) return null;
+  return Platform.OS==='web'
+    ? React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt})
+    : <Image source={{uri}} style={style} resizeMode="contain"/>;
+}
+function fmtDate(iso){
+  if(!iso)return '';
+  const d=new Date(iso);
+  return new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'}).format(d).replace(',',' ·').toUpperCase();
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#00142c',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  background: {
-    width: '100%',
-    height: '100%',
-  },
-  matchCard: {
-    width: '100%',
-    backgroundColor: 'rgba(8, 43, 72, 0.90)',
-    borderWidth: 1,
-    borderColor: 'rgba(120, 164, 197, 0.34)',
-    borderRadius: 18,
-    paddingHorizontal: 15,
-    paddingTop: 13,
-    paddingBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  matchHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  competition: {
-    color: '#b7cee2',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  round: {
-    color: '#fff',
-    fontSize: 9,
-    marginTop: 4,
-  },
-  date: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  teams: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    marginTop: 13,
-  },
-  team: {
-    width: '36%',
-    alignItems: 'center',
-  },
-  teamBadge: {
-    width: 58,
-    height: 66,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d6ad55',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#102f4b',
-  },
-  badgeText: {
-    color: '#d6ad55',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  teamLogo: {
-    width: 54,
-    height: 72,
-  },
-  teamName: {
-    color: '#fff',
-    fontSize: 8,
-    fontWeight: '800',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  vs: {
-    color: '#93abc1',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  stadium: {
-    color: '#b8c8d8',
-    fontSize: 9,
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  matchButton: {
-    marginTop: 14,
-    height: 34,
-    borderRadius: 11,
-    backgroundColor: '#9b1e3b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  matchButtonText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-  },
+export default function App(){
+ const {width,height}=useWindowDimensions();
+ const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+
+ const canvasWidth=Math.min(width,height/2), canvasHeight=canvasWidth*2;
+ const canvasLeft=(width-canvasWidth)/2, canvasTop=(height-canvasHeight)/2;
+ const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.04,width:canvasWidth*.135,height:canvasHeight*.105};
+ const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.185,width:canvasWidth*.89};
+
+ useEffect(()=>{
+  let live=true;
+  async function load(){
+   try{
+    setLoading(true); setError('');
+    const headers={'x-apisports-key':API_KEY};
+    const tr=await fetch(API+'/teams?search=Torreense',{headers});
+    const tj=await tr.json();
+    const found=(tj.response||[]).find(x=>/torreense/i.test(x.team?.name||'')) || tj.response?.[0];
+    if(!found?.team?.id) throw new Error('Torreense não encontrado');
+    const fr=await fetch(API+'/fixtures?team='+found.team.id+'&next=1',{headers});
+    const fj=await fr.json();
+    if(!fj.response?.length) throw new Error('Sem próximo jogo disponível');
+    if(live)setGame(fj.response[0]);
+   }catch(e){if(live)setError(e.message||'Erro ao obter jogo');}
+   finally{if(live)setLoading(false);}
+  }
+  load(); return()=>{live=false};
+ },[]);
+
+ const home=game?.teams?.home, away=game?.teams?.away;
+ return <View style={s.root}>
+  <StatusBar hidden/>
+  <Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>
+  <RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/>
+
+  <View style={contentStyle}>
+   <View style={s.card}>
+    {loading ? <View style={s.loading}><ActivityIndicator/><Text style={s.loadingText}>A obter próximo jogo…</Text></View> :
+    error ? <View style={s.loading}><Text style={s.error}>Não foi possível atualizar o jogo.</Text><Text style={s.errorSmall}>{error}</Text></View> :
+    <>
+     <View style={s.header}>
+      <View style={s.headerLeft}><Text style={s.competition} numberOfLines={1}>{game.league?.name||'COMPETIÇÃO'}</Text><Text style={s.round}>{game.league?.round||'Próximo jogo'}</Text></View>
+      <Text style={s.date}>{fmtDate(game.fixture?.date)}</Text>
+     </View>
+
+     <View style={s.teams}>
+      <View style={s.team}><RemoteLogo uri={home?.logo} style={s.teamLogo} alt={home?.name}/><Text style={s.teamName} numberOfLines={2}>{home?.name}</Text></View>
+      <Text style={s.vs}>VS</Text>
+      <View style={s.team}><RemoteLogo uri={away?.logo} style={s.teamLogo} alt={away?.name}/><Text style={s.teamName} numberOfLines={2}>{away?.name}</Text></View>
+     </View>
+
+     <Text style={s.stadium} numberOfLines={1}>⌖  {game.fixture?.venue?.name||game.fixture?.venue?.city||'Local a confirmar'}</Text>
+     <Pressable style={s.button}><Text style={s.buttonText}>VER JOGO</Text></Pressable>
+    </>}
+   </View>
+  </View>
+ </View>
+}
+
+const s=StyleSheet.create({
+ root:{flex:1,backgroundColor:'#00142c',alignItems:'center',justifyContent:'center',overflow:'hidden'},
+ background:{width:'100%',height:'100%'},
+ card:{width:'100%',backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.34)',borderRadius:16,paddingHorizontal:14,paddingTop:12,paddingBottom:11,shadowColor:'#000',shadowOpacity:.25,shadowRadius:16,shadowOffset:{width:0,height:7}},
+ loading:{height:205,alignItems:'center',justifyContent:'center'},
+ loadingText:{color:'#b7cee2',fontSize:9,marginTop:9},error:{color:'#fff',fontSize:10,fontWeight:'800'},errorSmall:{color:'#9fb5c8',fontSize:8,marginTop:5},
+ header:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'},headerLeft:{maxWidth:'58%'},
+ competition:{color:'#b7cee2',fontSize:8,fontWeight:'800',letterSpacing:.65},round:{color:'#fff',fontSize:8.5,marginTop:3},date:{color:'#fff',fontSize:8,fontWeight:'800'},
+ teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:11},
+ team:{width:'38%',alignItems:'center'},teamLogo:{width:47,height:52},teamName:{color:'#fff',fontSize:8,fontWeight:'800',marginTop:5,textAlign:'center',minHeight:20},vs:{color:'#93abc1',fontSize:12,fontWeight:'800'},
+ stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:7},
+ button:{marginTop:9,height:32,borderRadius:9,backgroundColor:'#9b1e3b',alignItems:'center',justifyContent:'center'},buttonText:{color:'#fff',fontSize:9,fontWeight:'900',letterSpacing:.35}
 });
