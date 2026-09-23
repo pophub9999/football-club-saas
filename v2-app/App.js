@@ -5,11 +5,10 @@ import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
 const TORREENSE_ID='143720';
-const TORREENSE_NEWS='https://www.torreense.com/blog';
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
 const SUPABASE_KEY='sb_publishable_TyM24TpRzq3_ijZsFRTVGg_bWM2WOky';
 const SB_HEADERS={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
-const cache={articles:new Map(),calendar:null};
+const cache={calendar:null};
 async function sb(path){
  const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:SB_HEADERS});
  if(!r.ok)throw new Error('Supabase '+r.status);
@@ -60,33 +59,16 @@ export default function App(){
  useEffect(()=>{let live=true;(async()=>{try{
   const [v,n,m]=await Promise.all([
    sb('app_sync?select=version,updated_at&id=eq.1'),
-   sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text&active=eq.true&order=published_at.desc.nullslast&limit=100'),
+   sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&active=eq.true&order=published_at.desc.nullslast&limit=100'),
    sb('matches?select=*,competitions(name),sports(name),home:home_team_id(name,logo_url),away:away_team_id(name,logo_url)&order=starts_at.asc&limit=200')
   ]);
   if(!live)return;
   setSyncVersion(v?.[0]?.version||1);
-  if(n?.length)setNews(n.map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',hero:x.hero_image_url,excerpt:x.excerpt})));
+  setNews((n||[]).map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',html:x.content_html||'',hero:x.hero_image_url,excerpt:x.excerpt})));
   if(m?.length)setCalendar(m.map(x=>({id:String(x.id),sport:(x.sports?.name||'Futebol').toUpperCase(),type:(x.event_type||'JOGO').toUpperCase(),date:x.starts_at?new Date(x.starts_at).toLocaleDateString('pt-PT'):'',round:x.round||'',title:(x.home?.name||'')+' × '+(x.away?.name||''),time:x.starts_at?new Date(x.starts_at).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}):'Hora a confirmar'})));
  }catch(e){} })();return()=>{live=false}},[]);
 
  useEffect(()=>{let live=true;(async()=>{try{setLoading(true);const r=await fetch(SPORTS_DB+'/eventsnext.php?id='+TORREENSE_ID),j=await r.json(),ev=j.events?.[0];if(!ev)throw new Error('Sem próximo jogo');if(live)setGame(ev);}catch(e){if(live)setError(e.message)}finally{if(live)setLoading(false)}})();return()=>{live=false}},[]);
- useEffect(()=>{let live=true;(async()=>{try{
-   const found=[],seen=new Set();
-   for(let page=1;page<=8;page++){
-    const source=page===1?TORREENSE_NEWS:TORREENSE_NEWS+'?page='+page;
-    const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(source);
-    const r=await fetch(proxy);if(!r.ok)break;const html=await r.text();
-    const re=/<a[^>]+href=["']([^"']*\/blog\/[^"'?#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;let m,added=0;
-    while((m=re.exec(html))){
-     const url=new URL(m[1],TORREENSE_NEWS).href;if(seen.has(url))continue;
-     const block=cleanHtml(m[2]);if(block.length<8)continue;
-     const date=(block.match(/\b\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}\b/)||[])[0]||'';
-     seen.add(url);added++;found.push({category:/Futebol/i.test(block)?'FUTEBOL':/Clube/i.test(block)?'CLUBE':'TORREENSE',title:block.replace(/^(Futebol|Clube)\s*/i,'').replace(date,'').trim(),date,url});
-    }
-    if(!added)break;
-   }
-   if(live&&found.length){setNews(found);found.slice(0,5).forEach(item=>{if(!cache.articles.has(item.url)){const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url);fetch(proxy).then(r=>r.text()).then(html=>{const article=html.match(/<article[\\s\\S]*?<\\/article>/i);cache.articles.set(item.url,cleanHtml(article?.[0]||html).slice(0,12000));}).catch(()=>{});}});}
-  }catch(e){} })();return()=>{live=false}},[]);
 
  async function openGame(){
   setScreen('game');setGameTab('RESUMO');if(!game?.idEvent)return;
@@ -103,10 +85,15 @@ export default function App(){
   ]).then(([a,b,d])=>setGameInfo(v=>({...v,stats:a.eventstats||a.event_stats||[],lineup:b.lineup||b.lineups||[],timeline:d.timeline||[]})));
  }
  async function openArticle(item){
-  const saved=item.body||cache.articles.get(item.url);
-  setPreviousScreen(screen);setSelectedNews({...item,body:saved||''});setScreen('article');if(saved)return;
+  setPreviousScreen(screen);setSelectedNews(item);setScreen('article');
+  if(item.body)return;
   setArticleLoading(true);
-  try{const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url),r=await fetch(proxy),html=await r.text();const article=html.match(/<article[\s\S]*?<\/article>/i),body=cleanHtml(article?.[0]||html).slice(0,12000);cache.articles.set(item.url,body);setSelectedNews({...item,body});}catch(e){setSelectedNews({...item,body:'Não foi possível carregar o conteúdo desta notícia.'})}finally{setArticleLoading(false)}
+  try{
+   const rows=await sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&id=eq.'+encodeURIComponent(item.id)+'&limit=1');
+   const x=rows?.[0];
+   if(x)setSelectedNews({...item,body:x.content_text||'',html:x.content_html||'',hero:x.hero_image_url||item.hero,excerpt:x.excerpt||item.excerpt});
+  }catch(e){setSelectedNews({...item,body:'Não foi possível carregar o conteúdo desta notícia.'})}
+  finally{setArticleLoading(false)}
  }
  async function openCalendar(){
   setScreen('calendar');if(calendar.length)return;
@@ -126,11 +113,7 @@ export default function App(){
    ];cache.calendar=fallback;setCalendar(fallback);}
   }catch(e){}finally{setCalendarLoading(false)}
  }
- const officialNews=news.length?news:[
-  {category:'CLUBE',title:'Estreia de sonho na Liga Europa',url:'https://www.torreense.com/blog/estreialigaeuropa'},
-  {category:'FUTEBOL',title:'Lillestrøm SK x SCU Torreense - Convocados',url:TORREENSE_NEWS},
-  {category:'FUTEBOL',title:'Lillestrøm SK x SCU Torreense - Informações Úteis',url:TORREENSE_NEWS}
- ];
+ const officialNews=news;
  const sports=['TODAS','FUTEBOL','FUTSAL','FUTEBOL FEMININO','FORMAÇÃO'];
  const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
 
@@ -149,7 +132,7 @@ export default function App(){
   </>}</Page>
  }
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
- if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{selectedNews?.title}</Text>{articleLoading?<ActivityIndicator/>:<><View>{(selectedNews?.body||'').split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ])/).reduce((rows,sentence)=>{const last=rows[rows.length-1];if(!last||last.length>320)rows.push(sentence);else rows[rows.length-1]=last+' '+sentence;return rows;},[]).map((p,i)=><Text key={i} style={s.articleParagraph}>{p}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
+ if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{selectedNews?.title}</Text>{selectedNews?.hero?<Image source={{uri:selectedNews.hero}} style={{width:'100%',height:190,borderRadius:12,marginBottom:16}} resizeMode="cover"/>:null}{articleLoading?<ActivityIndicator/>:<><View>{(selectedNews?.body||'').split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ])/).reduce((rows,sentence)=>{const last=rows[rows.length-1];if(!last||last.length>320)rows.push(sentence);else rows[rows.length-1]=last+' '+sentence;return rows;},[]).map((p,i)=><Text key={i} style={s.articleParagraph}>{p}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
  if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
 
  const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
