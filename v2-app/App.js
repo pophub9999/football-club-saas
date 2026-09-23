@@ -83,6 +83,15 @@ export default function App(){
      <Pressable style={s.button}><Text style={s.buttonText}>VER JOGO</Text></Pressable>
     </>}
    </View>
+
+   <View style={s.quickSection}>
+    <Text style={s.sectionTitle}>ACESSO RÁPIDO</Text>
+    <View style={s.quickRow}>
+     <Pressable style={s.quickCard}><Text style={s.quickIcon}>◷</Text><Text style={s.quickText}>JOGOS</Text></Pressable>
+     <Pressable style={s.quickCard}><Text style={s.quickIcon}>▤</Text><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
+     <Pressable style={s.quickCard}><Text style={s.quickIcon}>≡</Text><Text style={s.quickText}>CLASSIFICAÇÃO</Text></Pressable>
+    </View>
+   </View>
   </View>
  </View>
 }
@@ -90,13 +99,19 @@ export default function App(){
 const s=StyleSheet.create({
  root:{flex:1,backgroundColor:'#00142c',alignItems:'center',justifyContent:'center',overflow:'hidden'},
  background:{width:'100%',height:'100%'},
- card:{width:'100%',backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.34)',borderRadius:16,paddingHorizontal:14,paddingTop:12,paddingBottom:11,shadowColor:'#000',shadowOpacity:.25,shadowRadius:16,shadowOffset:{width:0,height:7}},
+ card:{width:'100%',backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.34)',borderRadius:14,paddingHorizontal:13,paddingTop:9,paddingBottom:9,shadowColor:'#000',shadowOpacity:.25,shadowRadius:16,shadowOffset:{width:0,height:7}},
  loading:{height:205,alignItems:'center',justifyContent:'center'},
  loadingText:{color:'#b7cee2',fontSize:9,marginTop:9},error:{color:'#fff',fontSize:10,fontWeight:'800'},errorSmall:{color:'#9fb5c8',fontSize:8,marginTop:5},
  header:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'},headerLeft:{maxWidth:'58%'},
  competition:{color:'#b7cee2',fontSize:8,fontWeight:'800',letterSpacing:.65},round:{color:'#fff',fontSize:8.5,marginTop:3},date:{color:'#fff',fontSize:8,fontWeight:'800'},
- teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:11},
- team:{width:'38%',alignItems:'center'},teamLogo:{width:47,height:52},teamName:{color:'#fff',fontSize:8,fontWeight:'800',marginTop:5,textAlign:'center',minHeight:20},vs:{color:'#93abc1',fontSize:12,fontWeight:'800'},
- stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:7},
- button:{marginTop:9,height:32,borderRadius:9,backgroundColor:'#9b1e3b',alignItems:'center',justifyContent:'center'},buttonText:{color:'#fff',fontSize:9,fontWeight:'900',letterSpacing:.35}
+ teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},
+ team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},teamName:{color:'#fff',fontSize:8,fontWeight:'800',marginTop:3,textAlign:'center',minHeight:16},vs:{color:'#93abc1',fontSize:12,fontWeight:'800'},
+ stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:4},
+ button:{marginTop:6,height:27,borderRadius:8,backgroundColor:'#9b1e3b',alignItems:'center',justifyContent:'center'},buttonText:{color:'#fff',fontSize:8.5,fontWeight:'900',letterSpacing:.35},
+ quickSection:{marginTop:12},
+ sectionTitle:{color:'#c7d8e7',fontSize:8,fontWeight:'900',letterSpacing:1.1,marginBottom:7},
+ quickRow:{flexDirection:'row',justifyContent:'space-between'},
+ quickCard:{width:'31.5%',height:61,borderRadius:11,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(120,164,197,.28)',alignItems:'center',justifyContent:'center'},
+ quickIcon:{color:'#d6e4ef',fontSize:16,fontWeight:'700',lineHeight:18},
+ quickText:{color:'#fff',fontSize:7.2,fontWeight:'900',letterSpacing:.35,marginTop:5,textAlign:'center'}
 });
