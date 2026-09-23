@@ -43,7 +43,8 @@ export default function App(){
     for (const candidate of candidates) {
       const today=new Date().toISOString().slice(0,10);
       const until=new Date(Date.now()+120*24*60*60*1000).toISOString().slice(0,10);
-      const fr=await fetch(API+'/fixtures?team='+candidate.team.id+'&from='+today+'&to='+until,{headers});
+      const season = new Date().getMonth() >= 6 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+      const fr=await fetch(API+'/fixtures?team='+candidate.team.id+'&season='+season+'&from='+today+'&to='+until,{headers});
       const fj=await fr.json();
       if (fj.errors && Object.keys(fj.errors).length) throw new Error(JSON.stringify(fj.errors));
       const future=(fj.response||[])
