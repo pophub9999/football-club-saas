@@ -44,7 +44,7 @@ function fmtDate(iso){
 export default function App(){
  const {width,height}=useWindowDimensions();
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const [news,setNews]=useState([]);
+ const [news,setNews]=useState([]),[newsLoading,setNewsLoading]=useState(true);
 
  const canvasWidth=Math.min(width,height/2), canvasHeight=canvasWidth*2;
  const canvasLeft=(width-canvasWidth)/2, canvasTop=(height-canvasHeight)/2;
@@ -80,6 +80,52 @@ export default function App(){
    finally{if(live)setLoading(false);}
   }
   load(); return()=>{live=false};
+ },[]);
+
+ useEffect(()=>{
+  let live=true;
+  async function loadNews(){
+   try{
+    setNewsLoading(true);
+    const source='https://www.torreense.com/blog';
+    const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(source);
+    const r=await fetch(proxy);
+    if(!r.ok) throw new Error('News HTTP '+r.status);
+    const html=await r.text();
+
+    const found=[];
+    const seen=new Set();
+    const re=/<a[^>]+href=["']([^"']*\/blog\/[^"'?#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let m;
+    while((m=re.exec(html)) && found.length<8){
+      const url=new URL(m[1],source).href;
+      if(seen.has(url)) continue;
+      const block=m[2]
+        .replace(/<script[\s\S]*?<\/script>/gi,' ')
+        .replace(/<style[\s\S]*?<\/style>/gi,' ')
+        .replace(/<[^>]+>/g,' ')
+        .replace(/&nbsp;/g,' ')
+        .replace(/&amp;/g,'&')
+        .replace(/&#39;/g,"'")
+        .replace(/&quot;/g,'"')
+        .replace(/\s+/g,' ')
+        .trim();
+      if(block.length<8) continue;
+      const category=/Futebol/i.test(block)?'FUTEBOL':/Clube/i.test(block)?'CLUBE':'TORREENSE';
+      const title=block.replace(/^(Futebol|Clube)\s*/i,'').trim();
+      if(!title) continue;
+      seen.add(url);
+      found.push({category,title,url});
+    }
+    if(live && found.length)setNews(found);
+   }catch(e){
+    // Keep the verified official-site fallback below if live retrieval is unavailable.
+   }finally{
+    if(live)setNewsLoading(false);
+   }
+  }
+  loadNews();
+  return()=>{live=false};
  },[]);
 
  const home=game?.teams?.home, away=game?.teams?.away;
