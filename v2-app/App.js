@@ -3,8 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator } from 'react-native';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
-const API='https://v3.football.api-sports.io';
-const API_KEY='983501ee4a4a6f41ea11b88ae30c3c92';
+const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
+const TORREENSE_ID='143720';
 
 function RemoteLogo({uri,style,alt}) {
   if (!uri) return null;
@@ -32,30 +32,25 @@ export default function App(){
   async function load(){
    try{
     setLoading(true); setError('');
-    const headers={'x-apisports-key':API_KEY};
-    const tr=await fetch(API+'/teams?search=Torreense',{headers});
-    const tj=await tr.json();
-    if (tj.errors && Object.keys(tj.errors).length) throw new Error(JSON.stringify(tj.errors));
-    const candidates=(tj.response||[]).filter(x=>/torreense/i.test(x.team?.name||''));
-    if(!candidates.length) throw new Error('Torreense não encontrado na API');
+    const r=await fetch(SPORTS_DB+'/eventsnext.php?id='+TORREENSE_ID);
+    if(!r.ok) throw new Error('TheSportsDB HTTP '+r.status);
+    const j=await r.json();
+    const ev=j.events?.[0];
+    if(!ev) throw new Error('TheSportsDB não devolveu próximo jogo');
 
-    let nextGame=null;
-    for (const candidate of candidates) {
-      const today=new Date().toISOString().slice(0,10);
-      const until=new Date(Date.now()+120*24*60*60*1000).toISOString().slice(0,10);
-      const season = new Date().getMonth() >= 6 ? new Date().getFullYear() : new Date().getFullYear() - 1;
-      const fr=await fetch(API+'/fixtures?team='+candidate.team.id+'&season='+season+'&from='+today+'&to='+until,{headers});
-      const fj=await fr.json();
-      if (fj.errors && Object.keys(fj.errors).length) throw new Error(JSON.stringify(fj.errors));
-      const future=(fj.response||[])
-        .filter(x=>new Date(x.fixture?.date).getTime()>Date.now())
-        .sort((a,b)=>new Date(a.fixture.date)-new Date(b.fixture.date));
-      if(future.length && (!nextGame || new Date(future[0].fixture.date)<new Date(nextGame.fixture.date))) {
-        nextGame=future[0];
+    const dateTime=ev.strTimestamp || (ev.dateEvent ? ev.dateEvent+'T'+(ev.strTime||'00:00:00') : null);
+    const normalized={
+      fixture:{
+        date:dateTime,
+        venue:{name:ev.strVenue||'',city:ev.strCity||''}
+      },
+      league:{name:ev.strLeague||'Liga Portugal',round:ev.intRound ? 'Jornada '+ev.intRound : 'Próximo jogo'},
+      teams:{
+        home:{name:ev.strHomeTeam,logo:ev.strHomeTeamBadge||ev.strHomeTeamLogo||null},
+        away:{name:ev.strAwayTeam,logo:ev.strAwayTeamBadge||ev.strAwayTeamLogo||null}
       }
-    }
-    if(!nextGame) throw new Error('A API-Football não devolveu jogos futuros nos próximos 120 dias');
-    if(live)setGame(nextGame);
+    };
+    if(live)setGame(normalized);
    }catch(e){if(live)setError(e.message||'Erro ao obter jogo');}
    finally{if(live)setLoading(false);}
   }
