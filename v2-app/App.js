@@ -6,7 +6,15 @@ const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/
 const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
 const TORREENSE_ID='143720';
 const TORREENSE_NEWS='https://www.torreense.com/blog';
+const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
+const SUPABASE_KEY='sb_publishable_TyM24TpRzq3_ijZsFRTVGg_bWM2WOky';
+const SB_HEADERS={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
 const cache={articles:new Map(),calendar:null};
+async function sb(path){
+ const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:SB_HEADERS});
+ if(!r.ok)throw new Error('Supabase '+r.status);
+ return r.json();
+}
 
 function RemoteLogo({uri,style,alt}) {
  if(!uri)return null;
@@ -42,11 +50,24 @@ export default function App(){
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
  const [news,setNews]=useState([]),[selectedNews,setSelectedNews]=useState(null),[articleLoading,setArticleLoading]=useState(false);
  const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('TODAS'),[calendarLoading,setCalendarLoading]=useState(false);
+ const [syncVersion,setSyncVersion]=useState(null);
 
  const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
  const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
  const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
  const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
+
+ useEffect(()=>{let live=true;(async()=>{try{
+  const [v,n,m]=await Promise.all([
+   sb('app_sync?select=version,updated_at&id=eq.1'),
+   sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text&active=eq.true&order=published_at.desc.nullslast&limit=100'),
+   sb('matches?select=*,competitions(name),sports(name),home:home_team_id(name,logo_url),away:away_team_id(name,logo_url)&order=starts_at.asc&limit=200')
+  ]);
+  if(!live)return;
+  setSyncVersion(v?.[0]?.version||1);
+  if(n?.length)setNews(n.map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',hero:x.hero_image_url,excerpt:x.excerpt})));
+  if(m?.length)setCalendar(m.map(x=>({id:String(x.id),sport:(x.sports?.name||'Futebol').toUpperCase(),type:(x.event_type||'JOGO').toUpperCase(),date:x.starts_at?new Date(x.starts_at).toLocaleDateString('pt-PT'):'',round:x.round||'',title:(x.home?.name||'')+' × '+(x.away?.name||''),time:x.starts_at?new Date(x.starts_at).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}):'Hora a confirmar'})));
+ }catch(e){} })();return()=>{live=false}},[]);
 
  useEffect(()=>{let live=true;(async()=>{try{setLoading(true);const r=await fetch(SPORTS_DB+'/eventsnext.php?id='+TORREENSE_ID),j=await r.json(),ev=j.events?.[0];if(!ev)throw new Error('Sem próximo jogo');if(live)setGame(ev);}catch(e){if(live)setError(e.message)}finally{if(live)setLoading(false)}})();return()=>{live=false}},[]);
  useEffect(()=>{let live=true;(async()=>{try{
@@ -82,7 +103,7 @@ export default function App(){
   ]).then(([a,b,d])=>setGameInfo(v=>({...v,stats:a.eventstats||a.event_stats||[],lineup:b.lineup||b.lineups||[],timeline:d.timeline||[]})));
  }
  async function openArticle(item){
-  const saved=cache.articles.get(item.url);
+  const saved=item.body||cache.articles.get(item.url);
   setPreviousScreen(screen);setSelectedNews({...item,body:saved||''});setScreen('article');if(saved)return;
   setArticleLoading(true);
   try{const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url),r=await fetch(proxy),html=await r.text();const article=html.match(/<article[\s\S]*?<\/article>/i),body=cleanHtml(article?.[0]||html).slice(0,12000);cache.articles.set(item.url,body);setSelectedNews({...item,body});}catch(e){setSelectedNews({...item,body:'Não foi possível carregar o conteúdo desta notícia.'})}finally{setArticleLoading(false)}
