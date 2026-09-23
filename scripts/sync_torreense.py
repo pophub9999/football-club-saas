@@ -28,33 +28,39 @@ def clean(s):
 
 def discover_news():
     found={}
-    # The archive currently has 7 pages. Keep a wider ceiling so this remains
-    # automatic as the archive grows.
+    empty_pages=0
     for page in range(1,21):
-        url="https://www.torreense.com/blog"+("" if page==1 else "?page="+str(page))
+        url="https://www.torreense.com/blog?page="+str(page)
         try:
             doc=get(url).replace("\\/","/")
             print("BLOG_HTTP_OK",url,"bytes",len(doc))
         except Exception as e:
             print("BLOG_FETCH_FAILED",url,repr(e))
+            empty_pages+=1
+            if empty_pages>=2: break
             continue
+
         links=[]
+        # The site emits normal hrefs, but not necessarily with a leading slash.
         for pat in [
-            r"""href\s*=\s*["']([^"']*?/blog/[^"'?#]+)""",
+            r"""href\s*=\s*["']([^"']*blog/[^"'?#]+)""",
             r'https?://(?:www\.)?torreense\.com/blog/[A-Za-z0-9_-]+',
-            r"""["'](/blog/[A-Za-z0-9_-]+)["']""",
+            r"""["']((?:https?://(?:www\.)?torreense\.com)?/?blog/[A-Za-z0-9_-]+)["']""",
         ]:
             links.extend(re.findall(pat,doc,re.I))
+
         before=len(found)
         for href in links:
-            u=urllib.parse.urljoin("https://www.torreense.com",href).rstrip("/")
+            u=urllib.parse.urljoin("https://www.torreense.com/",href).rstrip("/")
             if re.match(r'https://(?:www\.)?torreense\.com/blog/[A-Za-z0-9_-]+$',u,re.I):
                 found[u]=True
-        print("PAGE_DISCOVERED",page,len(found)-before,"TOTAL",len(found))
-        # Stop only after the archive has started and two consecutive pages
-        # add nothing. This avoids truncating discovery on one odd page.
-        if page>8 and len(found)==before:
+
+        added=len(found)-before
+        print("PAGE_DISCOVERED",page,added,"TOTAL",len(found))
+        empty_pages = empty_pages + 1 if added==0 else 0
+        if page>=7 and empty_pages>=2:
             break
+
     print("DISCOVERED_URLS",len(found))
     return list(found)
 
