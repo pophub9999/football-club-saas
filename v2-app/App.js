@@ -9,7 +9,7 @@ export default function App() {
       <Image
         source={require('./home-background.png')}
         style={styles.background}
-        resizeMode="cover"
+        resizeMode="contain"
       />
     </View>
   );
@@ -19,10 +19,11 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#00142c',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
     overflow: 'hidden',
   },
   background: {
-    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
