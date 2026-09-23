@@ -95,8 +95,22 @@ def article(url):
             except: section=""
 
     if not section:
-        print("ARTICLE_CONTENT_NOT_FOUND",url)
-        return None
+        bm=re.search(r"<body\b[^>]*>([\s\S]*?)</body>",doc,re.I)
+        raw=bm.group(1) if bm else doc
+        raw=re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<nav[\s\S]*?</nav>|<footer[\s\S]*?</footer>|<header[\s\S]*?</header>|<form[\s\S]*?</form>"," ",raw,flags=re.I)
+        raw_text=clean(raw)
+        if title:
+            q=raw_text.lower().find(title.lower())
+            if q>=0: raw_text=raw_text[q+len(title):].strip()
+        stop=len(raw_text)
+        for label in ["Política de Privacidade","Termos e Condições","Todos os direitos reservados"]:
+            q=raw_text.lower().find(label.lower())
+            if q>80: stop=min(stop,q)
+        raw_text=raw_text[:stop].strip()
+        if len(raw_text)>=40: section="<p>"+h.escape(raw_text)+"</p>"
+        else:
+            print("ARTICLE_CONTENT_NOT_FOUND",url)
+            return None
 
     section=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>","",section,flags=re.I)
     # Some Torreense pages expose a broad CMS container that also contains
