@@ -5,6 +5,7 @@ import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
 const TORREENSE_ID='143720';
+const TORREENSE_NEWS='https://www.torreense.com/blog';
 
 function RemoteLogo({uri,style,alt}) {
   if (!uri) return null;
@@ -43,6 +44,7 @@ function fmtDate(iso){
 export default function App(){
  const {width,height}=useWindowDimensions();
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const [news,setNews]=useState([]);
 
  const canvasWidth=Math.min(width,height/2), canvasHeight=canvasWidth*2;
  const canvasLeft=(width-canvasWidth)/2, canvasTop=(height-canvasHeight)/2;
@@ -81,6 +83,11 @@ export default function App(){
  },[]);
 
  const home=game?.teams?.home, away=game?.teams?.away;
+ const officialNews = news.length ? news : [
+  {category:'CLUBE',date:'21.09.2026',title:'Estreia de sonho na Liga Europa',url:'https://www.torreense.com/blog/estreialigaeuropa'},
+  {category:'FUTEBOL',date:'',title:'Lillestrøm SK x SCU Torreense - Convocados',url:TORREENSE_NEWS},
+  {category:'FUTEBOL',date:'',title:'Lillestrøm SK x SCU Torreense - Informações Úteis',url:TORREENSE_NEWS}
+ ];
  return <View style={s.root}>
   <StatusBar hidden/>
   <Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>
@@ -119,6 +126,23 @@ export default function App(){
      <Pressable style={s.quickCard}><ShortcutIcon type="star"/><Text style={s.quickText}>VANTAGENS</Text></Pressable>
     </View>
    </View>
+
+   <View style={s.newsSection}>
+    <View style={s.newsHeader}>
+     <Text style={s.newsHeading}>ÚLTIMAS NOTÍCIAS</Text>
+     <Text style={s.newsMore}>VER TODAS  ›</Text>
+    </View>
+    {officialNews.slice(0,3).map((item,i)=>(
+     <Pressable key={i} style={s.newsCard} onPress={()=>Platform.OS==='web' && window.open(item.url,'_blank')}>
+      <View style={s.newsAccent}/>
+      <View style={s.newsBody}>
+       <Text style={s.newsMeta}>{item.category}{item.date ? '  ·  '+item.date : ''}</Text>
+       <Text style={s.newsTitle} numberOfLines={2}>{item.title}</Text>
+      </View>
+      <Text style={s.newsArrow}>›</Text>
+     </Pressable>
+    ))}
+   </View>
   </View>
  </View>
 }
@@ -141,5 +165,15 @@ const s=StyleSheet.create({
  quickRow:{flexDirection:'row',justifyContent:'space-between'},
  quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},
  quickIconFallback:{color:'#f1b94f',fontSize:22,fontWeight:'400',lineHeight:26},
- quickText:{color:'#fff',fontSize:5.9,fontWeight:'900',letterSpacing:.18,marginTop:5,textAlign:'center'}
+ quickText:{color:'#fff',fontSize:5.9,fontWeight:'900',letterSpacing:.18,marginTop:5,textAlign:'center'},
+ newsSection:{marginTop:12},
+ newsHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:7},
+ newsHeading:{color:'#fff',fontSize:8.5,fontWeight:'900',letterSpacing:.75},
+ newsMore:{color:'#f1b94f',fontSize:6.5,fontWeight:'800',letterSpacing:.35},
+ newsCard:{minHeight:49,marginBottom:6,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',flexDirection:'row',alignItems:'center',overflow:'hidden'},
+ newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},
+ newsBody:{flex:1,paddingHorizontal:10,paddingVertical:7},
+ newsMeta:{color:'#f1b94f',fontSize:5.8,fontWeight:'900',letterSpacing:.55,marginBottom:3},
+ newsTitle:{color:'#fff',fontSize:8,fontWeight:'800',lineHeight:11},
+ newsArrow:{color:'#9eb6c9',fontSize:18,fontWeight:'300',paddingHorizontal:10}
 });
