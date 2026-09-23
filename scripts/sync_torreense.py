@@ -5,7 +5,12 @@ from datetime import datetime,timezone
 BASE=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 HEAD={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"}
-UA={"User-Agent":"TorreenseAppSync/1.0"}
+UA={
+ "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+ "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+ "Accept-Language":"pt-PT,pt;q=0.9,en;q=0.7",
+ "Cache-Control":"no-cache"
+}
 
 def get(url):
     req=urllib.request.Request(url,headers=UA)
@@ -26,13 +31,16 @@ def discover_news():
     for page in range(1,9):
         url="https://www.torreense.com/blog"+("" if page==1 else "?page="+str(page))
         try: doc=get(url)
-        except Exception: break
+        except Exception as e:
+            print("BLOG_FETCH_FAILED",url,repr(e))
+            break
         links=re.findall(r'href=["\']([^"\']*/blog/[^"\'?#]+)',doc,re.I)
         before=len(found)
         for href in links:
             u=urllib.parse.urljoin("https://www.torreense.com",href)
             found[u]=True
         if len(found)==before and page>1:break
+    print("DISCOVERED_URLS",len(found))
     return list(found)
 
 def article(url):
@@ -62,7 +70,9 @@ def main():
     for u in urls:
         try:rows.append(article(u))
         except Exception as e:print("article failed",u,e)
-    if rows: api("news?on_conflict=url","POST",rows)
+    if not rows:
+        raise RuntimeError("No Torreense news discovered/imported; failing sync instead of reporting false success")
+    api("news?on_conflict=url","POST",rows)
     now=datetime.now(timezone.utc).isoformat()
     status={"source":"torreense_news","last_sync":now,"last_success":now,"status":"success","message":"Official Torreense news sync","items_processed":len(rows),"updated_at":now}
     api("sync_status?on_conflict=source","POST",[status])
