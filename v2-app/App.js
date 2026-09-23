@@ -16,7 +16,7 @@ export default function App() {
         resizeMode="contain"
       />
 
-      <View style={styles.overlay} pointerEvents="none">
+      <View style={styles.phoneCanvas} pointerEvents="none">
         <Image
           source={{ uri: LOGO_URL }}
           style={styles.logo}
@@ -39,17 +39,18 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
+  phoneCanvas: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    aspectRatio: 0.5,
+    alignSelf: 'center',
   },
   logo: {
     position: 'absolute',
-    top: '4.5%',
-    left: '6%',
-    width: '10%',
-    maxWidth: 92,
-    minWidth: 58,
-    aspectRatio: 0.72,
+    top: '4.2%',
+    left: '5.8%',
+    width: '13.5%',
+    height: '11%',
   },
 });
