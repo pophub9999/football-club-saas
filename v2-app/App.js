@@ -35,12 +35,24 @@ export default function App(){
     const headers={'x-apisports-key':API_KEY};
     const tr=await fetch(API+'/teams?search=Torreense',{headers});
     const tj=await tr.json();
-    const found=(tj.response||[]).find(x=>/torreense/i.test(x.team?.name||'')) || tj.response?.[0];
-    if(!found?.team?.id) throw new Error('Torreense não encontrado');
-    const fr=await fetch(API+'/fixtures?team='+found.team.id+'&next=1',{headers});
-    const fj=await fr.json();
-    if(!fj.response?.length) throw new Error('Sem próximo jogo disponível');
-    if(live)setGame(fj.response[0]);
+    if (tj.errors && Object.keys(tj.errors).length) throw new Error(JSON.stringify(tj.errors));
+    const candidates=(tj.response||[]).filter(x=>/torreense/i.test(x.team?.name||''));
+    if(!candidates.length) throw new Error('Torreense não encontrado na API');
+
+    let nextGame=null;
+    for (const candidate of candidates) {
+      const fr=await fetch(API+'/fixtures?team='+candidate.team.id+'&next=10',{headers});
+      const fj=await fr.json();
+      if (fj.errors && Object.keys(fj.errors).length) throw new Error(JSON.stringify(fj.errors));
+      const future=(fj.response||[])
+        .filter(x=>new Date(x.fixture?.date).getTime()>Date.now())
+        .sort((a,b)=>new Date(a.fixture.date)-new Date(b.fixture.date));
+      if(future.length && (!nextGame || new Date(future[0].fixture.date)<new Date(nextGame.fixture.date))) {
+        nextGame=future[0];
+      }
+    }
+    if(!nextGame) throw new Error('A API-Football não devolveu fixtures futuras para o Torreense');
+    if(live)setGame(nextGame);
    }catch(e){if(live)setError(e.message||'Erro ao obter jogo');}
    finally{if(live)setLoading(false);}
   }
