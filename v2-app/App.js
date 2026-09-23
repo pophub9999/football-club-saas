@@ -41,7 +41,9 @@ export default function App(){
 
     let nextGame=null;
     for (const candidate of candidates) {
-      const fr=await fetch(API+'/fixtures?team='+candidate.team.id+'&next=10',{headers});
+      const today=new Date().toISOString().slice(0,10);
+      const until=new Date(Date.now()+120*24*60*60*1000).toISOString().slice(0,10);
+      const fr=await fetch(API+'/fixtures?team='+candidate.team.id+'&from='+today+'&to='+until,{headers});
       const fj=await fr.json();
       if (fj.errors && Object.keys(fj.errors).length) throw new Error(JSON.stringify(fj.errors));
       const future=(fj.response||[])
@@ -51,7 +53,7 @@ export default function App(){
         nextGame=future[0];
       }
     }
-    if(!nextGame) throw new Error('A API-Football não devolveu fixtures futuras para o Torreense');
+    if(!nextGame) throw new Error('A API-Football não devolveu jogos futuros nos próximos 120 dias');
     if(live)setGame(nextGame);
    }catch(e){if(live)setError(e.message||'Erro ao obter jogo');}
    finally{if(live)setLoading(false);}
