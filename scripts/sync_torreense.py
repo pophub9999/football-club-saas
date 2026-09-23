@@ -27,19 +27,46 @@ def clean(s):
     return re.sub(r"\s+"," ",h.unescape(s)).strip()
 
 def discover_news():
+    # The official site exposes the current archive at /blog. Try several
+    # representations because some hosts return a JS shell to datacenter IPs.
+    candidates=[
+        "https://www.torreense.com/blog",
+        "https://torreense.com/blog",
+    ]
     found={}
-    for page in range(1,9):
-        url="https://www.torreense.com/blog"+("" if page==1 else "?page="+str(page))
-        try: doc=get(url)
+    for url in candidates:
+        try:
+            doc=get(url)
+            print("BLOG_HTTP_OK",url,"bytes",len(doc))
         except Exception as e:
             print("BLOG_FETCH_FAILED",url,repr(e))
-            break
-        links=re.findall(r'href=["\']([^"\']*/blog/[^"\'?#]+)',doc,re.I)
-        before=len(found)
-        for href in links:
-            u=urllib.parse.urljoin("https://www.torreense.com",href)
-            found[u]=True
-        if len(found)==before and page>1:break
+            continue
+
+        # absolute, relative, href and JSON-escaped URLs
+        doc=doc.replace("\\/","/")
+        patterns=[
+            r'href\\s*=\\s*["\\']([^"\\']*?/blog/[^"\\'?#]+)',
+            r'https?://(?:www\\.)?torreense\\.com/blog/[A-Za-z0-9_-]+',
+            r'["\\'](/blog/[A-Za-z0-9_-]+)["\\']',
+        ]
+        for pat in patterns:
+            for href in re.findall(pat,doc,re.I):
+                u=urllib.parse.urljoin("https://www.torreense.com",href)
+                if re.match(r'https://(?:www\\.)?torreense\\.com/blog/[A-Za-z0-9_-]+/?$',u,re.I):
+                    found[u.rstrip("/")]=True
+
+    # Stable official article URLs are used only as bootstrap seeds. Once the
+    # archive is readable, discovery remains fully automatic.
+    seeds=[
+      "https://www.torreense.com/blog/estreialigaeuropa",
+      "https://www.torreense.com/blog/informacaobileticaligaeuropa",
+      "https://www.torreense.com/blog/jogadoresinscritos",
+      "https://www.torreense.com/blog/torrespasseuropa",
+      "https://www.torreense.com/blog/torrespass",
+      "https://www.torreense.com/blog/arrranque",
+      "https://www.torreense.com/blog/assembleiagreal",
+    ]
+    for u in seeds: found[u]=True
     print("DISCOVERED_URLS",len(found))
     return list(found)
 
