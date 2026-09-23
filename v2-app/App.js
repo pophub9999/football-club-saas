@@ -6,6 +6,7 @@ const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/
 const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
 const TORREENSE_ID='143720';
 const TORREENSE_NEWS='https://www.torreense.com/blog';
+const cache={articles:new Map(),calendar:null};
 
 function RemoteLogo({uri,style,alt}) {
  if(!uri)return null;
@@ -48,7 +49,23 @@ export default function App(){
  const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
 
  useEffect(()=>{let live=true;(async()=>{try{setLoading(true);const r=await fetch(SPORTS_DB+'/eventsnext.php?id='+TORREENSE_ID),j=await r.json(),ev=j.events?.[0];if(!ev)throw new Error('Sem próximo jogo');if(live)setGame(ev);}catch(e){if(live)setError(e.message)}finally{if(live)setLoading(false)}})();return()=>{live=false}},[]);
- useEffect(()=>{let live=true;(async()=>{try{const source=TORREENSE_NEWS,proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(source),r=await fetch(proxy),html=await r.text(),found=[],seen=new Set(),re=/<a[^>]+href=["']([^"']*\/blog\/[^"'?#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;let m;while((m=re.exec(html))&&found.length<10){const url=new URL(m[1],source).href;if(seen.has(url))continue;const block=cleanHtml(m[2]);if(block.length<8)continue;seen.add(url);found.push({category:/Futebol/i.test(block)?'FUTEBOL':/Clube/i.test(block)?'CLUBE':'TORREENSE',title:block.replace(/^(Futebol|Clube)\s*/i,'').trim(),url});}if(live&&found.length)setNews(found);}catch(e){} })();return()=>{live=false}},[]);
+ useEffect(()=>{let live=true;(async()=>{try{
+   const found=[],seen=new Set();
+   for(let page=1;page<=8;page++){
+    const source=page===1?TORREENSE_NEWS:TORREENSE_NEWS+'?page='+page;
+    const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(source);
+    const r=await fetch(proxy);if(!r.ok)break;const html=await r.text();
+    const re=/<a[^>]+href=["']([^"']*\/blog\/[^"'?#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;let m,added=0;
+    while((m=re.exec(html))){
+     const url=new URL(m[1],TORREENSE_NEWS).href;if(seen.has(url))continue;
+     const block=cleanHtml(m[2]);if(block.length<8)continue;
+     const date=(block.match(/\b\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}\b/)||[])[0]||'';
+     seen.add(url);added++;found.push({category:/Futebol/i.test(block)?'FUTEBOL':/Clube/i.test(block)?'CLUBE':'TORREENSE',title:block.replace(/^(Futebol|Clube)\s*/i,'').replace(date,'').trim(),date,url});
+    }
+    if(!added)break;
+   }
+   if(live&&found.length)setNews(found);
+  }catch(e){} })();return()=>{live=false}},[]);
 
  async function openGame(){
   setScreen('game');setGameTab('RESUMO');if(!game?.idEvent)return;
@@ -65,22 +82,27 @@ export default function App(){
   ]).then(([a,b,d])=>setGameInfo(v=>({...v,stats:a.eventstats||a.event_stats||[],lineup:b.lineup||b.lineups||[],timeline:d.timeline||[]})));
  }
  async function openArticle(item){
-  setSelectedNews({...item,body:''});setScreen('article');setArticleLoading(true);
-  try{const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url),r=await fetch(proxy),html=await r.text();let body='';const article=html.match(/<article[\s\S]*?<\/article>/i);body=cleanHtml(article?.[0]||html);setSelectedNews({...item,body:body.slice(0,7000)});}catch(e){setSelectedNews({...item,body:'Não foi possível carregar o conteúdo desta notícia.'})}finally{setArticleLoading(false)}
+  const saved=cache.articles.get(item.url);
+  setSelectedNews({...item,body:saved||''});setScreen('article');if(saved)return;
+  setArticleLoading(true);
+  try{const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url),r=await fetch(proxy),html=await r.text();const article=html.match(/<article[\s\S]*?<\/article>/i),body=cleanHtml(article?.[0]||html).slice(0,12000);cache.articles.set(item.url,body);setSelectedNews({...item,body});}catch(e){setSelectedNews({...item,body:'Não foi possível carregar o conteúdo desta notícia.'})}finally{setArticleLoading(false)}
  }
  async function openCalendar(){
-  setScreen('calendar'); if(calendar.length)return;setCalendarLoading(true);
+  setScreen('calendar');if(calendar.length)return;
+  if(cache.calendar){setCalendar(cache.calendar);return}
+  if(game){setCalendar([{id:game.idEvent||'next',sport:'FUTEBOL',type:'JOGO',date:game.dateEvent||'',round:game.intRound?'J'+game.intRound:'',title:(game.strHomeTeam||'')+' × '+(game.strAwayTeam||''),time:(game.strTime||'').slice(0,5)||'Hora a confirmar'}]);}
+  setCalendarLoading(true);
   try{
    const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent('https://www.torreense.com/futebol-profissional/equipa-principal/calendario');
    const html=await (await fetch(proxy)).text();
    const txt=cleanHtml(html),matches=[...txt.matchAll(/(\d{2}\.\d{2}\.\d{4})\s*\|\s*(J\d+)[\s\S]{0,140}?([A-Za-zÀ-ÿ0-9. ]+)\s+VS(?:\s+\d+-\d+)?\s+([A-Za-zÀ-ÿ0-9. ]+)/g)];
    const parsed=matches.map((m,i)=>({id:'f'+i,sport:'FUTEBOL',type:'JOGO',date:m[1],round:m[2],title:(m[3]+' × '+m[4]).replace(/\s+/g,' ').trim(),time:'Hora a confirmar'}));
-   if(parsed.length)setCalendar(parsed);
-   else setCalendar([
+   if(parsed.length){cache.calendar=parsed;setCalendar(parsed);}
+   else {const fallback=[
     {id:'1',sport:'FUTEBOL',type:'JOGO',date:'10.10.2026',round:'J7',title:'CD Tondela × SCU Torreense',time:'10:00'},
     {id:'2',sport:'FUTEBOL',type:'JOGO',date:'26.10.2026',round:'J8',title:'SCU Torreense × Amarante F.C.',time:'Hora a confirmar'},
     {id:'3',sport:'FUTEBOL',type:'JOGO',date:'31.10.2026',round:'J9',title:'Portimonense SC × SCU Torreense',time:'Hora a confirmar'}
-   ]);
+   ];cache.calendar=fallback;setCalendar(fallback);}
   }catch(e){}finally{setCalendarLoading(false)}
  }
  const officialNews=news.length?news:[
@@ -105,7 +127,7 @@ export default function App(){
    {gameTab==='ONZE'&&<View style={s.infoCard}>{gameInfo.lineup.length?gameInfo.lineup.map((x,i)=><Text key={i} style={s.body}>{x.strPlayer||x.strPlayerName||x.strHomeTeam||''}</Text>):<Text style={s.muted}>O onze aparece aqui quando for disponibilizado pela fonte.</Text>}</View>}
   </>}</Page>
  }
- if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
+ if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
  if(screen==='article')return <Page><Back title="NOTÍCIAS"/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{selectedNews?.title}</Text>{articleLoading?<ActivityIndicator/>:<><Text style={s.articleBody}>{selectedNews?.body}</Text><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
  if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
 
