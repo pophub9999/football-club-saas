@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator } from 'react-native';
+import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
@@ -8,218 +8,124 @@ const TORREENSE_ID='143720';
 const TORREENSE_NEWS='https://www.torreense.com/blog';
 
 function RemoteLogo({uri,style,alt}) {
-  if (!uri) return null;
-  return Platform.OS==='web'
-    ? React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt})
-    : <Image source={{uri}} style={style} resizeMode="contain"/>;
+ if(!uri)return null;
+ return Platform.OS==='web'?React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt}):<Image source={{uri}} style={style} resizeMode="contain"/>;
 }
 function ShortcutIcon({type}) {
-  const gold='#f1b94f';
-  if (Platform.OS==='web') {
-    const paths={
-      calendar:'<rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v6M16 3v6M4 10h16"/>',
-      news:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4v4H7zM14 9h4M14 12h4M7 16h11"/>',
-      shop:'<path d="M6 8h12l1 12H5L6 8zM9 9V7a3 3 0 0 1 6 0v2"/>',
-      members:'<circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 6a3 3 0 0 1 0 6M17 14c2.5.4 4 2.3 4 5"/>',
-      star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3z"/>'
-    };
-    return React.createElement('svg',{
-      width:28,height:28,viewBox:'0 0 24 24',fill:'none',stroke:gold,
-      strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round',
-      dangerouslySetInnerHTML:{__html:paths[type]}
-    });
-  }
-
-  // Native fallback keeps the same gold outline language without external assets.
-  const glyph={calendar:'▣',news:'▤',shop:'♧',members:'♙',star:'☆'}[type];
-  return <Text style={s.quickIconFallback}>{glyph}</Text>;
+ const gold='#f1b94f';
+ if(Platform.OS==='web'){
+  const paths={
+   calendar:'<rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v6M16 3v6M4 10h16"/>',
+   news:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4v4H7zM14 9h4M14 12h4M7 16h11"/>',
+   shop:'<path d="M6 8h12l1 12H5L6 8zM9 9V7a3 3 0 0 1 6 0v2"/>',
+   members:'<circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 6a3 3 0 0 1 0 6M17 14c2.5.4 4 2.3 4 5"/>',
+   star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3z"/>'
+  };
+  return React.createElement('svg',{width:27,height:27,viewBox:'0 0 24 24',fill:'none',stroke:gold,strokeWidth:1.35,strokeLinecap:'round',strokeLinejoin:'round',dangerouslySetInnerHTML:{__html:paths[type]}});
+ }
+ const glyph={calendar:'▣',news:'▤',shop:'♧',members:'♙',star:'☆'}[type];
+ return <Text style={s.quickIconFallback}>{glyph}</Text>;
 }
-
 function fmtDate(iso){
-  if(!iso)return '';
-  const d=new Date(iso);
-  return new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'}).format(d).replace(',',' ·').toUpperCase();
+ if(!iso)return '';
+ const d=new Date(iso);
+ return new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'}).format(d).replace(',',' ·').toUpperCase();
 }
+function cleanHtml(v=''){return v.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();}
+function toDate(ev){return ev?.strTimestamp||(ev?.dateEvent?ev.dateEvent+'T'+(ev.strTime||'00:00:00'):null);}
 
 export default function App(){
  const {width,height}=useWindowDimensions();
+ const [screen,setScreen]=useState('home');
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const [news,setNews]=useState([]),[newsLoading,setNewsLoading]=useState(true);
+ const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false);
+ const [news,setNews]=useState([]),[selectedNews,setSelectedNews]=useState(null),[articleLoading,setArticleLoading]=useState(false);
+ const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('TODAS'),[calendarLoading,setCalendarLoading]=useState(false);
 
- const canvasWidth=Math.min(width,height/2), canvasHeight=canvasWidth*2;
- const canvasLeft=(width-canvasWidth)/2, canvasTop=(height-canvasHeight)/2;
+ const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
  const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
  const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
- const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89};
+ const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
 
- useEffect(()=>{
-  let live=true;
-  async function load(){
-   try{
-    setLoading(true); setError('');
-    const r=await fetch(SPORTS_DB+'/eventsnext.php?id='+TORREENSE_ID);
-    if(!r.ok) throw new Error('TheSportsDB HTTP '+r.status);
-    const j=await r.json();
-    const ev=j.events?.[0];
-    if(!ev) throw new Error('TheSportsDB não devolveu próximo jogo');
+ useEffect(()=>{let live=true;(async()=>{try{setLoading(true);const r=await fetch(SPORTS_DB+'/eventsnext.php?id='+TORREENSE_ID),j=await r.json(),ev=j.events?.[0];if(!ev)throw new Error('Sem próximo jogo');if(live)setGame(ev);}catch(e){if(live)setError(e.message)}finally{if(live)setLoading(false)}})();return()=>{live=false}},[]);
+ useEffect(()=>{let live=true;(async()=>{try{const source=TORREENSE_NEWS,proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(source),r=await fetch(proxy),html=await r.text(),found=[],seen=new Set(),re=/<a[^>]+href=["']([^"']*\/blog\/[^"'?#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;let m;while((m=re.exec(html))&&found.length<10){const url=new URL(m[1],source).href;if(seen.has(url))continue;const block=cleanHtml(m[2]);if(block.length<8)continue;seen.add(url);found.push({category:/Futebol/i.test(block)?'FUTEBOL':/Clube/i.test(block)?'CLUBE':'TORREENSE',title:block.replace(/^(Futebol|Clube)\s*/i,'').trim(),url});}if(live&&found.length)setNews(found);}catch(e){} })();return()=>{live=false}},[]);
 
-    const dateTime=ev.strTimestamp || (ev.dateEvent ? ev.dateEvent+'T'+(ev.strTime||'00:00:00') : null);
-    const normalized={
-      fixture:{
-        date:dateTime,
-        venue:{name:ev.strVenue||'',city:ev.strCity||''}
-      },
-      league:{name:ev.strLeague||'Liga Portugal',round:ev.intRound ? 'Jornada '+ev.intRound : 'Próximo jogo'},
-      teams:{
-        home:{name:ev.strHomeTeam,logo:ev.strHomeTeamBadge||ev.strHomeTeamLogo||null},
-        away:{name:ev.strAwayTeam,logo:ev.strAwayTeamBadge||ev.strAwayTeamLogo||null}
-      }
-    };
-    if(live)setGame(normalized);
-   }catch(e){if(live)setError(e.message||'Erro ao obter jogo');}
-   finally{if(live)setLoading(false);}
-  }
-  load(); return()=>{live=false};
- },[]);
-
- useEffect(()=>{
-  let live=true;
-  async function loadNews(){
-   try{
-    setNewsLoading(true);
-    const source='https://www.torreense.com/blog';
-    const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(source);
-    const r=await fetch(proxy);
-    if(!r.ok) throw new Error('News HTTP '+r.status);
-    const html=await r.text();
-
-    const found=[];
-    const seen=new Set();
-    const re=/<a[^>]+href=["']([^"']*\/blog\/[^"'?#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
-    let m;
-    while((m=re.exec(html)) && found.length<8){
-      const url=new URL(m[1],source).href;
-      if(seen.has(url)) continue;
-      const block=m[2]
-        .replace(/<script[\s\S]*?<\/script>/gi,' ')
-        .replace(/<style[\s\S]*?<\/style>/gi,' ')
-        .replace(/<[^>]+>/g,' ')
-        .replace(/&nbsp;/g,' ')
-        .replace(/&amp;/g,'&')
-        .replace(/&#39;/g,"'")
-        .replace(/&quot;/g,'"')
-        .replace(/\s+/g,' ')
-        .trim();
-      if(block.length<8) continue;
-      const category=/Futebol/i.test(block)?'FUTEBOL':/Clube/i.test(block)?'CLUBE':'TORREENSE';
-      const title=block.replace(/^(Futebol|Clube)\s*/i,'').trim();
-      if(!title) continue;
-      seen.add(url);
-      found.push({category,title,url});
-    }
-    if(live && found.length)setNews(found);
-   }catch(e){
-    // Keep the verified official-site fallback below if live retrieval is unavailable.
-   }finally{
-    if(live)setNewsLoading(false);
-   }
-  }
-  loadNews();
-  return()=>{live=false};
- },[]);
-
- const home=game?.teams?.home, away=game?.teams?.away;
- const officialNews = news.length ? news : [
-  {category:'CLUBE',date:'21.09.2026',title:'Estreia de sonho na Liga Europa',url:'https://www.torreense.com/blog/estreialigaeuropa'},
-  {category:'FUTEBOL',date:'',title:'Lillestrøm SK x SCU Torreense - Convocados',url:TORREENSE_NEWS},
-  {category:'FUTEBOL',date:'',title:'Lillestrøm SK x SCU Torreense - Informações Úteis',url:TORREENSE_NEWS}
+ async function openGame(){
+  setScreen('game'); if(!game?.idEvent)return;
+  setGameLoading(true);
+  try{
+   const id=game.idEvent;
+   const urls=['lookupevent.php?id=','lookupeventstats.php?id=','lookuplineup.php?id=','lookuptimeline.php?id=','eventresults.php?id='];
+   const data=await Promise.all(urls.map(x=>fetch(SPORTS_DB+'/'+x+id).then(r=>r.json()).catch(()=>({}))));
+   setGameInfo({event:data[0].events?.[0]||game,stats:data[1].eventstats||data[1].event_stats||[],lineup:data[2].lineup||data[2].lineups||[],timeline:data[3].timeline||[],results:data[4].results||[]});
+  }finally{setGameLoading(false)}
+ }
+ async function openArticle(item){
+  setSelectedNews({...item,body:''});setScreen('article');setArticleLoading(true);
+  try{const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url),r=await fetch(proxy),html=await r.text();let body='';const article=html.match(/<article[\s\S]*?<\/article>/i);body=cleanHtml(article?.[0]||html);setSelectedNews({...item,body:body.slice(0,7000)});}catch(e){setSelectedNews({...item,body:'Não foi possível carregar o conteúdo desta notícia.'})}finally{setArticleLoading(false)}
+ }
+ async function openCalendar(){
+  setScreen('calendar'); if(calendar.length)return;setCalendarLoading(true);
+  try{
+   const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent('https://www.torreense.com/futebol-profissional/equipa-principal/calendario');
+   const html=await (await fetch(proxy)).text();
+   const txt=cleanHtml(html),matches=[...txt.matchAll(/(\d{2}\.\d{2}\.\d{4})\s*\|\s*(J\d+)[\s\S]{0,140}?([A-Za-zÀ-ÿ0-9. ]+)\s+VS(?:\s+\d+-\d+)?\s+([A-Za-zÀ-ÿ0-9. ]+)/g)];
+   const parsed=matches.map((m,i)=>({id:'f'+i,sport:'FUTEBOL',type:'JOGO',date:m[1],round:m[2],title:(m[3]+' × '+m[4]).replace(/\s+/g,' ').trim(),time:'Hora a confirmar'}));
+   if(parsed.length)setCalendar(parsed);
+   else setCalendar([
+    {id:'1',sport:'FUTEBOL',type:'JOGO',date:'10.10.2026',round:'J7',title:'CD Tondela × SCU Torreense',time:'10:00'},
+    {id:'2',sport:'FUTEBOL',type:'JOGO',date:'26.10.2026',round:'J8',title:'SCU Torreense × Amarante F.C.',time:'Hora a confirmar'},
+    {id:'3',sport:'FUTEBOL',type:'JOGO',date:'31.10.2026',round:'J9',title:'Portimonense SC × SCU Torreense',time:'Hora a confirmar'}
+   ]);
+  }catch(e){}finally{setCalendarLoading(false)}
+ }
+ const officialNews=news.length?news:[
+  {category:'CLUBE',title:'Estreia de sonho na Liga Europa',url:'https://www.torreense.com/blog/estreialigaeuropa'},
+  {category:'FUTEBOL',title:'Lillestrøm SK x SCU Torreense - Convocados',url:TORREENSE_NEWS},
+  {category:'FUTEBOL',title:'Lillestrøm SK x SCU Torreense - Informações Úteis',url:TORREENSE_NEWS}
  ];
- return <View style={s.root}>
-  <StatusBar hidden/>
-  <Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>
-  <RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/>
-  <View style={headerStyle} pointerEvents="none">
-   <Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text>
-  </View>
+ const sports=['TODAS','FUTEBOL','FUTSAL','FUTEBOL FEMININO','FORMAÇÃO'];
+ const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
 
-  <View style={contentStyle}>
-   <View style={s.card}>
-    {loading ? <View style={s.loading}><ActivityIndicator/><Text style={s.loadingText}>A obter próximo jogo…</Text></View> :
-    error ? <View style={s.loading}><Text style={s.error}>Não foi possível atualizar o jogo.</Text><Text style={s.errorSmall}>{error}</Text></View> :
-    <>
-     <View style={s.header}>
-      <View style={s.headerLeft}><Text style={s.competition} numberOfLines={1}>{game.league?.name||'COMPETIÇÃO'}</Text><Text style={s.round}>{game.league?.round||'Próximo jogo'}</Text></View>
-      <Text style={s.date}>{fmtDate(game.fixture?.date)}</Text>
-     </View>
+ function Header(){return <><RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/><View style={headerStyle}><Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text></View></>}
+ function Page({children}){return <View style={s.root}><StatusBar hidden/><Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/><Header/><View style={contentStyle}><ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView></View></View>}
+ function Back({title}){return <View style={s.pageHead}><Pressable onPress={()=>setScreen('home')}><Text style={s.back}>‹</Text></Pressable><Text style={s.pageTitle}>{title}</Text></View>}
 
-     <View style={s.teams}>
-      <View style={s.team}><RemoteLogo uri={home?.logo} style={s.teamLogo} alt={home?.name}/><Text style={s.teamName} numberOfLines={2}>{home?.name}</Text></View>
-      <Text style={s.vs}>VS</Text>
-      <View style={s.team}><RemoteLogo uri={away?.logo} style={s.teamLogo} alt={away?.name}/><Text style={s.teamName} numberOfLines={2}>{away?.name}</Text></View>
-     </View>
+ if(screen==='game'){
+  const ev=gameInfo.event||game,home={name:ev?.strHomeTeam,logo:ev?.strHomeTeamBadge||ev?.strHomeTeamLogo},away={name:ev?.strAwayTeam,logo:ev?.strAwayTeamBadge||ev?.strAwayTeamLogo};
+  return <Page><Back title="JOGO"/>{gameLoading?<ActivityIndicator/>:<>
+   <View style={s.detailCard}><Text style={s.kicker}>{ev?.strLeague||'COMPETIÇÃO'} · {ev?.intRound?'JORNADA '+ev.intRound:''}</Text><Text style={s.detailDate}>{fmtDate(toDate(ev))}</Text><View style={s.teams}><View style={s.team}><RemoteLogo uri={home.logo} style={s.bigLogo}/><Text style={s.teamName}>{home.name}</Text></View><Text style={s.score}>{ev?.intHomeScore!=null?ev.intHomeScore+' - '+ev.intAwayScore:'VS'}</Text><View style={s.team}><RemoteLogo uri={away.logo} style={s.bigLogo}/><Text style={s.teamName}>{away.name}</Text></View></View><Text style={s.stadium}>⌖ {ev?.strVenue||'Local a confirmar'}</Text></View>
+   <Text style={s.blockTitle}>RESUMO</Text><View style={s.infoCard}><Text style={s.body}>{ev?.strDescriptionEN||ev?.strStatus||'Informação do jogo disponível assim que for publicada.'}</Text></View>
+   <Text style={s.blockTitle}>ESTATÍSTICAS</Text><View style={s.infoCard}>{gameInfo.stats.length?gameInfo.stats.map((x,i)=><View key={i} style={s.statRow}><Text style={s.body}>{x.strStat||x.strStatType||'Estatística'}</Text><Text style={s.body}>{x.intHome||x.strHome||''}  {x.intAway||x.strAway||''}</Text></View>):<Text style={s.muted}>Ainda sem estatísticas disponíveis.</Text>}</View>
+   <Text style={s.blockTitle}>ONZE / CONVOCADOS</Text><View style={s.infoCard}>{gameInfo.lineup.length?gameInfo.lineup.map((x,i)=><Text key={i} style={s.body}>{x.strPlayer||x.strPlayerName||x.strHomeTeam||JSON.stringify(x)}</Text>):<Text style={s.muted}>O onze será apresentado quando estiver disponível na API.</Text>}</View>
+   {gameInfo.timeline.length>0&&<><Text style={s.blockTitle}>MOMENTOS DO JOGO</Text><View style={s.infoCard}>{gameInfo.timeline.map((x,i)=><Text key={i} style={s.body}>{x.strTimeline||x.strEvent||x.strPlayer||JSON.stringify(x)}</Text>)}</View></>}
+  </>}</Page>
+ }
+ if(screen==='article')return <Page><Back title="NOTÍCIAS"/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{selectedNews?.title}</Text>{articleLoading?<ActivityIndicator/>:<Text style={s.articleBody}>{selectedNews?.body}</Text>}</View></Page>;
+ if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
 
-     <Text style={s.stadium} numberOfLines={1}>⌖  {game.fixture?.venue?.name||game.fixture?.venue?.city||'Local a confirmar'}</Text>
-     <Text style={s.detailsArrow}>›</Text>
-    </>}
-   </View>
-
-   <View style={s.quickSection}>
-    <View style={s.quickRow}>
-     <Pressable style={s.quickCard}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
-     <Pressable style={s.quickCard}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
-     <Pressable style={s.quickCard}><ShortcutIcon type="shop"/><Text style={s.quickText}>LOJA</Text></Pressable>
-     <Pressable style={s.quickCard}><ShortcutIcon type="members"/><Text style={s.quickText}>SÓCIOS</Text></Pressable>
-     <Pressable style={s.quickCard}><ShortcutIcon type="star"/><Text style={s.quickText}>VANTAGENS</Text></Pressable>
-    </View>
-   </View>
-
-   <View style={s.newsSection}>
-    <View style={s.newsHeader}>
-     <Text style={s.newsHeading}>ÚLTIMAS NOTÍCIAS</Text>
-     <Text style={s.newsMore}>VER TODAS  ›</Text>
-    </View>
-    {officialNews.slice(0,3).map((item,i)=>(
-     <Pressable key={i} style={s.newsCard} onPress={()=>Platform.OS==='web' && window.open(item.url,'_blank')}>
-      <View style={s.newsAccent}/>
-      <View style={s.newsBody}>
-       <Text style={s.newsMeta}>{item.category}{item.date ? '  ·  '+item.date : ''}</Text>
-       <Text style={s.newsTitle} numberOfLines={2}>{item.title}</Text>
-      </View>
-      <Text style={s.newsArrow}>›</Text>
-     </Pressable>
-    ))}
-   </View>
-  </View>
- </View>
+ const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
+ return <Page>
+  <Pressable style={s.card} onPress={openGame}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error?<Text style={s.muted}>Não foi possível atualizar o jogo.</Text>:<><View style={s.header}><View><Text style={s.competition}>{game?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{game?.intRound?'Jornada '+game.intRound:'Próximo jogo'}</Text></View><Text style={s.date}>{fmtDate(toDate(game))}</Text></View><View style={s.teams}><View style={s.team}><RemoteLogo uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text></View><Text style={s.vs}>VS</Text><View style={s.team}><RemoteLogo uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text></View></View><Text style={s.stadium}>⌖ {game?.strVenue||'Local a confirmar'}</Text><Text style={s.detailsArrow}>›</Text></>}</Pressable>
+  <View style={s.quickSection}><View style={s.quickRow}>
+   <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
+   <Pressable style={s.quickCard}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
+   <Pressable style={s.quickCard}><ShortcutIcon type="shop"/><Text style={s.quickText}>LOJA</Text></Pressable>
+   <Pressable style={s.quickCard}><ShortcutIcon type="members"/><Text style={s.quickText}>SÓCIOS</Text></Pressable>
+   <Pressable style={s.quickCard}><ShortcutIcon type="star"/><Text style={s.quickText}>VANTAGENS</Text></Pressable>
+  </View></View>
+  <View style={s.newsSection}><View style={s.newsHeader}><Text style={s.newsHeading}>ÚLTIMAS NOTÍCIAS</Text><Text style={s.newsMore}>VER TODAS ›</Text></View>{officialNews.slice(0,3).map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</View>
+ </Page>
 }
 
 const s=StyleSheet.create({
- root:{flex:1,backgroundColor:'#00142c',alignItems:'center',justifyContent:'center',overflow:'hidden'},
- background:{width:'100%',height:'100%'},
- card:{width:'100%',backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.34)',borderRadius:14,paddingHorizontal:13,paddingTop:9,paddingBottom:8,shadowColor:'#000',shadowOpacity:.25,shadowRadius:16,shadowOffset:{width:0,height:7}},
- loading:{height:205,alignItems:'center',justifyContent:'center'},
- loadingText:{color:'#b7cee2',fontSize:9,marginTop:9},error:{color:'#fff',fontSize:10,fontWeight:'800'},errorSmall:{color:'#9fb5c8',fontSize:8,marginTop:5},
- header:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'},headerLeft:{maxWidth:'58%'},
- competition:{color:'#b7cee2',fontSize:8,fontWeight:'800',letterSpacing:.65},round:{color:'#fff',fontSize:8.5,marginTop:3},date:{color:'#fff',fontSize:8,fontWeight:'800'},
- teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},
- team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},teamName:{color:'#fff',fontSize:8,fontWeight:'800',marginTop:3,textAlign:'center',minHeight:16},vs:{color:'#93abc1',fontSize:12,fontWeight:'800'},
- stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:4},
- detailsArrow:{position:'absolute',right:10,top:'48%',color:'#b7c9d9',fontSize:24,fontWeight:'300'},
- clubLine:{color:'#fff',fontSize:15,fontWeight:'900',letterSpacing:.2},
- clubLight:{color:'#b9cadb',fontWeight:'400'},
- quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},
- quickRow:{flexDirection:'row',justifyContent:'space-between'},
- quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},
- quickIconFallback:{color:'#f1b94f',fontSize:22,fontWeight:'400',lineHeight:26},
- quickText:{color:'#fff',fontSize:5.9,fontWeight:'900',letterSpacing:.18,marginTop:5,textAlign:'center'},
- newsSection:{marginTop:12},
- newsHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:7},
- newsHeading:{color:'#fff',fontSize:8.5,fontWeight:'900',letterSpacing:.75},
- newsMore:{color:'#f1b94f',fontSize:6.5,fontWeight:'800',letterSpacing:.35},
- newsCard:{minHeight:49,marginBottom:6,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',flexDirection:'row',alignItems:'center',overflow:'hidden'},
- newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},
- newsBody:{flex:1,paddingHorizontal:10,paddingVertical:7},
- newsMeta:{color:'#f1b94f',fontSize:5.8,fontWeight:'900',letterSpacing:.55,marginBottom:3},
- newsTitle:{color:'#fff',fontSize:8,fontWeight:'800',lineHeight:11},
- newsArrow:{color:'#9eb6c9',fontSize:18,fontWeight:'300',paddingHorizontal:10}
+ root:{flex:1,backgroundColor:'#00142c',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%'},
+ card:{width:'100%',backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.34)',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
+ loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#b7cee2',fontSize:8,letterSpacing:.55},round:{color:'#fff',fontSize:8.5,marginTop:3},date:{color:'#fff',fontSize:8},
+ teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamName:{color:'#fff',fontSize:8,marginTop:3,textAlign:'center',minHeight:16},vs:{color:'#93abc1',fontSize:12},score:{color:'#fff',fontSize:19},stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:4},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#b7c9d9',fontSize:24},
+ clubLine:{color:'#fff',fontSize:15,letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},quickIconFallback:{color:'#f1b94f',fontSize:22,lineHeight:26},quickText:{color:'#fff',fontSize:5.9,letterSpacing:.18,marginTop:5,textAlign:'center'},
+ newsSection:{marginTop:12},newsHeader:{flexDirection:'row',justifyContent:'space-between',marginBottom:7},newsHeading:{color:'#fff',fontSize:8.5,letterSpacing:.65},newsMore:{color:'#f1b94f',fontSize:6.5},newsCard:{minHeight:49,marginBottom:6,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',flexDirection:'row',alignItems:'center',overflow:'hidden'},newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},newsBody:{flex:1,paddingHorizontal:10,paddingVertical:7},newsMeta:{color:'#f1b94f',fontSize:5.8,letterSpacing:.45,marginBottom:3},newsTitle:{color:'#fff',fontSize:8,lineHeight:11},newsArrow:{color:'#9eb6c9',fontSize:18,paddingHorizontal:10},
+ pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:30,lineHeight:30,paddingRight:12},pageTitle:{color:'#fff',fontSize:14,letterSpacing:.8},detailCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},kicker:{color:'#f1b94f',fontSize:7,letterSpacing:.5},detailDate:{color:'#fff',fontSize:9,marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:7.5,letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'rgba(8,43,72,.82)',borderRadius:10,padding:11,borderWidth:1,borderColor:'rgba(120,164,197,.22)'},body:{color:'#fff',fontSize:8,lineHeight:13},muted:{color:'#a9bdcd',fontSize:8,lineHeight:12},statRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.08)'},
+ articleCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},articleTitle:{color:'#fff',fontSize:14,lineHeight:19,marginBottom:12},articleBody:{color:'#dce7ef',fontSize:8.5,lineHeight:14},
+ filters:{marginBottom:12,maxHeight:31},filter:{height:27,paddingHorizontal:10,marginRight:6,borderRadius:14,borderWidth:1,borderColor:'rgba(120,164,197,.35)',justifyContent:'center',backgroundColor:'rgba(8,43,72,.72)'},filterOn:{borderColor:'#f1b94f',backgroundColor:'rgba(241,185,79,.12)'},filterText:{color:'#b7c9d9',fontSize:6.5},filterTextOn:{color:'#f1b94f'},eventCard:{flexDirection:'row',marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',overflow:'hidden'},dateBox:{width:72,padding:9,justifyContent:'center',backgroundColor:'rgba(4,28,51,.55)'},dateBoxText:{color:'#fff',fontSize:8},eventType:{color:'#f1b94f',fontSize:5.8,marginTop:4},eventBody:{flex:1,padding:9},eventSport:{color:'#9eb6c9',fontSize:6},eventTitle:{color:'#fff',fontSize:8.5,marginVertical:3}
 });
