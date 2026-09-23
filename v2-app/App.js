@@ -37,7 +37,7 @@ function toDate(ev){return ev?.strTimestamp||(ev?.dateEvent?ev.dateEvent+'T'+(ev
 
 export default function App(){
  const {width,height}=useWindowDimensions();
- const [screen,setScreen]=useState('home');
+ const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
  const [news,setNews]=useState([]),[selectedNews,setSelectedNews]=useState(null),[articleLoading,setArticleLoading]=useState(false);
@@ -64,7 +64,7 @@ export default function App(){
     }
     if(!added)break;
    }
-   if(live&&found.length)setNews(found);
+   if(live&&found.length){setNews(found);found.slice(0,5).forEach(item=>{if(!cache.articles.has(item.url)){const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url);fetch(proxy).then(r=>r.text()).then(html=>{const article=html.match(/<article[\\s\\S]*?<\\/article>/i);cache.articles.set(item.url,cleanHtml(article?.[0]||html).slice(0,12000));}).catch(()=>{});}});}
   }catch(e){} })();return()=>{live=false}},[]);
 
  async function openGame(){
@@ -83,7 +83,7 @@ export default function App(){
  }
  async function openArticle(item){
   const saved=cache.articles.get(item.url);
-  setSelectedNews({...item,body:saved||''});setScreen('article');if(saved)return;
+  setPreviousScreen(screen);setSelectedNews({...item,body:saved||''});setScreen('article');if(saved)return;
   setArticleLoading(true);
   try{const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(item.url),r=await fetch(proxy),html=await r.text();const article=html.match(/<article[\s\S]*?<\/article>/i),body=cleanHtml(article?.[0]||html).slice(0,12000);cache.articles.set(item.url,body);setSelectedNews({...item,body});}catch(e){setSelectedNews({...item,body:'Não foi possível carregar o conteúdo desta notícia.'})}finally{setArticleLoading(false)}
  }
@@ -115,7 +115,7 @@ export default function App(){
 
  function Header(){return <><RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/><View style={headerStyle}><Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text></View></>}
  function Page({children}){return <View style={s.root}><StatusBar hidden/><Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/><Header/><View style={contentStyle}><ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView></View></View>}
- function Back({title}){return <View style={s.pageHead}><Pressable onPress={()=>setScreen('home')}><Text style={s.back}>‹</Text></Pressable><Text style={s.pageTitle}>{title}</Text></View>}
+ function Back({title,to='home'}){return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={s.back}>‹</Text></Pressable><Text style={s.pageTitle}>{title}</Text></View>}
 
  if(screen==='game'){
   const ev=gameInfo.event||game,home={name:ev?.strHomeTeam,logo:ev?.strHomeTeamBadge||ev?.strHomeTeamLogo},away={name:ev?.strAwayTeam,logo:ev?.strAwayTeamBadge||ev?.strAwayTeamLogo};
@@ -128,7 +128,7 @@ export default function App(){
   </>}</Page>
  }
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
- if(screen==='article')return <Page><Back title="NOTÍCIAS"/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{selectedNews?.title}</Text>{articleLoading?<ActivityIndicator/>:<><Text style={s.articleBody}>{selectedNews?.body}</Text><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
+ if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{selectedNews?.title}</Text>{articleLoading?<ActivityIndicator/>:<><View>{(selectedNews?.body||'').split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ])/).reduce((rows,sentence)=>{const last=rows[rows.length-1];if(!last||last.length>320)rows.push(sentence);else rows[rows.length-1]=last+' '+sentence;return rows;},[]).map((p,i)=><Text key={i} style={s.articleParagraph}>{p}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
  if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
 
  const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
@@ -153,6 +153,6 @@ const s=StyleSheet.create({
  clubLine:{color:'#fff',fontSize:15,letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},quickIconFallback:{color:'#f1b94f',fontSize:22,lineHeight:26},quickText:{color:'#fff',fontSize:5.9,letterSpacing:.18,marginTop:5,textAlign:'center'},
  newsSection:{marginTop:12},newsHeader:{flexDirection:'row',justifyContent:'space-between',marginBottom:7},newsHeading:{color:'#fff',fontSize:8.5,letterSpacing:.65},newsMore:{color:'#f1b94f',fontSize:6.5},newsCard:{minHeight:49,marginBottom:6,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',flexDirection:'row',alignItems:'center',overflow:'hidden'},newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},newsBody:{flex:1,paddingHorizontal:10,paddingVertical:7},newsMeta:{color:'#f1b94f',fontSize:5.8,letterSpacing:.45,marginBottom:3},newsTitle:{color:'#fff',fontSize:8,lineHeight:11},newsArrow:{color:'#9eb6c9',fontSize:18,paddingHorizontal:10},
  pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:30,lineHeight:30,paddingRight:12},pageTitle:{color:'#fff',fontSize:14,letterSpacing:.8},detailCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},kicker:{color:'#f1b94f',fontSize:7,letterSpacing:.5},detailDate:{color:'#fff',fontSize:9,marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:7.5,letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'rgba(8,43,72,.82)',borderRadius:10,padding:11,borderWidth:1,borderColor:'rgba(120,164,197,.22)'},body:{color:'#fff',fontSize:8,lineHeight:13},muted:{color:'#a9bdcd',fontSize:8,lineHeight:12},statRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.08)'},
- articleCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},articleTitle:{color:'#fff',fontSize:14,lineHeight:19,marginBottom:12},articleBody:{color:'#dce7ef',fontSize:8.5,lineHeight:14},
+ articleCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},articleTitle:{color:'#fff',fontSize:14,lineHeight:19,marginBottom:12},articleBody:{color:'#dce7ef',fontSize:8.5,lineHeight:14},articleParagraph:{color:'#dce7ef',fontSize:8.5,lineHeight:14,marginBottom:9},
  filters:{marginBottom:12},filtersContent:{paddingRight:24},filter:{height:27,paddingHorizontal:10,marginRight:6,borderRadius:14,borderWidth:1,borderColor:'rgba(120,164,197,.35)',justifyContent:'center',backgroundColor:'rgba(8,43,72,.72)'},filterOn:{borderColor:'#f1b94f',backgroundColor:'rgba(241,185,79,.12)'},filterText:{color:'#b7c9d9',fontSize:6.5},filterTextOn:{color:'#f1b94f'},gameTabs:{flexDirection:'row',marginTop:10,marginBottom:8,borderRadius:10,backgroundColor:'rgba(4,28,51,.60)',padding:3},gameTab:{flex:1,height:29,alignItems:'center',justifyContent:'center',borderRadius:8},gameTabOn:{backgroundColor:'rgba(241,185,79,.14)',borderWidth:1,borderColor:'#f1b94f'},gameTabText:{color:'#aebfce',fontSize:7,letterSpacing:.3},gameTabTextOn:{color:'#f1b94f'},timeline:{marginTop:10,paddingTop:8,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.08)'},sourceButton:{marginTop:16,height:32,borderRadius:8,borderWidth:1,borderColor:'#f1b94f',alignItems:'center',justifyContent:'center'},sourceButtonText:{color:'#f1b94f',fontSize:7,letterSpacing:.4},eventCard:{flexDirection:'row',marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',overflow:'hidden'},dateBox:{width:72,padding:9,justifyContent:'center',backgroundColor:'rgba(4,28,51,.55)'},dateBoxText:{color:'#fff',fontSize:8},eventType:{color:'#f1b94f',fontSize:5.8,marginTop:4},eventBody:{flex:1,padding:9},eventSport:{color:'#9eb6c9',fontSize:6},eventTitle:{color:'#fff',fontSize:8.5,marginVertical:3}
 });
