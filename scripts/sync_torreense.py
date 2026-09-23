@@ -99,7 +99,21 @@ def article(url):
         return None
 
     section=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>","",section,flags=re.I)
+    # Some Torreense pages expose a broad CMS container that also contains
+    # the site header/footer. Trim everything before the article title and
+    # remove known navigation/footer text from the plain-text fallback.
     text=clean(section)
+    if title:
+        pos=text.lower().find(title.lower())
+        if pos>=0: text=text[pos+len(title):].strip()
+    noise=[
+      "Bilheteira","Loja","Clube História","Palmarés","Instalações","SAD",
+      "Estatutos","Órgãos Sociais","Contactos","Política de Privacidade",
+      "Termos e Condições","Cookies"
+    ]
+    for label in noise:
+        text=re.sub(r"(?:^|\\s)[•·-]?\\s*"+re.escape(label)+r"(?=\\s|$)"," ",text,flags=re.I)
+    text=re.sub(r"\\s+"," ",text).strip()
     if len(text)<40:
         print("ARTICLE_CONTENT_TOO_SHORT",url,len(text))
         return None
@@ -115,7 +129,7 @@ def article(url):
         dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",text,re.I)
         if dm: published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
 
-    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":section[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
+    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":"<p>"+h.escape(text[:30000])+"</p>","active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
 
 def main():
     urls=discover_news()
