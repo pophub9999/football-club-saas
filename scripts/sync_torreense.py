@@ -45,9 +45,9 @@ def discover_news():
         # absolute, relative, href and JSON-escaped URLs
         doc=doc.replace("\\/","/")
         patterns=[
-            r'href\\s*=\\s*["\\']([^"\\']*?/blog/[^"\\'?#]+)',
+            r"""href\s*=\s*["']([^"']*?/blog/[^"'?#]+)""",
             r'https?://(?:www\\.)?torreense\\.com/blog/[A-Za-z0-9_-]+',
-            r'["\\'](/blog/[A-Za-z0-9_-]+)["\\']',
+            r"""["'](/blog/[A-Za-z0-9_-]+)["']""",
         ]
         for pat in patterns:
             for href in re.findall(pat,doc,re.I):
