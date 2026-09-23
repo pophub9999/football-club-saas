@@ -27,46 +27,34 @@ def clean(s):
     return re.sub(r"\s+"," ",h.unescape(s)).strip()
 
 def discover_news():
-    # The official site exposes the current archive at /blog. Try several
-    # representations because some hosts return a JS shell to datacenter IPs.
-    candidates=[
-        "https://www.torreense.com/blog",
-        "https://torreense.com/blog",
-    ]
     found={}
-    for url in candidates:
+    # The archive currently has 7 pages. Keep a wider ceiling so this remains
+    # automatic as the archive grows.
+    for page in range(1,21):
+        url="https://www.torreense.com/blog"+("" if page==1 else "?page="+str(page))
         try:
-            doc=get(url)
+            doc=get(url).replace("\\/","/")
             print("BLOG_HTTP_OK",url,"bytes",len(doc))
         except Exception as e:
             print("BLOG_FETCH_FAILED",url,repr(e))
             continue
-
-        # absolute, relative, href and JSON-escaped URLs
-        doc=doc.replace("\\/","/")
-        patterns=[
+        links=[]
+        for pat in [
             r"""href\s*=\s*["']([^"']*?/blog/[^"'?#]+)""",
-            r'https?://(?:www\\.)?torreense\\.com/blog/[A-Za-z0-9_-]+',
+            r'https?://(?:www\.)?torreense\.com/blog/[A-Za-z0-9_-]+',
             r"""["'](/blog/[A-Za-z0-9_-]+)["']""",
-        ]
-        for pat in patterns:
-            for href in re.findall(pat,doc,re.I):
-                u=urllib.parse.urljoin("https://www.torreense.com",href)
-                if re.match(r'https://(?:www\\.)?torreense\\.com/blog/[A-Za-z0-9_-]+/?$',u,re.I):
-                    found[u.rstrip("/")]=True
-
-    # Stable official article URLs are used only as bootstrap seeds. Once the
-    # archive is readable, discovery remains fully automatic.
-    seeds=[
-      "https://www.torreense.com/blog/estreialigaeuropa",
-      "https://www.torreense.com/blog/informacaobileticaligaeuropa",
-      "https://www.torreense.com/blog/jogadoresinscritos",
-      "https://www.torreense.com/blog/torrespasseuropa",
-      "https://www.torreense.com/blog/torrespass",
-      "https://www.torreense.com/blog/arrranque",
-      "https://www.torreense.com/blog/assembleiagreal",
-    ]
-    for u in seeds: found[u]=True
+        ]:
+            links.extend(re.findall(pat,doc,re.I))
+        before=len(found)
+        for href in links:
+            u=urllib.parse.urljoin("https://www.torreense.com",href).rstrip("/")
+            if re.match(r'https://(?:www\.)?torreense\.com/blog/[A-Za-z0-9_-]+$',u,re.I):
+                found[u]=True
+        print("PAGE_DISCOVERED",page,len(found)-before,"TOTAL",len(found))
+        # Stop only after the archive has started and two consecutive pages
+        # add nothing. This avoids truncating discovery on one odd page.
+        if page>8 and len(found)==before:
+            break
     print("DISCOVERED_URLS",len(found))
     return list(found)
 
@@ -79,17 +67,29 @@ def article(url):
     img=""
     m=re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',doc,re.I)
     if m:img=h.unescape(m.group(1))
-    art=re.search(r"<article[\s\S]*?</article>",doc,re.I)
+
+    # Prefer the article/main content instead of the whole page. Keep its HTML
+    # so the app can retain paragraphs, headings, lists and inline images.
+    art=re.search(r"<article\\b[\\s\\S]*?</article>",doc,re.I)
+    if not art: art=re.search(r"<main\\b[\\s\\S]*?</main>",doc,re.I)
     section=art.group(0) if art else doc
+    section=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>","",section,flags=re.I)
     text=clean(section)
-    category="FUTEBOL" if re.search(r"futebol",doc,re.I) else ("CLUBE" if re.search(r"clube",doc,re.I) else "TORREENSE")
-    dates=re.findall(r"\b(\d{1,2})[./-](\d{1,2})[./-](20\d{2})\b",text)
+
+    category="FUTEBOL" if re.search(r">\\s*Futebol\\s*<",section,re.I) else ("CLUBE" if re.search(r">\\s*Clube\\s*<",section,re.I) else "TORREENSE")
     published=None
-    if dates:
-        d,mn,y=dates[0]
-        try:published=datetime(int(y),int(mn),int(d),12,tzinfo=timezone.utc).isoformat()
-        except:pass
-    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":section[:100000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
+    # Prefer explicit metadata, then visible Portuguese date.
+    dm=re.search(r'<meta[^>]+(?:property|name)=["\'](?:article:published_time|datePublished)["\'][^>]+content=["\']([^"\']+)',doc,re.I)
+    if dm:
+        try: published=datetime.fromisoformat(dm.group(1).replace("Z","+00:00")).isoformat()
+        except: pass
+    if not published:
+        months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
+        dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",text,re.I)
+        if dm:
+            published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
+
+    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":section[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
 
 def main():
     urls=discover_news()
