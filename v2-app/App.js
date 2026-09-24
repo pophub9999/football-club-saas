@@ -4,12 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
-const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
-const TORREENSE_ID='143720';
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
 const SUPABASE_KEY='sb_publishable_TyM24TpRzq3_ijZsFRTVGg_bWM2WOky';
 const SB_HEADERS={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Cache-Control':'no-cache','Pragma':'no-cache'};
-const cache={calendar:null};
 async function sb(path){
  const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:SB_HEADERS,cache:'no-store'});
  if(!r.ok)throw new Error('Supabase '+r.status);
@@ -18,7 +15,7 @@ async function sb(path){
 
 function RemoteLogo({uri,style,alt}) {
  if(!uri)return null;
- return Platform.OS==='web'?React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt}):<Image source={{uri:src}} style={style} resizeMode="contain"/>;
+ return Platform.OS==='web'?React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt}):<Image source={{uri}} style={style} resizeMode="contain"/>;
 }
 function ShortcutIcon({type}) {
  const gold='#f1b94f';
@@ -39,6 +36,15 @@ function fmtDate(iso){
  if(!iso)return '';
  const d=new Date(iso);
  return new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'}).format(d).replace(',',' ·').toUpperCase();
+}
+function fmtGameDate(ev){
+ const iso=ev?.strTimestamp||ev?.starts_at;
+ if(!iso)return '';
+ const d=new Date(iso);
+ if(ev?._timeConfirmed===false){
+  return new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short',year:'numeric',timeZone:'Europe/Lisbon'}).format(d).toUpperCase();
+ }
+ return fmtDate(iso);
 }
 function cleanHtml(v=''){return v.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();}
 function toDate(ev){return ev?.strTimestamp||(ev?.dateEvent?ev.dateEvent+'T'+(ev.strTime||'00:00:00'):null);}
@@ -144,6 +150,7 @@ export default function App(){
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
  const [news,setNews]=useState([]),[selectedNews,setSelectedNews]=useState(null),[articleLoading,setArticleLoading]=useState(false);
  const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('TODAS'),[calendarLoading,setCalendarLoading]=useState(false);
+ const [players,setPlayers]=useState([]);
  const [syncVersion,setSyncVersion]=useState(null);
 
  const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
@@ -152,32 +159,70 @@ export default function App(){
  const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
 
  useEffect(()=>{let live=true;(async()=>{try{
-  const [v,n,m]=await Promise.all([
+  setLoading(true);
+  const [v,n,m,p]=await Promise.all([
    sb('app_sync?select=version,updated_at&id=eq.1'),
    sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&active=eq.true&order=published_at.desc.nullslast&limit=100'),
-   sb('matches?select=*,competitions(name),sports(name),home:home_team_id(name,logo_url),away:away_team_id(name,logo_url)&order=starts_at.asc&limit=200')
+   sb('matches?select=id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,logo_url),away:teams!matches_away_team_id_fkey(name,logo_url)&order=starts_at.asc&limit=200'),
+   sb('players?select=id,name,short_name,shirt_number,position,photo_url&active=eq.true&order=position.asc,shirt_number.asc&limit=100')
   ]);
   if(!live)return;
   setSyncVersion(v?.[0]?.version||1);
   setNews((n||[]).map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',html:x.content_html||'',hero:x.hero_image_url,excerpt:x.excerpt})));
-  if(m?.length)setCalendar(m.map(x=>({id:String(x.id),sport:(x.sports?.name||'Futebol').toUpperCase(),type:(x.event_type||'JOGO').toUpperCase(),date:x.starts_at?new Date(x.starts_at).toLocaleDateString('pt-PT'):'',round:x.round||'',title:(x.home?.name||'')+' × '+(x.away?.name||''),time:x.starts_at?new Date(x.starts_at).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}):'Hora a confirmar'})));
- }catch(e){} })();return()=>{live=false}},[]);
+  setPlayers(p||[]);
 
- useEffect(()=>{let live=true;(async()=>{try{setLoading(true);const r=await fetch(SPORTS_DB+'/eventsnext.php?id='+TORREENSE_ID),j=await r.json(),ev=j.events?.[0];if(!ev)throw new Error('Sem próximo jogo');if(live)setGame(ev);}catch(e){if(live)setError(e.message)}finally{if(live)setLoading(false)}})();return()=>{live=false}},[]);
+  const mapped=(m||[]).map(x=>{
+   const timeConfirmed=x.raw_data?.time_confirmed!==false;
+   const ev={
+    idEvent:String(x.id),
+    dbId:x.id,
+    strLeague:x.competitions?.name||'COMPETIÇÃO',
+    intRound:(x.round||'').replace(/^J/i,''),
+    strTimestamp:x.starts_at,
+    starts_at:x.starts_at,
+    _timeConfirmed:timeConfirmed,
+    strHomeTeam:x.home?.name||'',
+    strAwayTeam:x.away?.name||'',
+    strHomeTeamBadge:x.home?.logo_url||null,
+    strAwayTeamBadge:x.away?.logo_url||null,
+    intHomeScore:x.home_score,
+    intAwayScore:x.away_score,
+    strVenue:x.venue||'Local a confirmar',
+    strStatus:x.status,
+    raw:x
+   };
+   return {
+    raw:x,
+    ev,
+    cal:{
+      id:String(x.id),
+      sport:(x.sports?.name||'Futebol').toUpperCase(),
+      type:(x.event_type||'JOGO').toUpperCase(),
+      date:x.starts_at?new Date(x.starts_at).toLocaleDateString('pt-PT',{timeZone:'Europe/Lisbon'}):'',
+      round:x.round||'',
+      title:(x.home?.name||'')+' × '+(x.away?.name||''),
+      time:timeConfirmed&&x.starts_at?new Date(x.starts_at).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'}):'Hora a confirmar'
+    }
+   };
+  });
+  setCalendar(mapped.map(x=>x.cal));
+
+  const now=Date.now();
+  const next=mapped.find(x=>x.raw.status!=='finished' && x.raw.starts_at && new Date(x.raw.starts_at).getTime()>=now)
+    || mapped.find(x=>x.raw.status!=='finished')
+    || mapped[mapped.length-1];
+  if(next)setGame(next.ev);
+  else setError('Sem jogos em cache.');
+ }catch(e){
+  if(live)setError('Não foi possível ler os dados em cache.');
+ }finally{
+  if(live)setLoading(false);
+ }})();return()=>{live=false}},[]);
 
  async function openGame(){
-  setScreen('game');setGameTab('RESUMO');if(!game?.idEvent)return;
-  setGameInfo({event:game,stats:[],lineup:[],timeline:[],results:[]});setGameLoading(true);
-  const id=game.idEvent;
-  try{
-   const detail=await fetch(SPORTS_DB+'/lookupevent.php?id='+id).then(r=>r.json()).catch(()=>({}));
-   setGameInfo(v=>({...v,event:detail.events?.[0]||game}));
-  }finally{setGameLoading(false)}
-  Promise.all([
-   fetch(SPORTS_DB+'/lookupeventstats.php?id='+id).then(r=>r.json()).catch(()=>({})),
-   fetch(SPORTS_DB+'/lookuplineup.php?id='+id).then(r=>r.json()).catch(()=>({})),
-   fetch(SPORTS_DB+'/lookuptimeline.php?id='+id).then(r=>r.json()).catch(()=>({}))
-  ]).then(([a,b,d])=>setGameInfo(v=>({...v,stats:a.eventstats||a.event_stats||[],lineup:b.lineup||b.lineups||[],timeline:d.timeline||[]})));
+  setScreen('game');setGameTab('RESUMO');
+  setGameInfo({event:game,stats:[],lineup:[],timeline:[],results:[]});
+  setGameLoading(false);
  }
  async function openArticle(item){
   setPreviousScreen(screen);setSelectedNews(item);setScreen('article');
@@ -190,22 +235,8 @@ export default function App(){
   finally{setArticleLoading(false)}
  }
  async function openCalendar(){
-  setScreen('calendar');if(calendar.length)return;
-  if(cache.calendar){setCalendar(cache.calendar);return}
-  if(game){setCalendar([{id:game.idEvent||'next',sport:'FUTEBOL',type:'JOGO',date:game.dateEvent||'',round:game.intRound?'J'+game.intRound:'',title:(game.strHomeTeam||'')+' × '+(game.strAwayTeam||''),time:(game.strTime||'').slice(0,5)||'Hora a confirmar'}]);}
-  setCalendarLoading(true);
-  try{
-   const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent('https://www.torreense.com/futebol-profissional/equipa-principal/calendario');
-   const html=await (await fetch(proxy)).text();
-   const txt=cleanHtml(html),matches=[...txt.matchAll(/(\d{2}\.\d{2}\.\d{4})\s*\|\s*(J\d+)[\s\S]{0,140}?([A-Za-zÀ-ÿ0-9. ]+)\s+VS(?:\s+\d+-\d+)?\s+([A-Za-zÀ-ÿ0-9. ]+)/g)];
-   const parsed=matches.map((m,i)=>({id:'f'+i,sport:'FUTEBOL',type:'JOGO',date:m[1],round:m[2],title:(m[3]+' × '+m[4]).replace(/\s+/g,' ').trim(),time:'Hora a confirmar'}));
-   if(parsed.length){cache.calendar=parsed;setCalendar(parsed);}
-   else {const fallback=[
-    {id:'1',sport:'FUTEBOL',type:'JOGO',date:'10.10.2026',round:'J7',title:'CD Tondela × SCU Torreense',time:'10:00'},
-    {id:'2',sport:'FUTEBOL',type:'JOGO',date:'26.10.2026',round:'J8',title:'SCU Torreense × Amarante F.C.',time:'Hora a confirmar'},
-    {id:'3',sport:'FUTEBOL',type:'JOGO',date:'31.10.2026',round:'J9',title:'Portimonense SC × SCU Torreense',time:'Hora a confirmar'}
-   ];cache.calendar=fallback;setCalendar(fallback);}
-  }catch(e){}finally{setCalendarLoading(false)}
+  setScreen('calendar');
+  setCalendarLoading(false);
  }
  const officialNews=news;
  const sports=['TODAS','FUTEBOL','FUTSAL','FUTEBOL FEMININO','FORMAÇÃO'];
@@ -218,7 +249,7 @@ export default function App(){
  if(screen==='game'){
   const ev=gameInfo.event||game,home={name:ev?.strHomeTeam,logo:ev?.strHomeTeamBadge||ev?.strHomeTeamLogo},away={name:ev?.strAwayTeam,logo:ev?.strAwayTeamBadge||ev?.strAwayTeamLogo};
   return <Page><Back title="JOGO"/>{gameLoading?<ActivityIndicator/>:<>
-   <View style={s.detailCard}><Text style={s.kicker}>{ev?.strLeague||'COMPETIÇÃO'} · {ev?.intRound?'JORNADA '+ev.intRound:''}</Text><Text style={s.detailDate}>{fmtDate(toDate(ev))}</Text><View style={s.teams}><View style={s.team}><RemoteLogo uri={home.logo} style={s.bigLogo}/><Text style={s.teamName}>{home.name}</Text></View><Text style={s.score}>{ev?.intHomeScore!=null?ev.intHomeScore+' - '+ev.intAwayScore:'VS'}</Text><View style={s.team}><RemoteLogo uri={away.logo} style={s.bigLogo}/><Text style={s.teamName}>{away.name}</Text></View></View><Text style={s.stadium}>⌖ {ev?.strVenue||'Local a confirmar'}</Text></View>
+   <View style={s.detailCard}><Text style={s.kicker}>{ev?.strLeague||'COMPETIÇÃO'} · {ev?.intRound?'JORNADA '+ev.intRound:''}</Text><Text style={s.detailDate}>{fmtGameDate(ev)}</Text><View style={s.teams}><View style={s.team}><RemoteLogo uri={home.logo} style={s.bigLogo}/><Text style={s.teamName}>{home.name}</Text></View><Text style={s.score}>{ev?.intHomeScore!=null?ev.intHomeScore+' - '+ev.intAwayScore:'VS'}</Text><View style={s.team}><RemoteLogo uri={away.logo} style={s.bigLogo}/><Text style={s.teamName}>{away.name}</Text></View></View><Text style={s.stadium}>⌖ {ev?.strVenue||'Local a confirmar'}</Text></View>
    <View style={s.gameTabs}>{['RESUMO','ESTATÍSTICAS','ONZE'].map(t=><Pressable key={t} onPress={()=>setGameTab(t)} style={[s.gameTab,gameTab===t&&s.gameTabOn]}><Text style={[s.gameTabText,gameTab===t&&s.gameTabTextOn]}>{t}</Text></Pressable>)}</View>
    {gameTab==='RESUMO'&&<View style={s.infoCard}><Text style={s.body}>{ev?.strDescriptionEN||ev?.strStatus||'Informação do jogo disponível assim que for publicada.'}</Text>{gameInfo.timeline.length>0&&<View style={s.timeline}>{gameInfo.timeline.map((x,i)=><Text key={i} style={s.body}>{x.strTimeline||x.strEvent||x.strPlayer||''}</Text>)}</View>}</View>}
    {gameTab==='ESTATÍSTICAS'&&<View style={s.infoCard}>{gameInfo.stats.length?gameInfo.stats.map((x,i)=><View key={i} style={s.statRow}><Text style={s.body}>{x.strStat||x.strStatType||'Estatística'}</Text><Text style={s.body}>{x.intHome||x.strHome||''}  {x.intAway||x.strAway||''}</Text></View>):<Text style={s.muted}>As estatísticas aparecem aqui quando forem disponibilizadas pela fonte.</Text>}</View>}
@@ -227,11 +258,11 @@ export default function App(){
  }
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
  if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{cleanNewsTitle(selectedNews?.title||'')}</Text>{selectedNews?.hero?<ArticleImage uri={selectedNews.hero} hero version={syncVersion}/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body,selectedNews?.url).map((b,i)=>b.type==='img'?<ArticleImage key={i} uri={b.src} version={syncVersion}/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
- if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
+ if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><View style={s.infoCard}><Text style={s.muted}>Calendário em cache · {calendar.length} jogos · Plantel em cache · {players.length} jogadores</Text></View><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
 
  const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
  return <Page>
-  <Pressable style={s.card} onPress={openGame}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error?<Text style={s.muted}>Não foi possível atualizar o jogo.</Text>:<><View style={s.header}><View><Text style={s.competition}>{game?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{game?.intRound?'Jornada '+game.intRound:'Próximo jogo'}</Text></View><Text style={s.date}>{fmtDate(toDate(game))}</Text></View><View style={s.teams}><View style={s.team}><RemoteLogo uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text></View><Text style={s.vs}>VS</Text><View style={s.team}><RemoteLogo uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text></View></View><Text style={s.stadium}>⌖ {game?.strVenue||'Local a confirmar'}</Text><Text style={s.detailsArrow}>›</Text></>}</Pressable>
+  <Pressable style={s.card} onPress={openGame}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error?<Text style={s.muted}>Não foi possível atualizar o jogo.</Text>:<><View style={s.header}><View><Text style={s.competition}>{game?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{game?.intRound?'Jornada '+game.intRound:'Próximo jogo'}</Text></View><Text style={s.date}>{fmtGameDate(game)}</Text></View><View style={s.teams}><View style={s.team}><RemoteLogo uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text></View><Text style={s.vs}>VS</Text><View style={s.team}><RemoteLogo uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text></View></View><Text style={s.stadium}>⌖ {game?.strVenue||'Local a confirmar'}</Text><Text style={s.detailsArrow}>›</Text></>}</Pressable>
   <View style={s.quickSection}><View style={s.quickRow}>
    <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
    <Pressable style={s.quickCard} onPress={()=>setScreen('news')}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
