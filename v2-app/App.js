@@ -54,36 +54,27 @@ function ArticleImage({uri,hero=false}){
  if(!uri)return null;
  const isPrice=/prices\.png|Captura/i.test(uri);
  const isMap=/map\.jpg|MapaEstadio/i.test(uri);
- const ratio=isPrice?(1000/170):isMap?(1000/918):1.8;
+ const ratio=isPrice?(1000/170):isMap?(1000/920):1.8;
 
- if(Platform.OS==='web'){
-  return React.createElement('img',{
-   src:uri,
-   alt:'',
-   style:{
-    width:'100%',
-    height:'auto',
-    objectFit:'contain',
-    display:'block',
-    borderRadius:hero?12:10,
-    marginTop:hero?0:10,
-    marginBottom:hero?16:10
-   }
-  });
- }
-
- return <Image
-  source={{uri}}
-  resizeMode="contain"
-  style={{
-   width:'100%',
-   aspectRatio:ratio,
-   alignSelf:'center',
-   borderRadius:hero?12:10,
-   marginTop:hero?0:10,
-   marginBottom:hero?16:10
-  }}
- />;
+ return <View style={{
+  width:'100%',
+  aspectRatio:ratio,
+  alignSelf:'center',
+  marginTop:hero?0:10,
+  marginBottom:hero?16:10,
+  overflow:'hidden',
+  borderRadius:hero?12:10
+ }}>
+  {Platform.OS==='web'
+   ?React.createElement('img',{
+      src:uri,alt:'',
+      style:{
+       position:'absolute',left:0,top:0,width:'100%',height:'100%',
+       objectFit:'contain',display:'block'
+      }
+    })
+   :<Image source={{uri}} resizeMode="contain" style={StyleSheet.absoluteFillObject}/>}
+ </View>;
 }
 
 function articleBlocks(html='',fallback='',url=''){
