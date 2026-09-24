@@ -1,0 +1,28 @@
+name: Validate V2 Web Export
+
+on:
+  push:
+    branches: ['v2-visual-first']
+  workflow_dispatch:
+
+jobs:
+  web-export:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2-app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: v2-app/package.json
+      - name: Install dependencies
+        run: npm install
+      - name: Validate Expo dependencies
+        run: npx expo install --check
+      - name: Export web
+        run: npx expo export --platform web
