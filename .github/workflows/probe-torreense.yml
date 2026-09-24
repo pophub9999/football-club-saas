@@ -1,5 +1,5 @@
 name: Probe Torreense Benefits
-# benefits probe trigger
+# legacy benefits trigger
 
 on:
   push:
