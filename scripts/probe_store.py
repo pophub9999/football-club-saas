@@ -57,3 +57,14 @@ if links:
     for inp in ps.find_all("input"):
         if inp.get("name") or inp.get("type") in ("radio","checkbox"):
             print("INPUT",inp.get("type"),inp.get("name"),inp.get("value"))
+
+print("ALL_PATH_LINKS")
+allp=[]
+for a in s.find_all("a",href=True):
+    href=urllib.parse.urljoin(BASE,a["href"])
+    if "path=" in href:
+        x=(a.get_text(" ",strip=True),href)
+        if x not in allp: allp.append(x)
+for t,u in allp[:200]: print("PATHLINK",repr(t),u)
+for m in sorted(set(re.findall(r'path(?:=|%3D)([0-9_]+)',html,re.I))):
+    print("PATHID",m)
