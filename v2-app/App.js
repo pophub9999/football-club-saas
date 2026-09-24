@@ -51,11 +51,21 @@ function cleanNewsText(v=''){
  return x.replace(/^(?:facebook|twitter|linkedin|x)\b[\s:|•-]*/i,'').trim();
 }
 function ArticleImage({uri,hero=false}){
- const [failed,setFailed]=useState(false);
+ const [loaded,setLoaded]=useState(false),[failed,setFailed]=useState(false);
  if(!uri||failed)return null;
  const style=hero?s.articleHeroImage:s.articleInlineImage;
- if(Platform.OS==='web')return React.createElement('img',{src:uri,alt:'',onError:()=>setFailed(true),style:{width:'100%',height:hero?190:210,objectFit:'cover',borderRadius:hero?12:10,display:'block',marginBottom:hero?16:0,marginTop:hero?0:10}});
- return <Image source={{uri}} style={style} resizeMode="cover" onError={()=>setFailed(true)}/>;
+ if(Platform.OS==='web')return React.createElement('img',{
+  src:uri,alt:'',
+  onLoad:()=>setLoaded(true),
+  onError:()=>setFailed(true),
+  style:{
+   width:'100%',height:loaded?(hero?190:210):0,opacity:loaded?1:0,
+   objectFit:'cover',borderRadius:hero?12:10,display:'block',
+   marginBottom:loaded&&hero?16:0,marginTop:loaded&&!hero?10:0
+  }
+ });
+ return <Image source={{uri}} resizeMode="cover" onLoad={()=>setLoaded(true)} onError={()=>setFailed(true)}
+   style={loaded?style:[style,{height:0,marginTop:0,marginBottom:0,opacity:0}]}/>;
 }
 function articleBlocks(html='',fallback=''){
  if(!html)return fallback?cleanNewsText(fallback).split(/\n\s*\n/).filter(Boolean).map(text=>({type:'p',text})):[];
