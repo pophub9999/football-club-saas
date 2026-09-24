@@ -1,5 +1,5 @@
 name: Sync Torreense Data
-# Sync trigger: team logos and player photos
+# Sync trigger: assets-first refresh
 
 on:
   workflow_dispatch:
