@@ -1,7 +1,7 @@
 import '@expo/metro-runtime';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking } from 'react-native';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
@@ -189,6 +189,8 @@ export default function App(){
  const [news,setNews]=useState([]),[selectedNews,setSelectedNews]=useState(null),[articleLoading,setArticleLoading]=useState(false);
  const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('TODAS'),[calendarLoading,setCalendarLoading]=useState(false);
  const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState('');
+ const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
+ const [cart,setCart]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?JSON.parse(window.localStorage.getItem('scut_cart')||'[]'):[]}catch{return []}});
  const [syncVersion,setSyncVersion]=useState(null);
 
  const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
@@ -198,17 +200,20 @@ export default function App(){
 
  useEffect(()=>{let live=true;(async()=>{try{
   setLoading(true);
-  const [v,n,m,p,st]=await Promise.all([
+  const [v,n,m,p,st,sc,sp]=await Promise.all([
    sb('app_sync?select=version,updated_at&id=eq.1'),
    sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&active=eq.true&order=published_at.desc.nullslast&limit=100'),
-   sb('matches?select=id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,logo_url),away:teams!matches_away_team_id_fkey(name,logo_url)&order=starts_at.asc&limit=200'),
+   sb('matches?select=id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,short_name,logo_url),away:teams!matches_away_team_id_fkey(name,short_name,logo_url)&order=starts_at.asc&limit=200'),
    sb('players?select=id,name,short_name,shirt_number,position,birth_date,nationality,height_cm,photo_url,team:teams!players_team_id_fkey(id,name,short_name,age_group,gender,sports(name))&active=eq.true&order=shirt_number.asc&limit=500'),
-   sb('standings?select=position,played,wins,draws,losses,goals_for,goals_against,points,team:teams!standings_team_id_fkey(name)&order=position.asc&limit=50')
+   sb('standings?select=position,played,wins,draws,losses,goals_for,goals_against,points,team:teams!standings_team_id_fkey(name)&order=position.asc&limit=50'),
+   sb('store_categories?select=id,name,sort_order&active=eq.true&order=sort_order.asc'),
+   sb('store_products?select=id,source_id,category_id,name,url,description_text,price,currency,stock_status,in_stock,image_url,images,options&active=eq.true&order=name.asc&limit=250')
   ]);
   if(!live)return;
   setSyncVersion(v?.[0]?.version||1);
   setNews((n||[]).map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',html:x.content_html||'',hero:x.hero_image_url,excerpt:x.excerpt})));
   setPlayers(p||[]);
+  setStoreCategories(sc||[]);setStoreProducts(sp||[]);
   const positions={};(st||[]).forEach(x=>{if(x.team?.name)positions[x.team.name]=x;});
 
   const mapped=(m||[]).map(x=>{
@@ -221,8 +226,8 @@ export default function App(){
     strTimestamp:x.starts_at,
     starts_at:x.starts_at,
     _timeConfirmed:timeConfirmed,
-    strHomeTeam:x.home?.name||'',
-    strAwayTeam:x.away?.name||'',
+    strHomeTeam:x.home?.short_name||x.home?.name||'',
+    strAwayTeam:x.away?.short_name||x.away?.name||'',
     strHomeTeamBadge:x.home?.logo_url||null,
     strAwayTeamBadge:x.away?.logo_url||null,
     intHomeScore:x.home_score,
@@ -242,7 +247,7 @@ export default function App(){
       type:(x.event_type||'JOGO').toUpperCase(),
       date:x.starts_at?new Date(x.starts_at).toLocaleDateString('pt-PT',{timeZone:'Europe/Lisbon'}):'',
       round:x.round||'',
-      title:(x.home?.name||'')+' × '+(x.away?.name||''),
+      title:(x.home?.short_name||x.home?.name||'')+' × '+(x.away?.short_name||x.away?.name||''),
       time:timeConfirmed&&x.starts_at?new Date(x.starts_at).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'}):'Hora a confirmar'
     }
    };
@@ -281,6 +286,25 @@ export default function App(){
   setScreen('calendar');
   setCalendarLoading(false);
  }
+ function saveCart(next){
+  setCart(next);
+  if(Platform.OS==='web'&&typeof window!=='undefined'){try{window.localStorage.setItem('scut_cart',JSON.stringify(next))}catch{}}
+ }
+ function addToCart(product){
+  if(product?.in_stock===false)return;
+  const found=cart.find(x=>x.id===product.id);
+  saveCart(found?cart.map(x=>x.id===product.id?{...x,qty:x.qty+1}:x):[...cart,{...product,qty:1}]);
+ }
+ function changeCartQty(id,delta){
+  saveCart(cart.map(x=>x.id===id?{...x,qty:Math.max(0,x.qty+delta)}:x).filter(x=>x.qty>0));
+ }
+ function moneyEUR(value){
+  return new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(value||0));
+ }
+ async function openOfficialStore(url='https://www.torreense.com/loja/'){
+  if(Platform.OS==='web'&&typeof window!=='undefined')window.open(url,'_blank');
+  else await Linking.openURL(url);
+ }
  const officialNews=news;
  const sports=['TODAS','FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
  const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
@@ -290,6 +314,9 @@ export default function App(){
  const squadPlayers=players
   .filter(x=>String(x.team?.id||'')===activeSquadId)
   .sort((a,b)=>playerPositionRank(a.position)-playerPositionRank(b.position)||(a.shirt_number??999)-(b.shirt_number??999)||(a.name||'').localeCompare(b.name||'','pt'));
+ const filteredStore=storeProducts.filter(x=>storeCategory==='TODOS'||String(x.category_id)===String(storeCategory));
+ const cartCount=cart.reduce((n,x)=>n+x.qty,0);
+ const cartTotal=cart.reduce((n,x)=>n+Number(x.price||0)*x.qty,0);
 
  function Header(){return <><RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/><View style={headerStyle}><Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text></View></>}
  function Page({children}){return <View style={s.root}><StatusBar hidden/><Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/><Header/><View style={contentStyle}><ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView></View></View>}
@@ -307,6 +334,32 @@ export default function App(){
  }
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
  if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{cleanNewsTitle(selectedNews?.title||'')}</Text>{selectedNews?.hero?<ArticleImage uri={selectedNews.hero} hero version={syncVersion}/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body,selectedNews?.url).map((b,i)=>b.type==='img'?<ArticleImage key={i} uri={b.src} version={syncVersion}/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
+ if(screen==='store')return <Page><Back title="LOJA"/>
+  <Pressable style={s.cartTopButton} onPress={()=>setScreen('cart')}><ShortcutIcon type="shop"/><Text style={s.cartTopText}>CARRINHO</Text><View style={s.cartBadge}><Text style={s.cartBadgeText}>{cartCount}</Text></View><Text style={s.cartTopArrow}>›</Text></Pressable>
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>
+   <Pressable onPress={()=>setStoreCategory('TODOS')} style={[s.filter,storeCategory==='TODOS'&&s.filterOn]}><Text style={[s.filterText,storeCategory==='TODOS'&&s.filterTextOn]}>TODOS</Text></Pressable>
+   {storeCategories.map(cat=><Pressable key={cat.id} onPress={()=>setStoreCategory(String(cat.id))} style={[s.filter,String(storeCategory)===String(cat.id)&&s.filterOn]}><Text style={[s.filterText,String(storeCategory)===String(cat.id)&&s.filterTextOn]}>{cat.name}</Text></Pressable>)}
+  </ScrollView>
+  {filteredStore.length?<View style={s.storeGrid}>{filteredStore.map(p=><View key={p.id} style={s.storeCard}>
+   {p.image_url?<Image source={{uri:p.image_url}} style={s.storeImage} resizeMode="contain"/>:<View style={[s.storeImage,s.storeImageFallback]}><ShortcutIcon type="shop"/></View>}
+   <Text style={s.storeName}>{p.name}</Text>
+   <Text style={s.storePrice}>{moneyEUR(p.price)}</Text>
+   <Text style={[s.storeStock,p.in_stock===false&&s.storeStockOut]}>{p.in_stock===false?'ESGOTADO':(p.stock_status||'DISPONÍVEL').toUpperCase()}</Text>
+   <Pressable disabled={p.in_stock===false} onPress={()=>addToCart(p)} style={[s.storeAdd,p.in_stock===false&&s.storeAddOff]}><Text style={s.storeAddText}>{p.in_stock===false?'INDISPONÍVEL':'ADICIONAR'}</Text></Pressable>
+   <Pressable onPress={()=>openOfficialStore(p.url)}><Text style={s.storeOfficial}>VER ARTIGO ›</Text></Pressable>
+  </View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>A loja está a sincronizar os artigos oficiais.</Text></View>}
+ </Page>;
+ if(screen==='cart')return <Page><Back title="CARRINHO" to="store"/>
+  {cart.length?<>
+   {cart.map(item=><View key={item.id} style={s.cartItem}>
+    {item.image_url?<Image source={{uri:item.image_url}} style={s.cartImage} resizeMode="contain"/>:null}
+    <View style={s.cartBody}><Text style={s.cartName}>{item.name}</Text><Text style={s.cartPrice}>{moneyEUR(item.price)}</Text><View style={s.qtyRow}><Pressable onPress={()=>changeCartQty(item.id,-1)} style={s.qtyBtn}><Text style={s.qtyText}>−</Text></Pressable><Text style={s.qtyValue}>{item.qty}</Text><Pressable onPress={()=>changeCartQty(item.id,1)} style={s.qtyBtn}><Text style={s.qtyText}>+</Text></Pressable></View></View>
+   </View>)}
+   <View style={s.cartTotalRow}><Text style={s.cartTotalLabel}>TOTAL</Text><Text style={s.cartTotalValue}>{moneyEUR(cartTotal)}</Text></View>
+   <Pressable style={s.checkoutBtn} onPress={()=>openOfficialStore('https://www.torreense.com/loja/index.php?route=checkout/checkout')}><Text style={s.checkoutText}>CONTINUAR NA LOJA OFICIAL</Text></Pressable>
+   <Text style={s.checkoutNote}>O pagamento é concluído na loja oficial do Torreense. Nesta primeira versão, os artigos do carrinho ainda não são transferidos automaticamente para o checkout oficial.</Text>
+  </>:<View style={s.infoCard}><Text style={s.muted}>O carrinho está vazio.</Text></View>}
+ </Page>;
  if(screen==='squads')return <Page><Back title="PLANTÉIS"/>
   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>
    {squadTeams.map(t=><Pressable key={t.id} onPress={()=>setSquadTeam(String(t.id))} style={[s.filter,activeSquadId===String(t.id)&&s.filterOn]}><Text style={[s.filterText,activeSquadId===String(t.id)&&s.filterTextOn]}>{t.short_name||t.name}</Text></Pressable>)}
@@ -329,7 +382,7 @@ export default function App(){
   <View style={s.quickSection}><View style={s.quickRow}>
    <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
    <Pressable style={s.quickCard} onPress={()=>setScreen('news')}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
-   <Pressable style={s.quickCard}><ShortcutIcon type="shop"/><Text style={s.quickText}>LOJA</Text></Pressable>
+   <Pressable style={s.quickCard} onPress={()=>setScreen('store')}><ShortcutIcon type="shop"/><Text style={s.quickText}>LOJA</Text></Pressable>
    <Pressable style={s.quickCard}><ShortcutIcon type="members"/><Text style={s.quickText}>SÓCIOS</Text></Pressable>
    <Pressable style={s.quickCard}><ShortcutIcon type="star"/><Text style={s.quickText}>VANTAGENS</Text></Pressable>
   </View></View>
@@ -343,6 +396,9 @@ const s=StyleSheet.create({
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#b7cee2',fontSize:8,letterSpacing:.55},round:{color:'#fff',fontSize:8.5,marginTop:3},date:{color:'#fff',fontSize:8},
  teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamLogoFallback:{borderRadius:999,backgroundColor:'rgba(255,255,255,.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'rgba(255,255,255,.18)'},teamLogoFallbackText:{color:'#dce7ef',fontSize:8,fontWeight:'700'},teamName:{color:'#fff',fontSize:8,marginTop:3,textAlign:'center',minHeight:16},teamStanding:{color:'#91abc0',fontSize:6,marginTop:1},vs:{color:'#93abc1',fontSize:12},score:{color:'#fff',fontSize:19},stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:4},gameStatus:{color:'#f1b94f',fontSize:6,textAlign:'center',marginTop:3},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#b7c9d9',fontSize:24},
  clubLine:{color:'#fff',fontSize:15,letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},quickIconFallback:{color:'#f1b94f',fontSize:22,lineHeight:26},quickText:{color:'#fff',fontSize:5.9,letterSpacing:.18,marginTop:5,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.50)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#fff',fontSize:7,letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:18},
+ cartTopButton:{height:34,marginBottom:10,borderRadius:10,borderWidth:1,borderColor:'rgba(241,185,79,.55)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},cartTopText:{color:'#fff',fontSize:7.5,letterSpacing:.6,marginLeft:8,flex:1},cartBadge:{minWidth:21,height:21,borderRadius:11,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},cartBadgeText:{color:'#082b48',fontSize:7,fontWeight:'700'},cartTopArrow:{color:'#f1b94f',fontSize:18,marginLeft:6},
+ storeGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},storeCard:{width:'48.5%',marginBottom:9,padding:7,borderRadius:11,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},storeImage:{width:'100%',aspectRatio:.9,borderRadius:8,backgroundColor:'#fff'},storeImageFallback:{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.06)'},storeName:{color:'#fff',fontSize:7.4,lineHeight:10,minHeight:22,marginTop:6},storePrice:{color:'#f1b94f',fontSize:8.5,fontWeight:'700',marginTop:3},storeStock:{color:'#9bd2ad',fontSize:5.6,marginTop:2},storeStockOut:{color:'#e6a4aa'},storeAdd:{height:26,borderRadius:7,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:6},storeAddOff:{opacity:.4},storeAddText:{color:'#082b48',fontSize:6.2,fontWeight:'700',letterSpacing:.25},storeOfficial:{color:'#b8c8d8',fontSize:5.8,textAlign:'center',marginTop:6},
+ cartItem:{flexDirection:'row',padding:8,marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},cartImage:{width:62,height:72,borderRadius:7,backgroundColor:'#fff'},cartBody:{flex:1,paddingLeft:9},cartName:{color:'#fff',fontSize:8,lineHeight:11},cartPrice:{color:'#f1b94f',fontSize:8,marginTop:3},qtyRow:{flexDirection:'row',alignItems:'center',marginTop:8},qtyBtn:{width:24,height:22,borderRadius:6,borderWidth:1,borderColor:'rgba(241,185,79,.55)',alignItems:'center',justifyContent:'center'},qtyText:{color:'#f1b94f',fontSize:13,lineHeight:16},qtyValue:{color:'#fff',fontSize:8,minWidth:28,textAlign:'center'},cartTotalRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:10,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.15)'},cartTotalLabel:{color:'#fff',fontSize:8,letterSpacing:.6},cartTotalValue:{color:'#f1b94f',fontSize:11,fontWeight:'700'},checkoutBtn:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},checkoutText:{color:'#082b48',fontSize:7,fontWeight:'700',letterSpacing:.45},checkoutNote:{color:'#8fa8ba',fontSize:5.8,lineHeight:9,marginTop:7,textAlign:'center'},
  newsSection:{marginTop:12},newsHeader:{flexDirection:'row',justifyContent:'space-between',marginBottom:7},newsHeading:{color:'#fff',fontSize:8.5,letterSpacing:.65},newsMore:{color:'#f1b94f',fontSize:6.5},newsCard:{minHeight:49,marginBottom:6,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',flexDirection:'row',alignItems:'center',overflow:'hidden'},newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},newsBody:{flex:1,paddingHorizontal:10,paddingVertical:7},newsMeta:{color:'#f1b94f',fontSize:5.8,letterSpacing:.45,marginBottom:3},newsTitle:{color:'#fff',fontSize:8,lineHeight:11},newsArrow:{color:'#9eb6c9',fontSize:18,paddingHorizontal:10},
  pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:30,lineHeight:30,paddingRight:12},pageTitle:{color:'#fff',fontSize:14,letterSpacing:.8},detailCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},kicker:{color:'#f1b94f',fontSize:7,letterSpacing:.5},detailDate:{color:'#fff',fontSize:9,marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:7.5,letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'rgba(8,43,72,.82)',borderRadius:10,padding:11,borderWidth:1,borderColor:'rgba(120,164,197,.22)'},body:{color:'#fff',fontSize:8,lineHeight:13},muted:{color:'#a9bdcd',fontSize:8,lineHeight:12},statRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.08)'},
  articleCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},articleTitle:{color:'#fff',fontSize:14,lineHeight:19,marginBottom:12},articleBody:{color:'#dce7ef',fontSize:8.5,lineHeight:14},articleParagraph:{color:'#dce7ef',fontSize:8.5,lineHeight:14,marginBottom:9},articleHeroImage:{width:'100%',height:190,borderRadius:12,marginBottom:16},articleInlineImage:{width:'100%',height:210,borderRadius:10,marginVertical:10},
