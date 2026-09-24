@@ -89,6 +89,27 @@ def api(path,method="GET",data=None,headers=None):
     req=urllib.request.Request(BASE+"/rest/v1/"+path,data=body,method=method,headers=headers or HEAD)
     with urllib.request.urlopen(req,timeout=25) as r:return r.read().decode()
 
+def print_cache_schema():
+    try:
+        req=urllib.request.Request(
+            BASE+"/rest/v1/",
+            headers={
+                "apikey":KEY,
+                "Authorization":"Bearer "+KEY,
+                "Accept":"application/openapi+json"
+            }
+        )
+        with urllib.request.urlopen(req,timeout=25) as r:
+            doc=json.load(r)
+        defs=doc.get("definitions",{})
+        for name in ("sports","teams","competitions","matches","players","standings"):
+            d=defs.get(name,{})
+            props=d.get("properties",{})
+            print("CACHE_SCHEMA",name,",".join(sorted(props.keys())))
+            print("CACHE_REQUIRED",name,",".join(d.get("required",[])))
+    except Exception as e:
+        print("CACHE_SCHEMA_FAILED",repr(e))
+
 def clean(s):
     s=re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>"," ",s,flags=re.I)
     s=re.sub(r"<[^>]+>"," ",s)
@@ -373,6 +394,7 @@ def article(url):
     }
 
 def main():
+    print_cache_schema()
     urls=discover_news()
 
     # If archive discovery is temporarily incomplete, keep any URLs already
