@@ -301,10 +301,28 @@ def article(url):
             if re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin|youtube|instagram)",src,re.I):
                 continue
             key=("img",src)
-            if key not in seen and text_started:
+            if key in seen:
+                continue
+
+            # Images can legitimately appear immediately after the title and
+            # before the first paragraph. Store them in our own CDN and keep
+            # them in the same position as the official article.
+            try:
+                ext=os.path.splitext(urllib.parse.urlparse(src).path)[1].lower()
+                if ext not in (".png",".jpg",".jpeg",".webp",".gif"):
+                    ext=".jpg"
+                slug=url.rstrip("/").split("/")[-1]
+                img_no=sum(1 for b in blocks if b.startswith("<img "))
+                cached=cache_image(src,"torreense/"+slug+"/inline-"+str(img_no+1)+ext)
+            except Exception as e:
+                print("IMAGE_CACHE_FAILED",url,src,repr(e))
+                cached=src if image_ok(src) else None
+
+            if cached:
                 seen.add(key)
-                blocks.append('<img src="'+h.escape(src,quote=True)+'">')
+                blocks.append('<img src="'+h.escape(cached,quote=True)+'">')
                 media_added=True
+
         if node.name in ("img","picture","source") or media_added:
             continue
 
@@ -335,33 +353,6 @@ def article(url):
         return None
 
     content_html="".join(blocks) if blocks else "<p>"+h.escape(text)+"</p>"
-
-    # TEMPORARY single-article validation: mirror the two verified official
-    # content images into our own Supabase Storage, then reference our CDN URLs.
-    # This removes Torreense hotlink/CMS behaviour from the app path entirely.
-    if url.rstrip("/").endswith("/blog/bilhetesjornada2ligaeuropa"):
-        slug=url.rstrip("/").split("/")[-1]
-        price_remote="https://www.torreense.com/source/Captura%20de%20ecra%CC%83%202026-09-23%2C%20a%CC%80s%2021.18.46.png"
-        map_remote="https://www.torreense.com/source/MapaEstadioLeiria.jpg"
-        price_img=cache_image(price_remote,"torreense/"+slug+"/prices.png")
-        map_img=cache_image(map_remote,"torreense/"+slug+"/map.jpg")
-
-        if price_img not in content_html:
-            content_html=re.sub(
-                r"(<p>[^<]*Os preços são os seguintes:[^<]*</p>)",
-                lambda m:m.group(1)+'<img src="'+h.escape(price_img,quote=True)+'">',
-                content_html,
-                count=1,
-                flags=re.I
-            )
-        if map_img not in content_html:
-            content_html=re.sub(
-                r"(<p>[^<]*consulte o mapa:[^<]*</p>)",
-                lambda m:m.group(1)+'<img src="'+h.escape(map_img,quote=True)+'">',
-                content_html,
-                count=1,
-                flags=re.I
-            )
 
     # Keep article media in its original position; no synthetic hero image.
     hero=None
