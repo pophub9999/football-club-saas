@@ -16,6 +16,21 @@ UA={
  "Accept-Language":"pt-PT,pt;q=0.9,en;q=0.7",
  "Cache-Control":"no-cache"
 }
+_IMAGE_OK={}
+
+def image_ok(url):
+    if not url:return False
+    if url in _IMAGE_OK:return _IMAGE_OK[url]
+    try:
+        req=urllib.request.Request(url,headers={**UA,"Range":"bytes=0-0"})
+        with urllib.request.urlopen(req,timeout=8) as r:
+            status=getattr(r,"status",200)
+            ctype=(r.headers.get("Content-Type") or "").lower()
+            ok=200 <= status < 400 and ctype.startswith("image/")
+    except Exception:
+        ok=False
+    _IMAGE_OK[url]=ok
+    return ok
 
 def get(url):
     req=urllib.request.Request(url,headers=UA)
@@ -109,7 +124,7 @@ def article(url):
             if vals:candidates.insert(0,vals[-1])
         for candidate in candidates:
             src=normalise_image(candidate)
-            if src:return src
+            if src and image_ok(src):return src
         return None
 
     # Find the visible article H1. This is the stable boundary we care about.
@@ -213,7 +228,8 @@ def article(url):
         return None
 
     content_html="".join(blocks) if blocks else "<p>"+h.escape(text)+"</p>"
-    hero=first_article_image or normalise_image(meta_img)
+    meta_hero=normalise_image(meta_img)
+    hero=first_article_image or (meta_hero if image_ok(meta_hero) else None)
 
     return {
         "source":"torreense",
