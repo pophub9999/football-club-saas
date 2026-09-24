@@ -1,5 +1,5 @@
 name: Sync Torreense Store
-# store sync trigger: prices and stock
+# store sync trigger: category prices
 
 on:
   workflow_dispatch:
