@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os,re,json,urllib.request,urllib.parse,urllib.error
 from datetime import datetime,timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
@@ -99,6 +100,31 @@ def upsert_category(cat):
     rows=api("store_categories?select=id&source=eq.torreense_store&source_id=eq."+urllib.parse.quote(cat["source_id"],safe="")+"&limit=1") or []
     return rows[0]["id"] if rows else None
 
+def product_detail(pid):
+    url=STORE+"/editor?id="+urllib.parse.quote(str(pid),safe="")+"&type=template"
+    doc=get(url)
+    desc=None
+    m=re.search(r'designMetadata:\{[\s\S]*?description:"((?:\\\\.|[^"\\\\])*)"[\s\S]*?fields:\[(.*?)\],relatedDesigns:',doc,re.S)
+    fields=[]
+    if m:
+        desc=js_string(m.group(1))
+        field_blob=m.group(2)
+        for fm in re.finditer(r'\{code:"((?:\\\\.|[^"\\\\])*)",options:\[(.*?)\]\}',field_blob,re.S):
+            code=js_string(fm.group(1))
+            vals=[js_string(x) for x in re.findall(r'"((?:\\\\.|[^"\\\\])*)"',fm.group(2))]
+            vals=[x for x in vals if x]
+            if vals:
+                label={"SIZE":"Tamanho","TRAIT_COLOR":"Cor"}.get(code,code)
+                fields.append({"name":label,"field":code,"values":[{"label":v,"value":v} for v in vals],"required":True})
+    if desc is None:
+        # HTML fallback for the visible description.
+        hm=re.search(r'<div class="info-section-body[^"]*">([\s\S]*?)</div>',doc,re.I)
+        if hm:
+            txt=re.sub(r'<[^>]+>',' ',hm.group(1))
+            desc=re.sub(r'\s+',' ',txt).strip()
+    return {"description_text":desc,"options":fields,"detail_url":url}
+
+
 def sync():
     master=get(STORE+"/products")
     categories=discover_categories(master)
@@ -137,6 +163,21 @@ def sync():
     if len(all_products)<20:
         raise RuntimeError("Unexpectedly small current store catalog: "+str(len(all_products)))
 
+    existing_rows=api("store_products?select=source_id,description_text,options&source=eq.torreense_store") or []
+    existing={str(x["source_id"]):x for x in existing_rows}
+    need_detail=[p for p in all_products.values() if not existing.get(str(p["source_id"]),{}).get("description_text")]
+    details={}
+    if need_detail:
+        print("STORE_DETAIL_FETCH",len(need_detail))
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            futures={pool.submit(product_detail,p["source_id"]):str(p["source_id"]) for p in need_detail}
+            for future in as_completed(futures):
+                pid=futures[future]
+                try:
+                    details[pid]=future.result()
+                except Exception as e:
+                    print("STORE_DETAIL_FAILED",pid,repr(e))
+
     rows=[]
     for p in all_products.values():
         pid=p["source_id"]
@@ -147,7 +188,7 @@ def sync():
           "name":p["name"],
           "slug":"product-"+pid,
           "url":STORE+"/editor?id="+pid+"&type=template",
-          "description_text":None,
+          "description_text":(details.get(pid,{}).get("description_text") or existing.get(pid,{}).get("description_text")),
           "price":p["price"],
           "compare_at_price":None,
           "currency":"EUR",
@@ -155,7 +196,7 @@ def sync():
           "in_stock":True,
           "image_url":p["image_url"],
           "images":[p["image_url"]] if p["image_url"] else [],
-          "options":[],
+          "options":(details.get(pid,{}).get("options") or existing.get(pid,{}).get("options") or []),
           "active":True,
           "raw_data":{
             "source_platform":"360imprimir",
