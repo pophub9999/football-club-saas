@@ -1,91 +1,54 @@
 #!/usr/bin/env python3
-import re,urllib.request,urllib.parse
+import re, json, urllib.request, urllib.parse
 from bs4 import BeautifulSoup
+
 UA={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36","Accept":"text/html,*/*","Accept-Language":"pt-PT,pt;q=0.9"}
-BASE="https://www.torreense.com/loja/"
+BASE="https://torreense.360imprimir.pt"
 
 def get(u):
     req=urllib.request.Request(u,headers=UA)
     with urllib.request.urlopen(req,timeout=30) as r:
         return r.read().decode("utf-8","ignore")
 
-html=get(BASE)
-print("ROOT_BYTES",len(html))
-s=BeautifulSoup(html,"html.parser")
-print("TITLE",s.title.get_text(" ",strip=True) if s.title else "")
-cats=[]
-for a in s.find_all("a",href=True):
-    href=urllib.parse.urljoin(BASE,a["href"])
-    txt=a.get_text(" ",strip=True)
-    if "route=product/category" in href and txt:
-        cats.append((txt,href))
-seen=[]
-for x in cats:
-    if x not in seen: seen.append(x)
-print("CATEGORIES",len(seen))
-for t,u in seen[:100]: print("CAT",repr(t),u)
-
-product_links=[]
-for a in s.find_all("a",href=True):
-    href=urllib.parse.urljoin(BASE,a["href"])
-    if "route=product/product" in href:
-        product_links.append((a.get_text(" ",strip=True),href))
-uniq=[]
-for x in product_links:
-    if x not in uniq: uniq.append(x)
-print("ROOT_PRODUCTS",len(uniq))
-for t,u in uniq[:50]: print("ROOT_PRODUCT",repr(t),u)
-
-# Probe known category and first product.
-caturl="https://www.torreense.com/loja/index.php?path=271011943&route=product%2Fcategory"
-ch=get(caturl); cs=BeautifulSoup(ch,"html.parser")
-links=[]
-for a in cs.find_all("a",href=True):
-    href=urllib.parse.urljoin(BASE,a["href"])
-    if "route=product/product" in href:
-        text=a.get_text(" ",strip=True)
-        if (text,href) not in links: links.append((text,href))
-print("CATEGORY_PRODUCTS",len(links))
-for t,u in links[:20]: print("PRODUCT",repr(t),u)
-if links:
-    ph=get(links[0][1]); ps=BeautifulSoup(ph,"html.parser")
-    print("PRODUCT_TITLE",ps.find("h1").get_text(" ",strip=True) if ps.find("h1") else "")
-    for img in ps.find_all("img",src=True)[:30]:
-        print("IMG",img.get("alt"),urllib.parse.urljoin(BASE,img["src"]))
-    for sel in ps.find_all("select"):
-        print("SELECT",sel.get("name"),sel.get("id"),[(o.get("value"),o.get_text(" ",strip=True)) for o in sel.find_all("option")])
-    for inp in ps.find_all("input"):
-        if inp.get("name") or inp.get("type") in ("radio","checkbox"):
-            print("INPUT",inp.get("type"),inp.get("name"),inp.get("value"))
-
-print("ALL_PATH_LINKS")
-allp=[]
-for a in s.find_all("a",href=True):
-    href=urllib.parse.urljoin(BASE,a["href"])
-    if "path=" in href:
-        x=(a.get_text(" ",strip=True),href)
-        if x not in allp: allp.append(x)
-for t,u in allp[:200]: print("PATHLINK",repr(t),u)
-for m in sorted(set(re.findall(r'path(?:=|%3D)([0-9_]+)',html,re.I))):
-    print("PATHID",m)
-
-print("CART_ROUTE_PATTERNS")
-sample=get("https://www.torreense.com/loja/index.php?route=product/product&product_id=297936553")
-for pat in [
-    r'index\.php\?route=[^"\'\s<>]+',
-    r'route=[^&"\'\s<>]*cart[^"\'\s<>]*',
-    r'checkout[^"\'\s<>]{0,120}',
-]:
-    vals=sorted(set(re.findall(pat,sample,re.I)))
-    for v in vals[:100]:
-        if "cart" in v.lower() or "checkout" in v.lower():
-            print("ROUTE",v)
-
-print("CART_ADD_CONTEXT")
-for needle in ["checkout/cart/add","checkout\\/cart\\/add"]:
-    pos=0
-    while True:
-        i=sample.find(needle,pos)
-        if i<0: break
-        print("CONTEXT",re.sub(r"\\s+"," ",sample[max(0,i-700):i+1400]))
-        pos=i+len(needle)
+for path in ["/","/products","/categories/equipamentos","/categories/lifestyle","/categories/gifts-e-acessorios"]:
+    url=BASE+path
+    try:
+        html=get(url)
+    except Exception as e:
+        print("FETCH_FAIL",url,repr(e));continue
+    print("\nPAGE",url,"BYTES",len(html))
+    s=BeautifulSoup(html,"html.parser")
+    print("TITLE",s.title.get_text(" ",strip=True) if s.title else "")
+    prod=[]
+    cats=[]
+    for a in s.find_all("a",href=True):
+        href=urllib.parse.urljoin(BASE,a["href"])
+        txt=" ".join(a.get_text(" ",strip=True).split())
+        if "/products/" in href:
+            if (txt,href) not in prod: prod.append((txt,href))
+        if "/categories/" in href:
+            if (txt,href) not in cats: cats.append((txt,href))
+    print("PRODUCT_LINKS",len(prod))
+    for t,u in prod[:20]: print("PRODUCT",repr(t),u)
+    print("CATEGORY_LINKS",len(cats))
+    for t,u in cats[:30]: print("CATEGORY",repr(t),u)
+    print("SCRIPT_SRCS")
+    for sc in s.find_all("script",src=True):
+        print("SCRIPT",urllib.parse.urljoin(BASE,sc["src"]))
+    patterns=[
+      r'https?://[^"\'\s<>]+',
+      r'["\'](/api/[^"\']+)["\']',
+      r'["\']([^"\']*(?:product|catalog|category|checkout|payment)[^"\']*)["\']'
+    ]
+    for pat in patterns:
+        vals=[]
+        for m in re.findall(pat,html,re.I):
+            if isinstance(m,tuple):m=m[0]
+            if m not in vals:vals.append(m)
+        for v in vals[:120]:
+            if any(x in v.lower() for x in ("api","product","catalog","category","checkout","payment","stripe","mbway","sibs","ifthen","eupago")):
+                print("PAT",v[:500])
+    # Next/React hydration data
+    nd=s.find("script",id="__NEXT_DATA__")
+    if nd:
+        print("NEXT_DATA",nd.get_text()[:5000])
