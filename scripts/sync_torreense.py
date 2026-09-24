@@ -9,8 +9,8 @@ except ModuleNotFoundError:
 
 BASE=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-TEST_NEWS_LIMIT=1  # temporário enquanto validamos o parser
-TEST_NEWS_URL="https://www.torreense.com/blog/bilhetesjornada2ligaeuropa"
+TEST_NEWS_LIMIT=0
+TEST_NEWS_URL=""
 HEAD={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"}
 UA={
  "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
@@ -132,65 +132,30 @@ def discover_news():
     print("DISCOVERED_URLS",len(found))
     return list(found)
 
-def existing_test_article(url):
-    # Temporary safety net while validating one article. If the Torreense server
-    # returns a JS shell without the article DOM, reuse the already-clean row from
-    # Supabase and only refresh/mirror its inline images.
+def existing_article(url):
+    # Safety net: if Torreense temporarily returns only a JS shell, preserve
+    # the last clean version already stored in Supabase instead of deleting it.
     try:
-        q="news?select=title,category,published_at,excerpt,content_text,content_html,url,slug&url=eq."+urllib.parse.quote(url,safe="")
+        q="news?select=title,category,published_at,excerpt,hero_image_url,content_text,content_html,url,slug&url=eq."+urllib.parse.quote(url,safe="")
         rows=json.loads(api(q))
     except Exception as e:
-        print("EXISTING_TEST_ARTICLE_READ_FAILED",repr(e))
+        print("EXISTING_ARTICLE_READ_FAILED",url,repr(e))
         return None
     if not rows:
         return None
-
     row=rows[0]
-    content_html=row.get("content_html") or ""
-    content_text=row.get("content_text") or ""
-    if not content_html and content_text:
-        content_html="<p>"+h.escape(content_text)+"</p>"
-
-    slug=url.rstrip("/").split("/")[-1]
-    price_remote="https://www.torreense.com/source/Captura%20de%20ecra%CC%83%202026-09-23%2C%20a%CC%80s%2021.18.46.png"
-    map_remote="https://www.torreense.com/source/MapaEstadioLeiria.jpg"
-    price_img=cache_image(price_remote,"torreense/"+slug+"/prices.png")
-    map_img=cache_image(map_remote,"torreense/"+slug+"/map.jpg")
-
-    # Remove old copies first so repeated test syncs stay deterministic.
-    content_html=re.sub(r"<img\\b[^>]*src=[\"'][^\"']*(?:prices\\.png|Captura[^\"']*)[\"'][^>]*>","",content_html,flags=re.I)
-    content_html=re.sub(r"<img\\b[^>]*src=[\"'][^\"']*(?:map\\.jpg|MapaEstadio[^\"']*)[\"'][^>]*>","",content_html,flags=re.I)
-
-    if re.search(r"Os preços são os seguintes:",content_html,re.I):
-        content_html=re.sub(
-            r"(<p>[^<]*Os preços são os seguintes:[^<]*</p>)",
-            lambda m:m.group(1)+'<img src="'+h.escape(price_img,quote=True)+'">',
-            content_html,count=1,flags=re.I
-        )
-    else:
-        content_html+='<img src="'+h.escape(price_img,quote=True)+'">'
-
-    if re.search(r"consulte o mapa:",content_html,re.I):
-        content_html=re.sub(
-            r"(<p>[^<]*consulte o mapa:[^<]*</p>)",
-            lambda m:m.group(1)+'<img src="'+h.escape(map_img,quote=True)+'">',
-            content_html,count=1,flags=re.I
-        )
-    else:
-        content_html+='<img src="'+h.escape(map_img,quote=True)+'">'
-
     now=datetime.now(timezone.utc).isoformat()
     return {
         "source":"torreense",
         "url":url,
-        "slug":row.get("slug") or slug,
-        "title":row.get("title") or slug,
-        "category":row.get("category") or "FUTEBOL",
+        "slug":row.get("slug") or url.rstrip("/").split("/")[-1],
+        "title":row.get("title") or url.rstrip("/").split("/")[-1],
+        "category":row.get("category") or "TORREENSE",
         "published_at":row.get("published_at"),
-        "excerpt":row.get("excerpt") or content_text[:300],
-        "hero_image_url":None,
-        "content_text":content_text[:30000],
-        "content_html":content_html[:150000],
+        "excerpt":row.get("excerpt") or "",
+        "hero_image_url":row.get("hero_image_url"),
+        "content_text":row.get("content_text") or "",
+        "content_html":row.get("content_html") or "",
         "active":True,
         "updated_at":now
     }
@@ -258,11 +223,10 @@ def article(url):
     if h1 is None:
         h1=soup.find("h1")
     if h1 is None:
-        if url.rstrip("/")==TEST_NEWS_URL.rstrip("/"):
-            item=existing_test_article(url)
-            if item:
-                print("ARTICLE_FALLBACK_EXISTING_ROW",url)
-                return item
+        item=existing_article(url)
+        if item:
+            print("ARTICLE_FALLBACK_EXISTING_ROW",url)
+            return item
         print("ARTICLE_CONTENT_NOT_FOUND",url,"NO_H1")
         return None
 
@@ -375,7 +339,7 @@ def article(url):
     # TEMPORARY single-article validation: mirror the two verified official
     # content images into our own Supabase Storage, then reference our CDN URLs.
     # This removes Torreense hotlink/CMS behaviour from the app path entirely.
-    if url.rstrip("/")==TEST_NEWS_URL.rstrip("/"):
+    if url.rstrip("/").endswith("/blog/bilhetesjornada2ligaeuropa"):
         slug=url.rstrip("/").split("/")[-1]
         price_remote="https://www.torreense.com/source/Captura%20de%20ecra%CC%83%202026-09-23%2C%20a%CC%80s%2021.18.46.png"
         map_remote="https://www.torreense.com/source/MapaEstadioLeiria.jpg"
@@ -418,29 +382,63 @@ def article(url):
     }
 
 def main():
-    # Durante o teste usamos uma notícia fixa. Isto evita depender da página
-    # de arquivo /blog, que por vezes devolve HTML reduzido ao GitHub runner.
-    urls=[TEST_NEWS_URL] if TEST_NEWS_URL else discover_news()
+    urls=discover_news()
+
+    # If archive discovery is temporarily incomplete, keep any URLs already
+    # stored in Supabase in the candidate set so valid cached articles survive.
+    try:
+        existing=json.loads(api("news?select=url&source=eq.torreense&order=id.asc&limit=1000"))
+        for row in existing:
+            u=(row.get("url") or "").rstrip("/")
+            if u and u not in urls:
+                urls.append(u)
+    except Exception as e:
+        print("EXISTING_URLS_READ_FAILED",repr(e))
+
+    if TEST_NEWS_URL:
+        urls=[TEST_NEWS_URL]
+    if TEST_NEWS_LIMIT and TEST_NEWS_LIMIT>0:
+        urls=urls[:TEST_NEWS_LIMIT]
+
+    print("SYNC_CANDIDATES",len(urls))
     rows=[]
-    for u in urls[:TEST_NEWS_LIMIT]:
+    failures=0
+    for u in urls:
         try:
             item=article(u)
-            if item: rows.append(item)
-        except Exception as e:print("article failed",u,e)
+            if item:
+                rows.append(item)
+            else:
+                failures+=1
+        except Exception as e:
+            failures+=1
+            print("ARTICLE_FAILED",u,repr(e))
+
     if not rows:
-        raise RuntimeError("No Torreense news discovered/imported; failing sync instead of reporting false success")
-    # Replace the Torreense snapshot atomically from the app's point of view:
-    # remove previous Torreense rows, then insert the freshly extracted set.
-    # This avoids duplicate rows even if historical records were created before
-    # URL upsert/conflict handling was reliable.
-    delete_headers={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"}
-    api("news?source=eq.torreense","DELETE",headers=delete_headers)
-    insert_headers={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"}
-    api("news","POST",rows,headers=insert_headers)
+        raise RuntimeError("No Torreense news imported; keeping previous database snapshot untouched")
+
+    # Upsert by URL. Never delete the whole snapshot merely because the source
+    # site returned incomplete HTML for some pages.
+    upsert_headers={
+        "apikey":KEY,
+        "Authorization":"Bearer "+KEY,
+        "Content-Type":"application/json",
+        "Prefer":"resolution=merge-duplicates,return=minimal"
+    }
+    api("news?on_conflict=url","POST",rows,headers=upsert_headers)
+
     now=datetime.now(timezone.utc).isoformat()
-    status={"source":"torreense_news","last_sync":now,"last_success":now,"status":"success","message":"Official Torreense news sync","items_processed":len(rows),"updated_at":now}
+    status={
+        "source":"torreense_news",
+        "last_sync":now,
+        "last_success":now,
+        "status":"success",
+        "message":"Official Torreense news sync",
+        "items_processed":len(rows),
+        "updated_at":now
+    }
     api("sync_status?on_conflict=source","POST",[status])
     api("app_sync?id=eq.1","PATCH",{"version":int(datetime.now().timestamp()),"updated_at":now})
-    print("Synced",len(rows),"news items")
+    print("Synced",len(rows),"news items; failures",failures)
 
 if __name__=="__main__":main()
