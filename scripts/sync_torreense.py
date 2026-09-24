@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-import os,re,json,html as h,urllib.request,urllib.parse
+import os,re,json,html as h,urllib.request,urllib.parse,subprocess,sys
 from datetime import datetime,timezone
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ModuleNotFoundError:
+    subprocess.check_call([sys.executable,"-m","pip","install","beautifulsoup4","-q"])
+    from bs4 import BeautifulSoup
 
 BASE=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
