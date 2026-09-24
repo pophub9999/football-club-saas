@@ -51,26 +51,30 @@ function cleanNewsText(v=''){
  return x.replace(/^(?:facebook|twitter|linkedin|x)\b[\s:|•-]*/i,'').trim();
 }
 function ArticleImage({uri,hero=false}){
- const fallbackRatio=/prices\.png|Captura/i.test(uri||'')?8.6:/map\.jpg|MapaEstadio/i.test(uri||'')?1.75:1.8;
- const [ratio,setRatio]=useState(fallbackRatio),[failed,setFailed]=useState(false);
+ if(!uri)return null;
+ const isPrice=/prices\.png|Captura/i.test(uri);
+ const isMap=/map\.jpg|MapaEstadio/i.test(uri);
+ const ratio=isPrice?(1000/170):isMap?(1000/918):1.8;
 
- useEffect(()=>{
-  let live=true;
-  if(!uri)return;
-  Image.getSize(
-   uri,
-   (w,h)=>{if(live&&w&&h)setRatio(w/h)},
-   ()=>{}
-  );
-  return()=>{live=false};
- },[uri]);
-
- if(!uri||failed)return null;
+ if(Platform.OS==='web'){
+  return React.createElement('img',{
+   src:uri,
+   alt:'',
+   style:{
+    width:'100%',
+    height:'auto',
+    objectFit:'contain',
+    display:'block',
+    borderRadius:hero?12:10,
+    marginTop:hero?0:10,
+    marginBottom:hero?16:10
+   }
+  });
+ }
 
  return <Image
   source={{uri}}
   resizeMode="contain"
-  onError={()=>setFailed(true)}
   style={{
    width:'100%',
    aspectRatio:ratio,
@@ -81,6 +85,7 @@ function ArticleImage({uri,hero=false}){
   }}
  />;
 }
+
 function articleBlocks(html='',fallback='',url=''){
  if(!html)return fallback?cleanNewsText(fallback).split(/\n\s*\n/).filter(Boolean).map(text=>({type:'p',text})):[];
  let body=html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ');
