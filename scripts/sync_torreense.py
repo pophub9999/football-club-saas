@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os,re,json,html as h,urllib.request,urllib.parse
 from datetime import datetime,timezone
+from bs4 import BeautifulSoup
 
 BASE=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
@@ -66,60 +67,133 @@ def discover_news():
 
 def article(url):
     doc=get(url)
+    soup=BeautifulSoup(doc,"html.parser")
 
     def meta_value(key):
-        for tag in re.findall(r"<meta\\b[^>]*>",doc,re.I):
-            if re.search(r"(?:property|name)=[\"']"+re.escape(key)+r"[\"']",tag,re.I):
-                m=re.search(r"content=[\"']([^\"']*)[\"']",tag,re.I)
-                if m:return h.unescape(m.group(1)).strip()
-        return ""
+        tag=soup.find("meta",attrs={"property":key}) or soup.find("meta",attrs={"name":key})
+        return h.unescape(tag.get("content","")).strip() if tag else ""
 
     title=meta_value("og:title")
-    if not title:
-        m=re.search(r"<title>(.*?)</title>",doc,re.I|re.S)
-        title=clean(m.group(1)) if m else ""
-    title=re.sub(r"\\s*\\|\\s*(?:Site Oficial do )?Torreense\\s*$","",title,flags=re.I).strip()
-    img=meta_value("og:image")
+    if not title and soup.title:
+        title=soup.title.get_text(" ",strip=True)
+    title=re.sub(r"\s*\|\s*(?:Site Oficial do )?Torreense\s*$","",title,flags=re.I).strip()
+    img=meta_value("og:image") or None
 
-    body=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>"," ",doc,flags=re.I)
-    visible=clean(body)
-
-    low=visible.lower()
-    t=title.lower().strip()
-    p=low.rfind(t) if t else -1
-    if p<0:
-        print("ARTICLE_CONTENT_NOT_FOUND",url)
+    # Find the visible article H1. This is the stable boundary we care about.
+    h1=None
+    for node in soup.find_all("h1"):
+        txt=node.get_text(" ",strip=True)
+        if title and (txt.casefold()==title.casefold() or title.casefold() in txt.casefold() or txt.casefold() in title.casefold()):
+            h1=node
+            break
+    if h1 is None:
+        h1=soup.find("h1")
+    if h1 is None:
+        print("ARTICLE_CONTENT_NOT_FOUND",url,"NO_H1")
         return None
 
-    start=p+len(title)
-    q=low.find("últimas notícias",start)
-    rawtxt=visible[start:q if q>start else None].strip()
-
-    # Remove page controls that sit between title and body.
-    rawtxt=re.sub(r"^.*?Partilhar\\s+notícia:\\s*","",rawtxt,flags=re.I|re.S)
-    rawtxt=re.sub(r"^(?:Facebook|X|Twitter|LinkedIn)\\b[:\\s•|-]*","",rawtxt,flags=re.I)
-    rawtxt=re.sub(r"\\s+Ver\\s+todas\\s*$","",rawtxt,flags=re.I)
-
-    if len(rawtxt)<40:
-        print("ARTICLE_CONTENT_NOT_FOUND",url)
-        return None
-
-    # Reconstruct paragraphs from common sentence boundaries so the app does not
-    # render one giant block while we avoid importing related-news/footer content.
-    parts=[x.strip() for x in re.split(r"(?<=[.!?])\\s+(?=[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ])",rawtxt) if x.strip()]
-    content_html="".join("<p>"+h.escape(x)+"</p>" for x in parts) if parts else "<p>"+h.escape(rawtxt)+"</p>"
-
-    category="TORREENSE"
-    if re.search(r"\\bFutebol\\b",visible,re.I): category="FUTEBOL"
-    elif re.search(r"\\bClube\\b",visible,re.I): category="CLUBE"
-
+    # Metadata immediately before the article.
     published=None
-    dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",visible,re.I)
+    category="TORREENSE"
+    previous_text=[]
+    for node in h1.find_all_previous(["p","span","div","time"],limit=40):
+        txt=node.get_text(" ",strip=True)
+        if txt:
+            previous_text.append(txt)
+    context=" ".join(reversed(previous_text))
+
+    dm=re.search(r"\b(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(20\d{2})\b",context,re.I)
     if dm:
         months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
         published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
 
-    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":rawtxt[:300],"hero_image_url":img or None,"content_text":rawtxt[:30000],"content_html":content_html[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
+    # Pick the nearest category label before H1.
+    for txt in reversed(previous_text):
+        if txt.strip().casefold()=="futebol":
+            category="FUTEBOL"; break
+        if txt.strip().casefold()=="clube":
+            category="CLUBE"; break
+
+    blocks=[]
+    text_parts=[]
+    seen=set()
+
+    # Walk semantic elements AFTER the title and STOP at the related-news heading.
+    for node in h1.find_all_next(["h1","h2","h3","p","li","img"]):
+        if node is h1:
+            continue
+
+        if node.name in ("h1","h2","h3"):
+            txt=node.get_text(" ",strip=True)
+            if re.fullmatch(r"Últimas\s+Notícias",txt,re.I):
+                break
+
+        # Ignore anything living in obvious page chrome/widgets.
+        bad_parent=False
+        for parent in node.parents:
+            if getattr(parent,"name",None) in ("nav","header","footer","form"):
+                bad_parent=True; break
+            cls=" ".join(parent.get("class",[]) if hasattr(parent,"get") else [])
+            ident=(parent.get("id","") if hasattr(parent,"get") else "")
+            if re.search(r"(share|social|related|latest|newsletter|footer|header|menu)",cls+" "+ident,re.I):
+                bad_parent=True; break
+        if bad_parent:
+            continue
+
+        if node.name=="img":
+            src=node.get("src") or node.get("data-src")
+            if not src:
+                srcset=node.get("srcset") or node.get("data-srcset")
+                if srcset:
+                    src=srcset.split(",")[0].strip().split(" ")[0]
+            if src:
+                src=urllib.parse.urljoin("https://www.torreense.com/",h.unescape(src))
+                if not re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin)",src,re.I):
+                    key=("img",src)
+                    if key not in seen:
+                        seen.add(key)
+                        blocks.append('<img src="'+h.escape(src,quote=True)+'">')
+            continue
+
+        txt=node.get_text(" ",strip=True)
+        if not txt:
+            continue
+        if re.fullmatch(r"(?:Partilhar\s+notícia:?|Partilhar:?|Ver\s+todas|Facebook|X|Twitter|LinkedIn)",txt,re.I):
+            continue
+        if txt==title:
+            continue
+
+        # Nested semantic tags can repeat the exact same text; keep one copy only.
+        key=(node.name,txt)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        tag=node.name if node.name in ("h2","h3","p","li") else "p"
+        blocks.append("<"+tag+">"+h.escape(txt)+"</"+tag+">")
+        text_parts.append(txt)
+
+    text=" ".join(text_parts).strip()
+    if len(text)<40:
+        print("ARTICLE_CONTENT_NOT_FOUND",url,"EMPTY_AFTER_H1")
+        return None
+
+    content_html="".join(blocks) if blocks else "<p>"+h.escape(text)+"</p>"
+
+    return {
+        "source":"torreense",
+        "url":url,
+        "slug":url.rstrip("/").split("/")[-1],
+        "title":title or url.rstrip("/").split("/")[-1],
+        "category":category,
+        "published_at":published,
+        "excerpt":text[:300],
+        "hero_image_url":img,
+        "content_text":text[:30000],
+        "content_html":content_html[:150000],
+        "active":True,
+        "updated_at":datetime.now(timezone.utc).isoformat()
+    }
 
 def main():
     urls=discover_news()
