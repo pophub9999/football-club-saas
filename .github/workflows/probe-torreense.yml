@@ -1,5 +1,5 @@
 name: Probe Torreense Benefits
-# legacy benefits trigger
+# missing advantage cards trigger
 
 on:
   push:
