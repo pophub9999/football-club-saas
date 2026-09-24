@@ -51,7 +51,6 @@ function cleanNewsText(v=''){
  if(latest>=0)x=x.slice(0,latest).trim();
  return x.replace(/^(?:facebook|twitter|linkedin|x)\b[\s:|•-]*/i,'').trim();
 }
-function bustUrl(uri,version){if(!uri)return uri;const sep=uri.includes('?')?'&':'?';return uri+sep+'v='+encodeURIComponent(version||Date.now());}
 function ArticleImage({uri,hero=false}){
  const {width,height}=useWindowDimensions();
  if(!uri)return null;
