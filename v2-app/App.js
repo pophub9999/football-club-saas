@@ -51,36 +51,34 @@ function cleanNewsText(v=''){
  return x.replace(/^(?:facebook|twitter|linkedin|x)\b[\s:|•-]*/i,'').trim();
 }
 function ArticleImage({uri,hero=false}){
- const [loaded,setLoaded]=useState(false),[failed,setFailed]=useState(false),[ratio,setRatio]=useState(null);
+ const fallbackRatio=/prices\.png|Captura/i.test(uri||'')?8.6:/map\.jpg|MapaEstadio/i.test(uri||'')?1.75:1.8;
+ const [ratio,setRatio]=useState(fallbackRatio),[failed,setFailed]=useState(false);
+
+ useEffect(()=>{
+  let live=true;
+  if(!uri)return;
+  Image.getSize(
+   uri,
+   (w,h)=>{if(live&&w&&h)setRatio(w/h)},
+   ()=>{}
+  );
+  return()=>{live=false};
+ },[uri]);
+
  if(!uri||failed)return null;
 
- if(Platform.OS==='web')return React.createElement('img',{
-  src:uri,alt:'',
-  onLoad:e=>{setLoaded(true);const w=e?.currentTarget?.naturalWidth||0,h=e?.currentTarget?.naturalHeight||0;if(w&&h)setRatio(w/h);},
-  onError:()=>setFailed(true),
-  style:{
-   width:'100%',
-   height:loaded?'auto':0,
-   opacity:loaded?1:0,
-   objectFit:'contain',
-   borderRadius:hero?12:10,
-   display:'block',
-   marginBottom:loaded&&hero?16:0,
-   marginTop:loaded&&!hero?10:0
-  }
- });
-
- const base={width:'100%',borderRadius:hero?12:10,marginBottom:loaded&&hero?16:0,marginTop:loaded&&!hero?10:0};
  return <Image
-   source={{uri}}
-   resizeMode="contain"
-   onLoad={e=>{
-     setLoaded(true);
-     const w=e?.nativeEvent?.source?.width||0,h=e?.nativeEvent?.source?.height||0;
-     if(w&&h)setRatio(w/h);
-   }}
-   onError={()=>setFailed(true)}
-   style={loaded?[base,ratio?{aspectRatio:ratio}:{height:hero?190:210}]:[base,{height:0,opacity:0}]}
+  source={{uri}}
+  resizeMode="contain"
+  onError={()=>setFailed(true)}
+  style={{
+   width:'100%',
+   aspectRatio:ratio,
+   alignSelf:'center',
+   borderRadius:hero?12:10,
+   marginTop:hero?0:10,
+   marginBottom:hero?16:10
+  }}
  />;
 }
 function articleBlocks(html='',fallback='',url=''){
