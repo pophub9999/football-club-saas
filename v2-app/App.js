@@ -1,3 +1,4 @@
+import '@expo/metro-runtime';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
