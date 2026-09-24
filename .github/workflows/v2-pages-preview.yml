@@ -1,0 +1,58 @@
+name: V2 GitHub Pages Preview
+
+on:
+  push:
+    branches: ['v2-visual-first']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: v2-pages-preview
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: v2-app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set GitHub Pages base URL
+        run: |
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('app.json','utf8')); p.expo.experiments={...(p.expo.experiments||{}),baseUrl:'/football-club-saas'}; fs.writeFileSync('app.json',JSON.stringify(p,null,2)+'\n');"
+
+      - name: Export web
+        run: npx expo export --platform web
+
+      - name: Disable Jekyll
+        run: touch dist/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: v2-app/dist
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
