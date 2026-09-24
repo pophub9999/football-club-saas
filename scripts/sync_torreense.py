@@ -68,7 +68,7 @@ def article(url):
     doc=get(url)
 
     def meta_value(key):
-        for tag in re.findall(r"<meta\\b[^>]*>",doc,re.I):
+        for tag in re.findall(r"<meta\b[^>]*>",doc,re.I):
             if re.search(r"(?:property|name)=[\"']"+re.escape(key)+r"[\"']",tag,re.I):
                 m=re.search(r"content=[\"']([^\"']*)[\"']",tag,re.I)
                 if m:return h.unescape(m.group(1)).strip()
@@ -78,12 +78,12 @@ def article(url):
     if not title:
         m=re.search(r"<title>(.*?)</title>",doc,re.I|re.S)
         title=clean(m.group(1)) if m else ""
-    title=re.sub(r"\\s*\\|\\s*(?:Site Oficial do )?Torreense\\s*$","",title,flags=re.I).strip()
+    title=re.sub(r"\s*\|\s*(?:Site Oficial do )?Torreense\s*$","",title,flags=re.I).strip()
     img=meta_value("og:image")
 
     # Remove non-content chrome first, then locate the article by visible text.
     body=doc
-    body=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>"," ",body,flags=re.I)
+    body=re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<nav[\s\S]*?</nav>|<footer[\s\S]*?</footer>|<header[\s\S]*?</header>|<form[\s\S]*?</form>"," ",body,flags=re.I)
 
     # Diagnostic fallback: the Torreense CMS may not expose the visible title in h1/p/div
     # in the raw HTML. In that case, extract the full visible text between the page title
@@ -91,7 +91,7 @@ def article(url):
     # Work with blocks in source order. Start at the block that contains the title
     # and stop when reaching the "Últimas Notícias" section.
     blocks=[]
-    for m in re.finditer(r"<(h1|h2|h3|p|li|div)\\b[^>]*>([\\s\\S]*?)</\\1>|<img\\b([^>]*)/?>",body,re.I):
+    for m in re.finditer(r"<(h1|h2|h3|p|li|div)\b[^>]*>([\s\S]*?)</\1>|<img\b([^>]*)/?>",body,re.I):
         tag=(m.group(1) or "img").lower()
         if tag=="img":
             attrs=m.group(3) or ""
@@ -114,15 +114,15 @@ def article(url):
         q=low.find("últimas notícias",p+len(t)) if p>=0 else -1
         if p>=0:
             rawtxt=visible[p+len(title): q if q>p else None].strip()
-            rawtxt=re.sub(r"^(?:Bilheteira|Loja|Clube|História|Palmarés|Instalações|SAD|Estatutos|Órgãos Sociais|Contactos)\\b[:\\s•|-]*","",rawtxt,flags=re.I)
+            rawtxt=re.sub(r"^(?:Bilheteira|Loja|Clube|História|Palmarés|Instalações|SAD|Estatutos|Órgãos Sociais|Contactos)\b[:\s•|-]*","",rawtxt,flags=re.I)
             if len(rawtxt)>=40:
                 text=rawtxt
                 content_html="<p>"+h.escape(rawtxt)+"</p>"
                 category="TORREENSE"
-                if re.search(r"\\bFutebol\\b",visible,re.I): category="FUTEBOL"
-                elif re.search(r"\\bClube\\b",visible,re.I): category="CLUBE"
+                if re.search(r"\bFutebol\b",visible,re.I): category="FUTEBOL"
+                elif re.search(r"\bClube\b",visible,re.I): category="CLUBE"
                 published=None
-                dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",visible,re.I)
+                dm=re.search(r"\b(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(20\d{2})\b",visible,re.I)
                 if dm:
                     months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
                     published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
@@ -132,7 +132,7 @@ def article(url):
 
     useful=[]
     for tag,txt in blocks[start_i:]:
-        if txt and re.search(r"^Últimas\\s+Notícias$",txt,re.I):
+        if txt and re.search(r"^Últimas\s+Notícias$",txt,re.I):
             break
         if tag=="img":
             if txt and not re.search(r"logo|icon|sprite",txt,re.I):
@@ -160,11 +160,11 @@ def article(url):
 
     category="TORREENSE"
     plain=clean(doc)
-    if re.search(r"\\bFutebol\\b",plain,re.I): category="FUTEBOL"
-    elif re.search(r"\\bClube\\b",plain,re.I): category="CLUBE"
+    if re.search(r"\bFutebol\b",plain,re.I): category="FUTEBOL"
+    elif re.search(r"\bClube\b",plain,re.I): category="CLUBE"
 
     published=None
-    dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",plain,re.I)
+    dm=re.search(r"\b(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(20\d{2})\b",plain,re.I)
     if dm:
         months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
         published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
