@@ -209,6 +209,7 @@ def upsert_category(source_id,name,url,sort_order):
 def category_products(url):
     found={}
     for page in range(1,8):
+        before=set(found)
         sep="&" if "?" in url else "?"
         u=url+sep+"limit=100&page="+str(page)
         soup=BeautifulSoup(get(u),"html.parser")
@@ -249,8 +250,7 @@ def category_products(url):
                 found[pid]=item
         if not page_ids:
             break
-        if page>1 and not any(pid not in list(found.keys())[:-len(page_ids)] for pid in page_ids):
-            # We already requested limit=100, so a repeated page means no more.
+        if page>1 and set(found)==before:
             break
     return list(found.values())
 
