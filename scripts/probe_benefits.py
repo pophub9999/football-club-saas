@@ -40,3 +40,7 @@ for img in s2.find_all("img"):
             if ("Desconto" in txt or "Vantagens" in txt or "Oferta" in txt) and len(txt)<900:
                 print("OFFCARD","ALT",repr(alt),"TAG",p.name,"CLASS",p.get("class"),"TXT",txt[:700])
                 break
+
+for needle in ["Bom Repouso","Footlab"]:
+    i=h2.find(needle)
+    print("SNIP",needle,i,re.sub(r"\\s+"," ",h2[max(0,i-1200):i+1800]) if i>=0 else "NOT_FOUND")
