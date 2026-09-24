@@ -81,7 +81,36 @@ def article(url):
     if not title and soup.title:
         title=soup.title.get_text(" ",strip=True)
     title=re.sub(r"\s*\|\s*(?:Site Oficial do )?Torreense\s*$","",title,flags=re.I).strip()
-    img=meta_value("og:image") or None
+    meta_img=meta_value("og:image") or None
+
+    def normalise_image(src):
+        if not src:return None
+        src=h.unescape(src).strip()
+        if not src or src.startswith("data:") or src.startswith("blob:"):return None
+        if src.startswith("//"):return "https:"+src
+        if re.match(r"^https?://",src,re.I):return src
+        return urllib.parse.urljoin("https://www.torreense.com/",src.lstrip("/"))
+
+    def node_image(node):
+        candidates=[
+            node.get("data-src"),node.get("data-lazy-src"),node.get("data-original"),
+            node.get("data-image"),node.get("src")
+        ]
+        pic=node.find_parent("picture")
+        if pic:
+            for source in pic.find_all("source"):
+                ss=source.get("data-srcset") or source.get("srcset")
+                if ss:
+                    vals=[x.strip().split(" ")[0] for x in ss.split(",") if x.strip()]
+                    if vals:candidates.insert(0,vals[-1])
+        ss=node.get("data-srcset") or node.get("srcset")
+        if ss:
+            vals=[x.strip().split(" ")[0] for x in ss.split(",") if x.strip()]
+            if vals:candidates.insert(0,vals[-1])
+        for candidate in candidates:
+            src=normalise_image(candidate)
+            if src:return src
+        return None
 
     # Find the visible article H1. This is the stable boundary we care about.
     h1=None
@@ -121,6 +150,8 @@ def article(url):
     blocks=[]
     text_parts=[]
     seen=set()
+    first_article_image=None
+    text_started=False
 
     # Walk semantic elements AFTER the title and STOP at the related-news heading.
     for node in h1.find_all_next(["h1","h2","h3","p","li","img"]):
@@ -145,17 +176,15 @@ def article(url):
             continue
 
         if node.name=="img":
-            src=node.get("src") or node.get("data-src")
-            if not src:
-                srcset=node.get("srcset") or node.get("data-srcset")
-                if srcset:
-                    src=srcset.split(",")[0].strip().split(" ")[0]
-            if src:
-                src=urllib.parse.urljoin("https://www.torreense.com/",h.unescape(src))
-                if not re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin)",src,re.I):
-                    key=("img",src)
-                    if key not in seen:
-                        seen.add(key)
+            src=node_image(node)
+            alt=(node.get("alt") or "").strip()
+            if src and not re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin|youtube|instagram)",src+" "+alt,re.I):
+                key=("img",src)
+                if key not in seen:
+                    seen.add(key)
+                    if first_article_image is None:
+                        first_article_image=src
+                    elif text_started:
                         blocks.append('<img src="'+h.escape(src,quote=True)+'">')
             continue
 
@@ -176,6 +205,7 @@ def article(url):
         tag=node.name if node.name in ("h2","h3","p","li") else "p"
         blocks.append("<"+tag+">"+h.escape(txt)+"</"+tag+">")
         text_parts.append(txt)
+        text_started=True
 
     text=" ".join(text_parts).strip()
     if len(text)<40:
@@ -183,6 +213,7 @@ def article(url):
         return None
 
     content_html="".join(blocks) if blocks else "<p>"+h.escape(text)+"</p>"
+    hero=first_article_image or normalise_image(meta_img)
 
     return {
         "source":"torreense",
@@ -192,7 +223,7 @@ def article(url):
         "category":category,
         "published_at":published,
         "excerpt":text[:300],
-        "hero_image_url":img,
+        "hero_image_url":hero,
         "content_text":text[:30000],
         "content_html":content_html[:150000],
         "active":True,
