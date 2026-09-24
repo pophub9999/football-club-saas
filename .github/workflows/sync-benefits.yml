@@ -1,5 +1,5 @@
 name: Sync Torreense Benefits
-# benefits parser fix trigger
+# merge official advantages trigger
 
 on:
   workflow_dispatch:
