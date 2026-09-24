@@ -113,7 +113,7 @@ def article(url):
         p=low.rfind(t) if t else -1
         q=low.find("últimas notícias",p+len(t)) if p>=0 else -1
         if p>=0:
-            rawtxt=visible[p+len(title): q if q>p else None].strip()
+            rawtxt=visible[p+len(title): q if q>p else None].strip()\n            rawtxt=re.sub(r"^.*?Partilhar\\s+notícia:\\s*","",rawtxt,flags=re.I|re.S)
             rawtxt=re.sub(r"^(?:Bilheteira|Loja|Clube|História|Palmarés|Instalações|SAD|Estatutos|Órgãos Sociais|Contactos)\b[:\s•|-]*","",rawtxt,flags=re.I)
             if len(rawtxt)>=40:
                 text=rawtxt
@@ -131,17 +131,32 @@ def article(url):
         return None
 
     useful=[]
+    content_started=False
+    stop_markers=re.compile(r"^(?:Últimas\\s+Notícias|Ver\\s+todas)$",re.I)
+    share_markers=re.compile(r"^(?:Partilhar\\s+notícia:?|Partilhar:?|Facebook|X|Twitter|LinkedIn)$",re.I)
     for tag,txt in blocks[start_i:]:
-        if txt and re.search(r"^Últimas\s+Notícias$",txt,re.I):
+        t=(txt or "").strip()
+        if t and stop_markers.search(t):
             break
+        if t and share_markers.search(t):
+            continue
         if tag=="img":
-            if txt and not re.search(r"logo|icon|sprite",txt,re.I):
-                useful.append(("img",txt))
-        elif txt:
-            useful.append((tag,txt))
+            if content_started and t and not re.search(r"logo|icon|sprite|facebook|twitter|linkedin|share",t,re.I):
+                useful.append(("img",t))
+            continue
+        # Generic divs often contain the whole article plus children, causing duplicated
+        # content and large blank areas in the app. Keep semantic text blocks only.
+        if tag=="div" or not t:
+            continue
+        if not content_started:
+            # The actual article begins with the first paragraph after the share controls.
+            if tag=="p" and len(t)>20:
+                content_started=True
+            else:
+                continue
+        useful.append((tag,t))
 
-    # Remove obvious repeated navigation labels that can still exist in generic divs.
-    noise={"Bilheteira","Loja","Clube","História","Palmarés","Instalações","SAD","Estatutos","Órgãos Sociais","Contactos"}
+    noise={"Bilheteira","Loja","Clube","História","Palmarés","Instalações","SAD","Estatutos","Órgãos Sociais","Contactos","Partilhar notícia:","Ver todas"}
     useful=[(tag,txt) for tag,txt in useful if not (tag!="img" and txt.strip() in noise)]
 
     text=" ".join(txt for tag,txt in useful if tag!="img").strip()
