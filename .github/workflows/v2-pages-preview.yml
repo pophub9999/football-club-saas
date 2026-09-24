@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: Supabase calendar cache test
+# Deploy trigger: richer match and squads
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
