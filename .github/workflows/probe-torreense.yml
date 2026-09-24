@@ -1,5 +1,5 @@
-name: Probe Torreense Store
-# product options trigger
+name: Probe Torreense Benefits
+# benefits probe trigger
 
 on:
   push:
@@ -20,4 +20,4 @@ jobs:
           python-version: '3.12'
       - name: Install parser dependency
         run: pip install beautifulsoup4 -q
-      - run: python scripts/probe_store.py
+      - run: python scripts/probe_benefits.py
