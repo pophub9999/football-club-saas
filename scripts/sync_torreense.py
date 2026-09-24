@@ -113,7 +113,8 @@ def article(url):
         p=low.rfind(t) if t else -1
         q=low.find("últimas notícias",p+len(t)) if p>=0 else -1
         if p>=0:
-            rawtxt=visible[p+len(title): q if q>p else None].strip()\n            rawtxt=re.sub(r"^.*?Partilhar\\s+notícia:\\s*","",rawtxt,flags=re.I|re.S)
+            rawtxt=visible[p+len(title): q if q>p else None].strip()
+            rawtxt=re.sub(r"^.*?Partilhar\s+notícia:\s*","",rawtxt,flags=re.I|re.S)
             rawtxt=re.sub(r"^(?:Bilheteira|Loja|Clube|História|Palmarés|Instalações|SAD|Estatutos|Órgãos Sociais|Contactos)\b[:\s•|-]*","",rawtxt,flags=re.I)
             if len(rawtxt)>=40:
                 text=rawtxt
