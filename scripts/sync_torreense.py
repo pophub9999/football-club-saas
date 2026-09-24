@@ -70,8 +70,8 @@ def article(url):
     def meta_value(key):
         # Attribute order on meta tags is not guaranteed.
         for tag in re.findall(r"<meta\\b[^>]*>",doc,re.I):
-            if re.search(r'(?:property|name)=["\\']'+re.escape(key)+r'["\\']',tag,re.I):
-                m=re.search(r'content=["\\']([^"\\']*)["\\']',tag,re.I)
+            if re.search(r"(?:property|name)=[\"']"+re.escape(key)+r"[\"']",tag,re.I):
+                m=re.search(r"content=[\"']([^\"']*)[\"']",tag,re.I)
                 if m:return h.unescape(m.group(1)).strip()
         return ""
 
