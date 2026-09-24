@@ -104,14 +104,14 @@ def product_detail(pid):
     url=STORE+"/editor?id="+urllib.parse.quote(str(pid),safe="")+"&type=template"
     doc=get(url)
     desc=None
-    m=re.search(r'designMetadata:\{[\s\S]*?description:"((?:\\\\.|[^"\\\\])*)"[\s\S]*?fields:\[(.*?)\],relatedDesigns:',doc,re.S)
+    m=re.search(r'designMetadata:\{[\s\S]*?description:"(.*?)"[\s\S]*?fields:\[(.*?)\],relatedDesigns:',doc,re.S)
     fields=[]
     if m:
         desc=js_string(m.group(1))
         field_blob=m.group(2)
-        for fm in re.finditer(r'\{code:"((?:\\\\.|[^"\\\\])*)",options:\[(.*?)\]\}',field_blob,re.S):
+        for fm in re.finditer(r'\{code:"([^"]+)",options:\[(.*?)\]\}',field_blob,re.S):
             code=js_string(fm.group(1))
-            vals=[js_string(x) for x in re.findall(r'"((?:\\\\.|[^"\\\\])*)"',fm.group(2))]
+            vals=[js_string(x) for x in re.findall(r'"([^"]*)"',fm.group(2))]
             vals=[x for x in vals if x]
             if vals:
                 label={"SIZE":"Tamanho","TRAIT_COLOR":"Cor"}.get(code,code)
@@ -160,9 +160,9 @@ def sync():
     if len(all_products)<20:
         raise RuntimeError("Unexpectedly small current store catalog: "+str(len(all_products)))
 
-    existing_rows=api("store_products?select=source_id,description_text,options&source=eq.torreense_store") or []
+    existing_rows=api("store_products?select=source_id,description_text,options,raw_data&source=eq.torreense_store") or []
     existing={str(x["source_id"]):x for x in existing_rows}
-    need_detail=[p for p in all_products.values() if not existing.get(str(p["source_id"]),{}).get("description_text")]
+    need_detail=[p for p in all_products.values() if not existing.get(str(p["source_id"]),{}).get("raw_data",{}).get("detail_synced")]
     details={}
     if need_detail:
         print("STORE_DETAIL_FETCH",len(need_detail))
@@ -201,7 +201,8 @@ def sync():
             "is_customized":p["customized"],
             "delivery_days":p["delivery_days"],
             "price_ex_vat":p["price_ex_vat"],
-            "default_quantity":p["quantity"]
+            "default_quantity":p["quantity"],
+            "detail_synced": bool(details.get(pid)) or bool(existing.get(pid,{}).get("raw_data",{}).get("detail_synced"))
           },
           "updated_at":now
         })
