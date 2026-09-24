@@ -1,4 +1,4 @@
-name: Probe Torreense Pages
+name: Probe Torreense Store
 
 on:
   push:
@@ -17,4 +17,4 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python scripts/probe_torreense_pages.py
+      - run: python scripts/probe_store.py
