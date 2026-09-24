@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: squad ordering
+# Deploy trigger: multi-modality calendar and women squad
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
