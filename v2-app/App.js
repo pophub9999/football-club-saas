@@ -7,17 +7,17 @@ const SPORTS_DB='https://www.thesportsdb.com/api/v1/json/123';
 const TORREENSE_ID='143720';
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
 const SUPABASE_KEY='sb_publishable_TyM24TpRzq3_ijZsFRTVGg_bWM2WOky';
-const SB_HEADERS={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
+const SB_HEADERS={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Cache-Control':'no-cache','Pragma':'no-cache'};
 const cache={calendar:null};
 async function sb(path){
- const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:SB_HEADERS});
+ const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:SB_HEADERS,cache:'no-store'});
  if(!r.ok)throw new Error('Supabase '+r.status);
  return r.json();
 }
 
 function RemoteLogo({uri,style,alt}) {
  if(!uri)return null;
- return Platform.OS==='web'?React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt}):<Image source={{uri}} style={style} resizeMode="contain"/>;
+ return Platform.OS==='web'?React.createElement('img',{src:uri,style:{...style,objectFit:'contain'},alt}):<Image source={{uri:src}} style={style} resizeMode="contain"/>;
 }
 function ShortcutIcon({type}) {
  const gold='#f1b94f';
@@ -50,8 +50,10 @@ function cleanNewsText(v=''){
  if(latest>=0)x=x.slice(0,latest).trim();
  return x.replace(/^(?:facebook|twitter|linkedin|x)\b[\s:|•-]*/i,'').trim();
 }
-function ArticleImage({uri,hero=false}){
+function bustUrl(uri,version){if(!uri)return uri;const sep=uri.includes('?')?'&':'?';return uri+sep+'v='+encodeURIComponent(version||Date.now());}
+function ArticleImage({uri,hero=false,version=''}){
  if(!uri)return null;
+ const src=bustUrl(uri,version);
  const isPrice=/prices\.png|Captura/i.test(uri);
  const isMap=/map\.jpg|MapaEstadio/i.test(uri);
  const ratio=isPrice?(1000/170):isMap?(1000/920):1.8;
@@ -67,13 +69,13 @@ function ArticleImage({uri,hero=false}){
  }}>
   {Platform.OS==='web'
    ?React.createElement('img',{
-      src:uri,alt:'',
+      src:src,alt:'',
       style:{
        position:'absolute',left:0,top:0,width:'100%',height:'100%',
        objectFit:'contain',display:'block'
       }
     })
-   :<Image source={{uri}} resizeMode="contain" style={StyleSheet.absoluteFillObject}/>}
+   :<Image source={{uri:src}} resizeMode="contain" style={StyleSheet.absoluteFillObject}/>}
  </View>;
 }
 
@@ -163,7 +165,6 @@ export default function App(){
  }
  async function openArticle(item){
   setPreviousScreen(screen);setSelectedNews(item);setScreen('article');
-  if(item.body)return;
   setArticleLoading(true);
   try{
    const rows=await sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&id=eq.'+encodeURIComponent(item.id)+'&limit=1');
@@ -209,7 +210,7 @@ export default function App(){
   </>}</Page>
  }
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
- if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{cleanNewsTitle(selectedNews?.title||'')}</Text>{selectedNews?.hero?<ArticleImage uri={selectedNews.hero} hero/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body,selectedNews?.url).map((b,i)=>b.type==='img'?<ArticleImage key={i} uri={b.src}/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
+ if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{cleanNewsTitle(selectedNews?.title||'')}</Text>{selectedNews?.hero?<ArticleImage uri={selectedNews.hero} hero version={syncVersion}/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body,selectedNews?.url).map((b,i)=>b.type==='img'?<ArticleImage key={i} uri={b.src} version={syncVersion}/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
  if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
 
  const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
