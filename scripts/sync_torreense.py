@@ -178,8 +178,9 @@ def article(url):
     seen=set()
     text_started=False
 
-    # Walk semantic elements AFTER the title and STOP at the related-news heading.
-    for node in h1.find_all_next(["h1","h2","h3","p","li","img"]):
+    # Walk EVERY element after H1. Torreense sometimes stores article images
+    # in link/data attributes instead of a normal <img src>, so inspect all nodes.
+    for node in h1.find_all_next(True):
         if node is h1:
             continue
 
@@ -188,7 +189,6 @@ def article(url):
             if re.fullmatch(r"Últimas\s+Notícias",txt,re.I):
                 break
 
-        # Ignore anything living in obvious page chrome/widgets.
         bad_parent=False
         for parent in node.parents:
             if getattr(parent,"name",None) in ("nav","header","footer","form"):
@@ -200,14 +200,36 @@ def article(url):
         if bad_parent:
             continue
 
-        if node.name=="img":
-            src=node_image(node)
-            alt=(node.get("alt") or "").strip()
-            if src and text_started and not re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin|youtube|instagram)",src+" "+alt,re.I):
-                key=("img",src)
-                if key not in seen:
-                    seen.add(key)
-                    blocks.append('<img src="'+h.escape(src,quote=True)+'">')
+        # Detect article images even when the CMS puts the real file in href,
+        # data-srcset, data-image, etc. This catches Torreense /source/... media.
+        media_candidates=[]
+        if hasattr(node,"get"):
+            for attr in ("src","data-src","data-lazy-src","data-original","data-image","href","srcset","data-srcset"):
+                value=node.get(attr)
+                if not value:
+                    continue
+                vals=[x.strip().split(" ")[0] for x in value.split(",")] if "srcset" in attr else [value]
+                media_candidates.extend(vals)
+
+        media_added=False
+        for candidate in media_candidates:
+            src=normalise_image(candidate)
+            if not src:
+                continue
+            pathpart=urllib.parse.urlparse(src).path.lower()
+            if not ("/source/" in pathpart or re.search(r"\.(?:png|jpe?g|webp|gif)$",pathpart,re.I)):
+                continue
+            if re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin|youtube|instagram)",src,re.I):
+                continue
+            key=("img",src)
+            if key not in seen and text_started:
+                seen.add(key)
+                blocks.append('<img src="'+h.escape(src,quote=True)+'">')
+                media_added=True
+        if node.name in ("img","picture","source") or media_added:
+            continue
+
+        if node.name not in ("h2","h3","p","li"):
             continue
 
         txt=node.get_text(" ",strip=True)
@@ -218,13 +240,12 @@ def article(url):
         if txt==title:
             continue
 
-        # Nested semantic tags can repeat the exact same text; keep one copy only.
         key=(node.name,txt)
         if key in seen:
             continue
         seen.add(key)
 
-        tag=node.name if node.name in ("h2","h3","p","li") else "p"
+        tag=node.name
         blocks.append("<"+tag+">"+h.escape(txt)+"</"+tag+">")
         text_parts.append(txt)
         text_started=True
