@@ -85,6 +85,9 @@ def article(url):
     body=doc
     body=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>"," ",body,flags=re.I)
 
+    # Diagnostic fallback: the Torreense CMS may not expose the visible title in h1/p/div
+    # in the raw HTML. In that case, extract the full visible text between the page title
+    # and the "Últimas Notícias" marker after stripping chrome.
     # Work with blocks in source order. Start at the block that contains the title
     # and stop when reaching the "Últimas Notícias" section.
     blocks=[]
@@ -104,6 +107,26 @@ def article(url):
             break
 
     if start_i is None:
+        visible=clean(body)
+        low=visible.lower()
+        t=title.lower().strip()
+        p=low.find(t) if t else -1
+        q=low.find("últimas notícias",p+len(t)) if p>=0 else -1
+        if p>=0:
+            rawtxt=visible[p+len(title): q if q>p else None].strip()
+            rawtxt=re.sub(r"^(?:Bilheteira|Loja|Clube|História|Palmarés|Instalações|SAD|Estatutos|Órgãos Sociais|Contactos)\\b[:\\s•|-]*","",rawtxt,flags=re.I)
+            if len(rawtxt)>=40:
+                text=rawtxt
+                content_html="<p>"+h.escape(rawtxt)+"</p>"
+                category="TORREENSE"
+                if re.search(r"\\bFutebol\\b",visible,re.I): category="FUTEBOL"
+                elif re.search(r"\\bClube\\b",visible,re.I): category="CLUBE"
+                published=None
+                dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",visible,re.I)
+                if dm:
+                    months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
+                    published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
+                return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":content_html[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
         print("ARTICLE_CONTENT_NOT_FOUND",url)
         return None
 
