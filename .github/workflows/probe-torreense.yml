@@ -1,5 +1,5 @@
 name: Probe Torreense Store
-# storefront API scan trigger
+# product options trigger
 
 on:
   push:
