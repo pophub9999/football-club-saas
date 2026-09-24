@@ -39,37 +39,51 @@ def find_partners(node):
 
 def extract_partners(html):
     soup=BeautifulSoup(html,"html.parser")
+    prefix="self.__next_f.push("
     for sc in soup.find_all("script"):
         txt=sc.string or sc.get_text() or ""
-        if '"partners"' not in txt and '\"partners\"' not in txt:
+        if "partners" not in txt or prefix not in txt:
             continue
-        for m in re.finditer(r"self\.__next_f\.push\((\[.*?\])\)\s*;?",txt,re.S):
-            raw=m.group(1)
+        pos=0
+        while True:
+            i=txt.find(prefix,pos)
+            if i<0:break
+            raw=txt[i+len(prefix):]
+            # One Next.js flight push per script in the current page. Use the
+            # last closing parenthesis so brackets inside the encoded payload
+            # cannot truncate the JSON.
+            j=raw.rfind(")")
+            if j<0:break
+            raw=raw[:j].strip().rstrip(";")
             try:
                 outer=json.loads(raw)
             except Exception:
+                pos=i+len(prefix)
                 continue
-            if not isinstance(outer,list) or len(outer)<2 or not isinstance(outer[1],str):
-                continue
-            payload=outer[1]
-            # Next.js RSC entries are prefixed like "5:".
-            candidate=payload.split(":",1)[1] if ":" in payload else payload
-            try:
-                obj=json.loads(candidate)
-            except Exception:
-                continue
-            partners=find_partners(obj)
-            if partners is not None:
-                return partners
+            if isinstance(outer,list) and len(outer)>=2 and isinstance(outer[1],str):
+                payload=outer[1]
+                candidate=payload.split(":",1)[1] if ":" in payload else payload
+                try:
+                    obj=json.loads(candidate)
+                    partners=find_partners(obj)
+                    if partners is not None:
+                        return partners
+                except Exception:
+                    # Even if the whole RSC fragment changes, the decoded
+                    # string still contains ordinary JSON for the partners.
+                    marker='"partners":'
+                    k=payload.find(marker)
+                    if k>=0:
+                        tail=payload[k+len(marker):].lstrip()
+                        if tail.startswith("["):
+                            try:
+                                arr,_=json.JSONDecoder().raw_decode(tail)
+                                if isinstance(arr,list) and arr:
+                                    return arr
+                            except Exception:
+                                pass
+            pos=i+len(prefix)
 
-    # Fallback for source changes: decode quoted partners JSON directly.
-    m=re.search(r'\\"partners\\":(\[.*?\])[,}]',html,re.S)
-    if m:
-        try:
-            arr=json.loads(m.group(1).replace('\\"','"'))
-            if isinstance(arr,list):return arr
-        except Exception:
-            pass
     raise RuntimeError("Could not extract Torreense partner JSON")
 
 def pct_label(v):
