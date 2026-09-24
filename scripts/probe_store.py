@@ -66,3 +66,25 @@ for idx,sc in enumerate(s.find_all("script")):
     if body and ("products" in body or "categories" in body):
         print("INLINE_SCRIPT",idx,"type=",sc.get("type"),"len=",len(body))
         print(body[:15000])
+
+print("\nASSET_API_SCAN")
+html=get(BASE+"/products")
+asset_urls=sorted(set(urllib.parse.urljoin(BASE,m) for m in re.findall(r'["\']([^"\']+/_app/immutable/[^"\']+\.js)["\']',html)))
+print("ASSETS",len(asset_urls))
+for u in asset_urls[:150]:
+    try:
+        js=get(u)
+    except Exception as e:
+        continue
+    low=js.lower()
+    if any(k in low for k in ["mbway","multibanco","checkout","payment","cart","/api/"]):
+        print("ASSET_MATCH",u,"LEN",len(js))
+        for key in ["mbway","multibanco","checkout","payment","cart","/api/"]:
+            pos=0
+            hits=0
+            while hits<8:
+                i=low.find(key,pos)
+                if i<0: break
+                snippet=re.sub(r"\s+"," ",js[max(0,i-500):i+1200])
+                print("CTX",key,snippet)
+                pos=i+len(key);hits+=1
