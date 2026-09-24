@@ -158,8 +158,8 @@ def existing_test_article(url):
     map_img=cache_image(map_remote,"torreense/"+slug+"/map.jpg")
 
     # Remove old copies first so repeated test syncs stay deterministic.
-    content_html=re.sub(r'<img\\b[^>]*src=["\\'][^"\\']*(?:prices\\.png|Captura[^"\\']*)["\\'][^>]*>','',content_html,flags=re.I)
-    content_html=re.sub(r'<img\\b[^>]*src=["\\'][^"\\']*(?:map\\.jpg|MapaEstadio[^"\\']*)["\\'][^>]*>','',content_html,flags=re.I)
+    content_html=re.sub(r"<img\\b[^>]*src=[\"'][^\"']*(?:prices\\.png|Captura[^\"']*)[\"'][^>]*>","",content_html,flags=re.I)
+    content_html=re.sub(r"<img\\b[^>]*src=[\"'][^\"']*(?:map\\.jpg|MapaEstadio[^\"']*)[\"'][^>]*>","",content_html,flags=re.I)
 
     if re.search(r"Os preços são os seguintes:",content_html,re.I):
         content_html=re.sub(
