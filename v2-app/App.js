@@ -415,7 +415,7 @@ export default function App(){
    <View style={s.benefitCardTop}><View style={s.benefitNameWrap}><Text style={s.benefitName}>{b.business_name}</Text><Text style={s.benefitCategory}>{b.category||'Parceiro'}</Text></View><View style={s.benefitDiscount}><Text style={s.benefitDiscountText}>{b.discount_label||(b.discount_pct!=null?'−'+Number(b.discount_pct)+'%':'VANTAGEM')}</Text></View></View>
    {b.discount_conditions?<Text style={s.benefitConditions}>{b.discount_conditions}</Text>:null}
    {b.address?<Text style={s.benefitAddress}>⌖ {b.address}</Text>:b.locality?<Text style={s.benefitAddress}>⌖ {b.locality}</Text>:null}
-   {b.maps_url?<Pressable onPress={()=>openOfficialStore(b.maps_url)} style={s.benefitMapBtn}><Text style={s.benefitMapText}>ABRIR NO MAPA</Text><Text style={s.benefitMapArrow}>›</Text></Pressable>:null}
+   {b.maps_url?<Pressable onPress={()=>openOfficialStore(b.maps_url)} style={s.benefitMapBtn}><Text style={s.benefitMapText}>ABRIR NO MAPA</Text><Text style={s.benefitMapArrow}>›</Text></Pressable>:b.source_url?<Pressable onPress={()=>openOfficialStore(b.source_url)} style={s.benefitMapBtn}><Text style={s.benefitMapText}>VER NO SITE OFICIAL</Text><Text style={s.benefitMapArrow}>›</Text></Pressable>:null}
   </View>):<View style={s.infoCard}><Text style={s.muted}>Não foram encontrados parceiros com estes filtros.</Text></View>}
  </Page>;
  if(screen==='store')return <Page><Back title="LOJA"/>
