@@ -1,7 +1,5 @@
 name: Sync Torreense Data
-# schema-only trigger
-# cache schema probe
-# Sync trigger: leading article images
+# Sync trigger: team logos and player photos
 
 on:
   workflow_dispatch:
