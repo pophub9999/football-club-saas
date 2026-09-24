@@ -1,5 +1,5 @@
 name: Probe Torreense Store
-# current 360imprimir store trigger
+# hydration data trigger
 
 on:
   push:
