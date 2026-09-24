@@ -1,5 +1,5 @@
 name: Probe Torreense Store
-# add-to-cart request trigger
+# current 360imprimir store trigger
 
 on:
   push:
