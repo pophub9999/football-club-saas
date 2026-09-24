@@ -118,7 +118,7 @@ def article(url):
             if value:safe.append("<"+tag+">"+h.escape(value)+"</"+tag+">")
         else:
             attrs=m.group(3) or ""
-            sm=re.search(r'(?:src|data-src)=["\\']([^"\\']+)["\\']',attrs,re.I)
+            sm=re.search(r"(?:src|data-src)=[\"']([^\"']+)[\"']",attrs,re.I)
             if sm:
                 src=urllib.parse.urljoin("https://www.torreense.com/",h.unescape(sm.group(1)))
                 if not re.search(r"logo|icon",src,re.I):safe.append('<img src="'+h.escape(src,quote=True)+'">')
