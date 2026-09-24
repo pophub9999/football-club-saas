@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: collapse broken article images
+# Deploy trigger: original article images only
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
