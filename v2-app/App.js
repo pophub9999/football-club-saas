@@ -41,8 +41,17 @@ function fmtDate(iso){
 }
 function cleanHtml(v=''){return v.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();}
 function toDate(ev){return ev?.strTimestamp||(ev?.dateEvent?ev.dateEvent+'T'+(ev.strTime||'00:00:00'):null);}
+function cleanNewsTitle(v=''){return v.replace(/\s*\|\s*(?:Site Oficial do )?Torreense\s*$/i,'').trim();}
+function cleanNewsText(v=''){
+ let x=cleanHtml(v||'');
+ const share=x.toLowerCase().lastIndexOf('partilhar notícia:');
+ if(share>=0)x=x.slice(share+'partilhar notícia:'.length).trim();
+ const latest=x.toLowerCase().indexOf('últimas notícias');
+ if(latest>=0)x=x.slice(0,latest).trim();
+ return x.replace(/^(?:facebook|twitter|linkedin|x)\b[\s:|•-]*/i,'').trim();
+}
 function articleBlocks(html='',fallback=''){
- if(!html)return fallback?fallback.split(/\n\s*\n/).filter(Boolean).map(text=>({type:'p',text})):[];
+ if(!html)return fallback?cleanNewsText(fallback).split(/\n\s*\n/).filter(Boolean).map(text=>({type:'p',text})):[];
  let body=html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ');
  const blocks=[];
  const re=/<(h1|h2|h3|p|li|img)\b([^>]*)>([\s\S]*?)<\/\1>|<img\b([^>]*)\/?>/gi;
@@ -53,7 +62,7 @@ function articleBlocks(html='',fallback=''){
    const sm=attrs.match(/(?:src|data-src)=["']([^"']+)["']/i);
    if(sm?.[1]&&!/logo|icon/i.test(sm[1]))blocks.push({type:'img',src:sm[1]});
   }else{
-   const text=cleanHtml(inside);
+   const text=cleanNewsText(inside);
    if(text&&text.length>1)blocks.push({type:tag==='li'?'li':tag[0]==='h'?'h':'p',text});
   }
  }
@@ -151,7 +160,7 @@ export default function App(){
   </>}</Page>
  }
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
- if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{selectedNews?.title}</Text>{selectedNews?.hero?<Image source={{uri:selectedNews.hero}} style={{width:'100%',height:190,borderRadius:12,marginBottom:16}} resizeMode="cover"/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body).map((b,i)=>b.type==='img'?<Image key={i} source={{uri:b.src}} style={{width:'100%',height:210,borderRadius:10,marginVertical:10}} resizeMode="cover"/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
+ if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{cleanNewsTitle(selectedNews?.title||'')}</Text>{selectedNews?.hero?<Image source={{uri:selectedNews.hero}} style={{width:'100%',height:190,borderRadius:12,marginBottom:16}} resizeMode="cover"/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body).map((b,i)=>b.type==='img'?<Image key={i} source={{uri:b.src}} style={{width:'100%',height:210,borderRadius:10,marginVertical:10}} resizeMode="cover"/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
  if(screen==='calendar')return <Page><Back title="CALENDÁRIO"/><ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sports.map(x=><Pressable key={x} onPress={()=>setSport(x)} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}</ScrollView>{calendarLoading?<ActivityIndicator/>:filtered.length?filtered.map(x=><View key={x.id} style={s.eventCard}><View style={s.dateBox}><Text style={s.dateBoxText}>{x.date}</Text><Text style={s.eventType}>{x.type}</Text></View><View style={s.eventBody}><Text style={s.eventSport}>{x.sport} · {x.round}</Text><Text style={s.eventTitle}>{x.title}</Text><Text style={s.muted}>{x.time}</Text></View></View>):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem eventos publicados para esta modalidade.</Text></View>}</Page>;
 
  const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
