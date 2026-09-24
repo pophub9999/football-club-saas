@@ -68,7 +68,6 @@ def article(url):
     doc=get(url)
 
     def meta_value(key):
-        # Attribute order on meta tags is not guaranteed.
         for tag in re.findall(r"<meta\\b[^>]*>",doc,re.I):
             if re.search(r"(?:property|name)=[\"']"+re.escape(key)+r"[\"']",tag,re.I):
                 m=re.search(r"content=[\"']([^\"']*)[\"']",tag,re.I)
@@ -82,56 +81,67 @@ def article(url):
     title=re.sub(r"\\s*\\|\\s*Site Oficial do Torreense\\s*$","",title,flags=re.I).strip()
     img=meta_value("og:image")
 
-    # The Torreense CMS page has a reliable visible boundary:
-    # article starts at its H1 and ends before "Últimas Notícias".
-    # Extract this exact region instead of generic containers that include menus/footer.
-    section=""
-    h1s=list(re.finditer(r"<h1\\b[^>]*>([\\s\\S]*?)</h1>",doc,re.I))
-    chosen=None
-    for hm in h1s:
-        ht=clean(hm.group(1))
-        if title and (ht.lower()==title.lower() or title.lower() in ht.lower() or ht.lower() in title.lower()):
-            chosen=hm
+    # Remove non-content chrome first, then locate the article by visible text.
+    body=doc
+    body=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>"," ",body,flags=re.I)
+
+    # Work with blocks in source order. Start at the block that contains the title
+    # and stop when reaching the "Últimas Notícias" section.
+    blocks=[]
+    for m in re.finditer(r"<(h1|h2|h3|p|li|div)\\b[^>]*>([\\s\\S]*?)</\\1>|<img\\b([^>]*)/?>",body,re.I):
+        tag=(m.group(1) or "img").lower()
+        if tag=="img":
+            attrs=m.group(3) or ""
+            sm=re.search(r"(?:src|data-src)=[\"']([^\"']+)[\"']",attrs,re.I)
+            blocks.append(("img", urllib.parse.urljoin("https://www.torreense.com/",h.unescape(sm.group(1))) if sm else ""))
+        else:
+            blocks.append((tag, clean(m.group(2))))
+
+    start_i=None
+    for i,(tag,txt) in enumerate(blocks):
+        if title and txt and (txt.lower()==title.lower() or title.lower() in txt.lower() or txt.lower() in title.lower()):
+            start_i=i+1
             break
-    if not chosen and h1s: chosen=h1s[0]
 
-    if chosen:
-        tail=doc[chosen.end():]
-        stop=re.search(r"<h[1-6]\\b[^>]*>\\s*(?:<[^>]+>\\s*)*Últimas\\s+Notícias(?:\\s*</[^>]+>)*\\s*</h[1-6]>",tail,re.I)
-        article_html=tail[:stop.start()] if stop else tail
-        # Remove chrome/widgets defensively.
-        article_html=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>","",article_html,flags=re.I)
-        section=article_html.strip()
+    if start_i is None:
+        print("ARTICLE_CONTENT_NOT_FOUND",url)
+        return None
 
-    text=clean(section)
+    useful=[]
+    for tag,txt in blocks[start_i:]:
+        if txt and re.search(r"^Últimas\\s+Notícias$",txt,re.I):
+            break
+        if tag=="img":
+            if txt and not re.search(r"logo|icon|sprite",txt,re.I):
+                useful.append(("img",txt))
+        elif txt:
+            useful.append((tag,txt))
+
+    # Remove obvious repeated navigation labels that can still exist in generic divs.
+    noise={"Bilheteira","Loja","Clube","História","Palmarés","Instalações","SAD","Estatutos","Órgãos Sociais","Contactos"}
+    useful=[(tag,txt) for tag,txt in useful if not (tag!="img" and txt.strip() in noise)]
+
+    text=" ".join(txt for tag,txt in useful if tag!="img").strip()
     if len(text)<40:
         print("ARTICLE_CONTENT_NOT_FOUND",url)
         return None
 
-    # Preserve useful article structure only. This prevents surrounding CMS UI
-    # from ever reaching the app while keeping paragraphs/headings/lists/images.
     safe=[]
-    for m in re.finditer(r"<(h2|h3|p|li)\\b[^>]*>([\\s\\S]*?)</\\1>|<img\\b([^>]*)/?>",section,re.I):
-        if m.group(1):
-            tag=m.group(1).lower()
-            value=clean(m.group(2))
-            if value:safe.append("<"+tag+">"+h.escape(value)+"</"+tag+">")
+    for tag,txt in useful:
+        if tag=="img":
+            safe.append('<img src="'+h.escape(txt,quote=True)+'">')
         else:
-            attrs=m.group(3) or ""
-            sm=re.search(r"(?:src|data-src)=[\"']([^\"']+)[\"']",attrs,re.I)
-            if sm:
-                src=urllib.parse.urljoin("https://www.torreense.com/",h.unescape(sm.group(1)))
-                if not re.search(r"logo|icon",src,re.I):safe.append('<img src="'+h.escape(src,quote=True)+'">')
+            outtag=tag if tag in ("h2","h3","p","li") else "p"
+            safe.append("<"+outtag+">"+h.escape(txt)+"</"+outtag+">")
     content_html="".join(safe)
-    if not content_html: content_html="<p>"+h.escape(text)+"</p>"
 
     category="TORREENSE"
-    pre=doc[max(0,(chosen.start() if chosen else 0)-1500):(chosen.start() if chosen else 0)]
-    if re.search(r">\\s*Futebol\\s*<",pre,re.I): category="FUTEBOL"
-    elif re.search(r">\\s*Clube\\s*<",pre,re.I): category="CLUBE"
+    plain=clean(doc)
+    if re.search(r"\\bFutebol\\b",plain,re.I): category="FUTEBOL"
+    elif re.search(r"\\bClube\\b",plain,re.I): category="CLUBE"
 
     published=None
-    dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",clean(pre),re.I)
+    dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",plain,re.I)
     if dm:
         months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
         published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
