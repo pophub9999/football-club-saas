@@ -51,31 +51,46 @@ function cleanNewsText(v=''){
  return x.replace(/^(?:facebook|twitter|linkedin|x)\b[\s:|•-]*/i,'').trim();
 }
 function bustUrl(uri,version){if(!uri)return uri;const sep=uri.includes('?')?'&':'?';return uri+sep+'v='+encodeURIComponent(version||Date.now());}
-function ArticleImage({uri,hero=false,version=''}){
+function ArticleImage({uri,hero=false}){
+ const {width,height}=useWindowDimensions();
  if(!uri)return null;
- const src=bustUrl(uri,version);
+
  const isPrice=/prices\.png|Captura/i.test(uri);
  const isMap=/map\.jpg|MapaEstadio/i.test(uri);
- const ratio=isPrice?(1000/170):isMap?(1000/920):1.8;
+ const canvasWidth=Math.min(width,height/2);
+ const imageWidth=Math.max(120,canvasWidth*.89-28);
+ const imageHeight=isPrice
+   ? imageWidth/(1000/170)
+   : isMap
+     ? imageWidth/(1000/920)
+     : imageWidth/1.8;
 
- return <View style={{
+ const frameStyle={
   width:'100%',
-  aspectRatio:ratio,
+  height:imageHeight,
   alignSelf:'center',
   marginTop:hero?0:10,
   marginBottom:hero?16:10,
   overflow:'hidden',
   borderRadius:hero?12:10
- }}>
-  {Platform.OS==='web'
-   ?React.createElement('img',{
-      src:src,alt:'',
-      style:{
-       position:'absolute',left:0,top:0,width:'100%',height:'100%',
-       objectFit:'contain',display:'block'
-      }
-    })
-   :<Image source={{uri:src}} resizeMode="contain" style={StyleSheet.absoluteFillObject}/>}
+ };
+
+ if(Platform.OS==='web'){
+  return <View style={frameStyle}>
+   {React.createElement('img',{
+    src:uri,
+    alt:'',
+    style:{
+     position:'absolute',left:0,top:0,
+     width:'100%',height:'100%',
+     objectFit:'contain',display:'block'
+    }
+   })}
+  </View>;
+ }
+
+ return <View style={frameStyle}>
+  <Image source={{uri}} resizeMode="contain" style={StyleSheet.absoluteFillObject}/>
  </View>;
 }
 
