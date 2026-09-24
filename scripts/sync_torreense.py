@@ -395,6 +395,7 @@ def article(url):
 
 def main():
     print_cache_schema()
+    return  # temporary schema probe
     urls=discover_news()
 
     # If archive discovery is temporarily incomplete, keep any URLs already
