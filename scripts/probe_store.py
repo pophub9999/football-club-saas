@@ -68,3 +68,15 @@ for a in s.find_all("a",href=True):
 for t,u in allp[:200]: print("PATHLINK",repr(t),u)
 for m in sorted(set(re.findall(r'path(?:=|%3D)([0-9_]+)',html,re.I))):
     print("PATHID",m)
+
+print("CART_ROUTE_PATTERNS")
+sample=get("https://www.torreense.com/loja/index.php?route=product/product&product_id=297936553")
+for pat in [
+    r'index\.php\?route=[^"\'\s<>]+',
+    r'route=[^&"\'\s<>]*cart[^"\'\s<>]*',
+    r'checkout[^"\'\s<>]{0,120}',
+]:
+    vals=sorted(set(re.findall(pat,sample,re.I)))
+    for v in vals[:100]:
+        if "cart" in v.lower() or "checkout" in v.lower():
+            print("ROUTE",v)
