@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os,re,json,html as h,urllib.request,urllib.parse,subprocess,sys
+import os,re,json,html as h,urllib.request,urllib.parse,urllib.error,subprocess,sys
 from datetime import datetime,timezone
 try:
     from bs4 import BeautifulSoup
@@ -33,6 +33,52 @@ def image_ok(url):
         ok=False
     _IMAGE_OK[url]=ok
     return ok
+
+def ensure_news_bucket():
+    payload=json.dumps({"id":"news","name":"news","public":True}).encode()
+    req=urllib.request.Request(
+        BASE+"/storage/v1/bucket",
+        data=payload,
+        method="POST",
+        headers={"Authorization":"Bearer "+KEY,"apikey":KEY,"Content-Type":"application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req,timeout=20):
+            pass
+    except urllib.error.HTTPError as e:
+        # 400/409 normally means the bucket already exists.
+        if e.code not in (400,409):
+            raise
+
+def cache_image(remote_url,object_path):
+    ensure_news_bucket()
+    req=urllib.request.Request(remote_url,headers=UA)
+    with urllib.request.urlopen(req,timeout=25) as r:
+        data=r.read()
+        ctype=(r.headers.get("Content-Type") or "application/octet-stream").split(";")[0]
+    if not ctype.startswith("image/"):
+        raise RuntimeError("Not an image: "+remote_url+" -> "+ctype)
+
+    encoded="/".join(urllib.parse.quote(x,safe="") for x in object_path.split("/"))
+    up=urllib.request.Request(
+        BASE+"/storage/v1/object/news/"+encoded,
+        data=data,
+        method="POST",
+        headers={
+            "Authorization":"Bearer "+KEY,
+            "apikey":KEY,
+            "Content-Type":ctype,
+            "x-upsert":"true"
+        }
+    )
+    try:
+        with urllib.request.urlopen(up,timeout=25):
+            pass
+    except urllib.error.HTTPError as e:
+        detail=e.read().decode("utf-8","ignore")
+        raise RuntimeError("Storage upload failed "+str(e.code)+" "+detail)
+
+    return BASE+"/storage/v1/object/public/news/"+encoded
 
 def get(url):
     req=urllib.request.Request(url,headers=UA)
@@ -258,17 +304,20 @@ def article(url):
 
     content_html="".join(blocks) if blocks else "<p>"+h.escape(text)+"</p>"
 
-    # TEMPORARY test fallback for the single article under validation.
-    # The official page exposes these two inline images and the browser can load them,
-    # but the CMS markup is not exposing their URLs consistently to the parser.
-    # Inject them at the exact semantic positions so we can validate app rendering.
+    # TEMPORARY single-article validation: mirror the two verified official
+    # content images into our own Supabase Storage, then reference our CDN URLs.
+    # This removes Torreense hotlink/CMS behaviour from the app path entirely.
     if url.rstrip("/")==TEST_NEWS_URL.rstrip("/"):
-        price_img="https://www.torreense.com/source/Captura%20de%20ecra%CC%83%202026-09-23%2C%20a%CC%80s%2021.18.46.png"
-        map_img="https://www.torreense.com/source/MapaEstadioLeiria.jpg"
+        slug=url.rstrip("/").split("/")[-1]
+        price_remote="https://www.torreense.com/source/Captura%20de%20ecra%CC%83%202026-09-23%2C%20a%CC%80s%2021.18.46.png"
+        map_remote="https://www.torreense.com/source/MapaEstadioLeiria.jpg"
+        price_img=cache_image(price_remote,"torreense/"+slug+"/prices.png")
+        map_img=cache_image(map_remote,"torreense/"+slug+"/map.jpg")
+
         if price_img not in content_html:
             content_html=re.sub(
                 r"(<p>[^<]*Os preços são os seguintes:[^<]*</p>)",
-                r'\\1<img src="'+h.escape(price_img,quote=True)+'">',
+                lambda m:m.group(1)+'<img src="'+h.escape(price_img,quote=True)+'">',
                 content_html,
                 count=1,
                 flags=re.I
@@ -276,7 +325,7 @@ def article(url):
         if map_img not in content_html:
             content_html=re.sub(
                 r"(<p>[^<]*consulte o mapa:[^<]*</p>)",
-                r'\\1<img src="'+h.escape(map_img,quote=True)+'">',
+                lambda m:m.group(1)+'<img src="'+h.escape(map_img,quote=True)+'">',
                 content_html,
                 count=1,
                 flags=re.I
