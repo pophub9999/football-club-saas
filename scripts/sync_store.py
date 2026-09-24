@@ -30,7 +30,8 @@ def api(path,method="GET",data=None,prefer=None):
 def js_string(raw):
     if raw is None:return None
     try:return json.loads('"'+raw+'"')
-    except:return raw.replace(r'\"','"').replace(r"\/", "/").replace(r"\\","\")
+    except:
+        return raw.replace('\\/','/').replace('\\\"','"')
 
 def discover_categories(doc):
     out={}
