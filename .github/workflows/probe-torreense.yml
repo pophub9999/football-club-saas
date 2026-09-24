@@ -1,4 +1,5 @@
 name: Probe Torreense Store
+# store path trigger
 
 on:
   push:
