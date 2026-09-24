@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: final multi-modality calendar
+# Deploy trigger: store catalog and cart
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
