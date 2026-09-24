@@ -1,0 +1,20 @@
+name: Probe Torreense Pages
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/probe-torreense.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/probe_torreense_pages.py
