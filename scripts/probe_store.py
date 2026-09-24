@@ -80,3 +80,12 @@ for pat in [
     for v in vals[:100]:
         if "cart" in v.lower() or "checkout" in v.lower():
             print("ROUTE",v)
+
+print("CART_ADD_CONTEXT")
+for needle in ["checkout/cart/add","checkout\\/cart\\/add"]:
+    pos=0
+    while True:
+        i=sample.find(needle,pos)
+        if i<0: break
+        print("CONTEXT",re.sub(r"\\s+"," ",sample[max(0,i-700):i+1400]))
+        pos=i+len(needle)
