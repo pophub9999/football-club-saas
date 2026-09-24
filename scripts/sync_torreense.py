@@ -181,7 +181,14 @@ def main():
         except Exception as e:print("article failed",u,e)
     if not rows:
         raise RuntimeError("No Torreense news discovered/imported; failing sync instead of reporting false success")
-    api("news?on_conflict=url","POST",rows)
+    # Replace the Torreense snapshot atomically from the app's point of view:
+    # remove previous Torreense rows, then insert the freshly extracted set.
+    # This avoids duplicate rows even if historical records were created before
+    # URL upsert/conflict handling was reliable.
+    delete_headers={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"}
+    api("news?source=eq.torreense","DELETE",headers=delete_headers)
+    insert_headers={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"}
+    api("news","POST",rows,headers=insert_headers)
     now=datetime.now(timezone.utc).isoformat()
     status={"source":"torreense_news","last_sync":now,"last_success":now,"status":"success","message":"Official Torreense news sync","items_processed":len(rows),"updated_at":now}
     api("sync_status?on_conflict=source","POST",[status])
