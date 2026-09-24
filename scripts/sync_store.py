@@ -168,7 +168,7 @@ def parse_product(url,category_id):
 
     imgs=image_candidates(soup,name)
     cached=[]
-    for i,src in enumerate(imgs[:8]):
+    for i,src in enumerate(imgs[:1]):
         try:
             ext=os.path.splitext(urllib.parse.urlparse(src).path)[1].lower()
             if ext not in (".png",".jpg",".jpeg",".webp",".gif"):ext=".jpg"
@@ -183,7 +183,7 @@ def parse_product(url,category_id):
       "description_text":desc[:12000] if desc else None,
       "price":price,"currency":"EUR","stock_status":stock or None,"in_stock":in_stock,
       "image_url":cached[0] if cached else (imgs[0] if imgs else None),
-      "images":cached or imgs[:8],"options":options,"active":True,
+      "images":cached or imgs[:1],"options":options,"active":True,
       "raw_data":{"official_url":url,"product_id":pid},
       "updated_at":datetime.now(timezone.utc).isoformat()
     }
