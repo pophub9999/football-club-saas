@@ -68,7 +68,7 @@ def article(url):
     doc=get(url)
 
     def meta_value(key):
-        for tag in re.findall(r"<meta\b[^>]*>",doc,re.I):
+        for tag in re.findall(r"<meta\\b[^>]*>",doc,re.I):
             if re.search(r"(?:property|name)=[\"']"+re.escape(key)+r"[\"']",tag,re.I):
                 m=re.search(r"content=[\"']([^\"']*)[\"']",tag,re.I)
                 if m:return h.unescape(m.group(1)).strip()
@@ -78,105 +78,48 @@ def article(url):
     if not title:
         m=re.search(r"<title>(.*?)</title>",doc,re.I|re.S)
         title=clean(m.group(1)) if m else ""
-    title=re.sub(r"\s*\|\s*(?:Site Oficial do )?Torreense\s*$","",title,flags=re.I).strip()
+    title=re.sub(r"\\s*\\|\\s*(?:Site Oficial do )?Torreense\\s*$","",title,flags=re.I).strip()
     img=meta_value("og:image")
 
-    # Remove non-content chrome first, then locate the article by visible text.
-    body=doc
-    body=re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<nav[\s\S]*?</nav>|<footer[\s\S]*?</footer>|<header[\s\S]*?</header>|<form[\s\S]*?</form>"," ",body,flags=re.I)
+    body=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>"," ",doc,flags=re.I)
+    visible=clean(body)
 
-    # Diagnostic fallback: the Torreense CMS may not expose the visible title in h1/p/div
-    # in the raw HTML. In that case, extract the full visible text between the page title
-    # and the "Últimas Notícias" marker after stripping chrome.
-    # Work with blocks in source order. Start at the block that contains the title
-    # and stop when reaching the "Últimas Notícias" section.
-    blocks=[]
-    for m in re.finditer(r"<(h1|h2|h3|p|li|div)\b[^>]*>([\s\S]*?)</\1>|<img\b([^>]*)/?>",body,re.I):
-        tag=(m.group(1) or "img").lower()
-        if tag=="img":
-            attrs=m.group(3) or ""
-            sm=re.search(r"(?:src|data-src)=[\"']([^\"']+)[\"']",attrs,re.I)
-            blocks.append(("img", urllib.parse.urljoin("https://www.torreense.com/",h.unescape(sm.group(1))) if sm else ""))
-        else:
-            blocks.append((tag, clean(m.group(2))))
-
-    start_i=None
-    for i,(tag,txt) in enumerate(blocks):
-        if title and txt and (txt.lower()==title.lower() or title.lower() in txt.lower() or txt.lower() in title.lower()):
-            start_i=i+1
-            break
-
-    if start_i is None:
-        visible=clean(body)
-        low=visible.lower()
-        t=title.lower().strip()
-        p=low.rfind(t) if t else -1
-        q=low.find("últimas notícias",p+len(t)) if p>=0 else -1
-        if p>=0:
-            rawtxt=visible[p+len(title): q if q>p else None].strip()
-            rawtxt=re.sub(r"^.*?Partilhar\s+notícia:\s*","",rawtxt,flags=re.I|re.S)
-            rawtxt=re.sub(r"^(?:Bilheteira|Loja|Clube|História|Palmarés|Instalações|SAD|Estatutos|Órgãos Sociais|Contactos)\b[:\s•|-]*","",rawtxt,flags=re.I)
-            if len(rawtxt)>=40:
-                text=rawtxt
-                content_html="<p>"+h.escape(rawtxt)+"</p>"
-                category="TORREENSE"
-                if re.search(r"\bFutebol\b",visible,re.I): category="FUTEBOL"
-                elif re.search(r"\bClube\b",visible,re.I): category="CLUBE"
-                published=None
-                dm=re.search(r"\b(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(20\d{2})\b",visible,re.I)
-                if dm:
-                    months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
-                    published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
-                return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":content_html[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
+    low=visible.lower()
+    t=title.lower().strip()
+    p=low.rfind(t) if t else -1
+    if p<0:
         print("ARTICLE_CONTENT_NOT_FOUND",url)
         return None
 
-    useful=[]
-    stop_markers=re.compile(r"^(?:Últimas\\s+Notícias|Ver\\s+todas)$",re.I)
-    share_markers=re.compile(r"^(?:Partilhar\\s+notícia:?|Partilhar:?|Facebook|X|Twitter|LinkedIn)$",re.I)
-    for tag,txt in blocks[start_i:]:
-        t=(txt or "").strip()
-        if t and stop_markers.search(t):
-            break
-        if t and share_markers.search(t):
-            continue
-        if tag=="img":
-            if t and not re.search(r"logo|icon|sprite|facebook|twitter|linkedin|share",t,re.I):
-                useful.append(("img",t))
-            continue
-        if tag=="div" or not t:
-            continue
-        useful.append((tag,t))
+    start=p+len(title)
+    q=low.find("últimas notícias",start)
+    rawtxt=visible[start:q if q>start else None].strip()
 
-    noise={"Bilheteira","Loja","Clube","História","Palmarés","Instalações","SAD","Estatutos","Órgãos Sociais","Contactos","Partilhar notícia:","Ver todas"}
-    useful=[(tag,txt) for tag,txt in useful if not (tag!="img" and txt.strip() in noise)]
+    # Remove page controls that sit between title and body.
+    rawtxt=re.sub(r"^.*?Partilhar\\s+notícia:\\s*","",rawtxt,flags=re.I|re.S)
+    rawtxt=re.sub(r"^(?:Facebook|X|Twitter|LinkedIn)\\b[:\\s•|-]*","",rawtxt,flags=re.I)
+    rawtxt=re.sub(r"\\s+Ver\\s+todas\\s*$","",rawtxt,flags=re.I)
 
-    text=" ".join(txt for tag,txt in useful if tag!="img").strip()
-    if len(text)<40:
+    if len(rawtxt)<40:
         print("ARTICLE_CONTENT_NOT_FOUND",url)
         return None
 
-    safe=[]
-    for tag,txt in useful:
-        if tag=="img":
-            safe.append('<img src="'+h.escape(txt,quote=True)+'">')
-        else:
-            outtag=tag if tag in ("h2","h3","p","li") else "p"
-            safe.append("<"+outtag+">"+h.escape(txt)+"</"+outtag+">")
-    content_html="".join(safe)
+    # Reconstruct paragraphs from common sentence boundaries so the app does not
+    # render one giant block while we avoid importing related-news/footer content.
+    parts=[x.strip() for x in re.split(r"(?<=[.!?])\\s+(?=[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ])",rawtxt) if x.strip()]
+    content_html="".join("<p>"+h.escape(x)+"</p>" for x in parts) if parts else "<p>"+h.escape(rawtxt)+"</p>"
 
     category="TORREENSE"
-    plain=clean(doc)
-    if re.search(r"\bFutebol\b",plain,re.I): category="FUTEBOL"
-    elif re.search(r"\bClube\b",plain,re.I): category="CLUBE"
+    if re.search(r"\\bFutebol\\b",visible,re.I): category="FUTEBOL"
+    elif re.search(r"\\bClube\\b",visible,re.I): category="CLUBE"
 
     published=None
-    dm=re.search(r"\b(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(20\d{2})\b",plain,re.I)
+    dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",visible,re.I)
     if dm:
         months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
         published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
 
-    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":content_html[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
+    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":rawtxt[:300],"hero_image_url":img or None,"content_text":rawtxt[:30000],"content_html":content_html[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
 
 def main():
     urls=discover_news()
