@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 SUPA=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 SOURCE_URL="https://mapa.torreense.com/mapa"
+OFFICIAL_ADV_URL="https://www.torreense.com/socio-vantagens"
 UA={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36","Accept":"text/html,*/*","Accept-Language":"pt-PT,pt;q=0.9"}
 HEAD={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json"}
 
@@ -92,6 +93,48 @@ def pct_label(v):
     shown=str(int(n)) if n.is_integer() else str(n).replace(".",",")
     return "−"+shown+"%"
 
+def norm_name(v):
+    import unicodedata
+    x=unicodedata.normalize("NFKD",str(v or ""))
+    x="".join(ch for ch in x if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+"," ",x.lower()).strip()
+
+def slug(v):
+    return re.sub(r"[^a-z0-9]+","-",norm_name(v)).strip("-")
+
+def extract_official_advantages(html):
+    soup=BeautifulSoup(html,"html.parser")
+    out=[]
+    cards=soup.select("div.col-md-6.col-lg-4.col-xl-3.text-center")
+    for card in cards:
+        img=card.find("img")
+        name=(img.get("alt") or "").strip() if img else ""
+        if not name:
+            continue
+        text=" ".join(card.get_text(" ",strip=True).split())
+        if not text:
+            continue
+        heading=card.find(["h2","h3","h4","h5","h6"])
+        label=" ".join(heading.get_text(" ",strip=True).split()) if heading else ""
+        if not label:
+            m=re.match(r"^((?:Até\s+)?\d+(?:[.,]\d+)?%\s+Desconto|Desconto Direto|Oferta[^.]+|Múltiplas Vantagens)",text,re.I)
+            label=m.group(1).strip() if m else "Vantagem de Sócio"
+        conditions=text
+        if label and conditions.lower().startswith(label.lower()):
+            conditions=conditions[len(label):].strip()
+        pct=None
+        m=re.search(r"(\d+(?:[.,]\d+)?)\s*%",label)
+        if m:
+            try:pct=float(m.group(1).replace(",","."))
+            except:pct=None
+        out.append({
+          "name":name,
+          "label":label,
+          "conditions":conditions or None,
+          "discount_pct":pct
+        })
+    return out
+
 def main():
     partners=extract_partners(get(SOURCE_URL))
     if len(partners)<50:
@@ -99,6 +142,7 @@ def main():
 
     now=datetime.now(timezone.utc).isoformat()
     rows=[]
+    by_name={}
     for p in partners:
         sid=str(p.get("id") or "").strip()
         name=str(p.get("businessName") or "").strip()
@@ -106,7 +150,7 @@ def main():
         pct=p.get("discountPct")
         try:pct=float(pct) if pct is not None else None
         except:pct=None
-        rows.append({
+        row={
           "source":"torreense_partner_map",
           "source_id":sid,
           "business_name":name,
@@ -123,21 +167,54 @@ def main():
           "active":True,
           "raw_data":p,
           "updated_at":now
+        }
+        rows.append(row)
+        by_name[norm_name(name)]=row
+
+    official=extract_official_advantages(get(OFFICIAL_ADV_URL))
+    for a in official:
+        key=norm_name(a["name"])
+        if key in by_name:
+            # Keep the richer map entry, but supplement conditions from the
+            # official advantages page when the map record is less detailed.
+            row=by_name[key]
+            if not row.get("discount_conditions") and a.get("conditions"):
+                row["discount_conditions"]=a["conditions"]
+            row["raw_data"]={**(row.get("raw_data") or {}),"official_advantage":a}
+            continue
+        rows.append({
+          "source":"torreense_advantages",
+          "source_id":"official-"+slug(a["name"]),
+          "business_name":a["name"],
+          "category":"Vantagens Oficiais",
+          "discount_pct":a.get("discount_pct"),
+          "discount_label":a.get("label") or "Vantagem de Sócio",
+          "discount_conditions":a.get("conditions"),
+          "address":None,
+          "locality":None,
+          "latitude":None,
+          "longitude":None,
+          "maps_url":None,
+          "source_url":OFFICIAL_ADV_URL,
+          "active":True,
+          "raw_data":a,
+          "updated_at":now
         })
 
-    api("member_benefits?source=eq.torreense_partner_map","PATCH",{"active":False,"updated_at":now})
+    api("member_benefits?source=in.(torreense_partner_map,torreense_advantages)","PATCH",{"active":False,"updated_at":now})
     # Send in chunks to stay well below request limits.
     for i in range(0,len(rows),50):
         api("member_benefits?on_conflict=source,source_id","POST",rows[i:i+50],"resolution=merge-duplicates,return=minimal")
 
     status={
-      "source":"torreense_partner_map","last_sync":now,"last_success":now,
-      "status":"success","message":"Official Torreense member benefits sync",
+      "source":"torreense_benefits","last_sync":now,"last_success":now,
+      "status":"success","message":"Official Torreense partner map and member advantages sync",
       "items_processed":len(rows),"updated_at":now
     }
     api("sync_status?on_conflict=source","POST",[status],"resolution=merge-duplicates,return=minimal")
     api("app_sync?id=eq.1","PATCH",{"version":int(datetime.now().timestamp()),"updated_at":now})
     print("BENEFITS_SYNCED",len(rows))
+    print("OFFICIAL_ADVANTAGES",len(official))
     print("BENEFIT_CATEGORIES",len(set(x["category"] for x in rows if x["category"])))
     print("BENEFIT_LOCALITIES",len(set(x["locality"] for x in rows if x["locality"])))
 
