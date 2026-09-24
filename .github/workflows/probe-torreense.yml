@@ -1,5 +1,5 @@
 name: Probe Torreense Store
-# store cart endpoint trigger
+# add-to-cart request trigger
 
 on:
   push:
