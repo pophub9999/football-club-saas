@@ -1,5 +1,5 @@
 name: Sync Torreense Store
-# store sync trigger: category prices
+# store sync trigger: current 360imprimir catalog
 
 on:
   workflow_dispatch:
