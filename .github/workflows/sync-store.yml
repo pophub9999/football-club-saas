@@ -1,5 +1,5 @@
 name: Sync Torreense Store
-# store sync trigger: fast catalog images
+# store sync trigger: prices and stock
 
 on:
   workflow_dispatch:
