@@ -103,9 +103,13 @@ def article(url):
         if not src:return None
         src=h.unescape(src).strip()
         if not src or src.startswith("data:") or src.startswith("blob:"):return None
-        if src.startswith("//"):return "https:"+src
-        if re.match(r"^https?://",src,re.I):return src
-        return urllib.parse.urljoin("https://www.torreense.com/",src.lstrip("/"))
+        if src.startswith("//"):src="https:"+src
+        elif not re.match(r"^https?://",src,re.I):
+            src=urllib.parse.urljoin("https://www.torreense.com/",src.lstrip("/"))
+        # Torreense currently emits a broken featured-image URL on article pages.
+        if re.search(r"/blog/images/news/featured/",src,re.I):
+            return None
+        return src
 
     def node_image(node):
         candidates=[
@@ -125,7 +129,13 @@ def article(url):
             if vals:candidates.insert(0,vals[-1])
         for candidate in candidates:
             src=normalise_image(candidate)
-            if src and image_ok(src):return src
+            if not src:
+                continue
+            # Article media hosted under /source/ is the canonical content media.
+            if "/source/" in src.lower():
+                return src
+            if image_ok(src):
+                return src
         return None
 
     # Find the visible article H1. This is the stable boundary we care about.
@@ -166,7 +176,6 @@ def article(url):
     blocks=[]
     text_parts=[]
     seen=set()
-    first_article_image=None
     text_started=False
 
     # Walk semantic elements AFTER the title and STOP at the related-news heading.
@@ -194,14 +203,11 @@ def article(url):
         if node.name=="img":
             src=node_image(node)
             alt=(node.get("alt") or "").strip()
-            if src and not re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin|youtube|instagram)",src+" "+alt,re.I):
+            if src and text_started and not re.search(r"(logo|icon|sprite|avatar|facebook|twitter|linkedin|youtube|instagram)",src+" "+alt,re.I):
                 key=("img",src)
                 if key not in seen:
                     seen.add(key)
-                    if first_article_image is None:
-                        first_article_image=src
-                    elif text_started:
-                        blocks.append('<img src="'+h.escape(src,quote=True)+'">')
+                    blocks.append('<img src="'+h.escape(src,quote=True)+'">')
             continue
 
         txt=node.get_text(" ",strip=True)
@@ -229,8 +235,8 @@ def article(url):
         return None
 
     content_html="".join(blocks) if blocks else "<p>"+h.escape(text)+"</p>"
-    meta_hero=normalise_image(meta_img)
-    hero=first_article_image or (meta_hero if image_ok(meta_hero) else None)
+    # Keep article media in its original position; no synthetic hero image.
+    hero=None
 
     return {
         "source":"torreense",
