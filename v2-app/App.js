@@ -53,13 +53,15 @@ function cleanNewsText(v=''){
 }
 function ArticleImage({uri,hero=false}){
  const {width,height}=useWindowDimensions();
- if(!uri)return null;
+ const [loaded,setLoaded]=useState(false);
+ const [failed,setFailed]=useState(false);
+ if(!uri||failed)return null;
 
  const isPrice=/prices\.png|Captura/i.test(uri);
  const isMap=/map\.jpg|MapaEstadio/i.test(uri);
  const canvasWidth=Math.min(width,height/2);
  const imageWidth=Math.max(120,canvasWidth*.89-28);
- const imageHeight=isPrice
+ const targetHeight=isPrice
    ? imageWidth/(1000/170)
    : isMap
      ? imageWidth/(1000/920)
@@ -67,10 +69,10 @@ function ArticleImage({uri,hero=false}){
 
  const frameStyle={
   width:'100%',
-  height:imageHeight,
+  height:loaded?targetHeight:0,
   alignSelf:'center',
-  marginTop:hero?0:10,
-  marginBottom:hero?16:10,
+  marginTop:loaded?(hero?0:10):0,
+  marginBottom:loaded?(hero?16:10):0,
   overflow:'hidden',
   borderRadius:hero?12:10
  };
@@ -80,6 +82,8 @@ function ArticleImage({uri,hero=false}){
    {React.createElement('img',{
     src:uri,
     alt:'',
+    onLoad:()=>setLoaded(true),
+    onError:()=>setFailed(true),
     style:{
      position:'absolute',left:0,top:0,
      width:'100%',height:'100%',
@@ -90,7 +94,13 @@ function ArticleImage({uri,hero=false}){
  }
 
  return <View style={frameStyle}>
-  <Image source={{uri}} resizeMode="contain" style={StyleSheet.absoluteFillObject}/>
+  <Image
+   source={{uri}}
+   resizeMode="contain"
+   onLoad={()=>setLoaded(true)}
+   onError={()=>setFailed(true)}
+   style={StyleSheet.absoluteFillObject}
+  />
  </View>;
 }
 
