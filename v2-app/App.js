@@ -153,6 +153,34 @@ function articleBlocks(html='',fallback='',url=''){
 }
 
 
+function playerPositionRank(position=''){
+ const p=String(position).toLowerCase();
+ if(p.includes('guarda'))return 1;
+ if(p.includes('defesa'))return 2;
+ if(p.includes('fixo'))return 2;
+ if(p.includes('médio')||p.includes('medio'))return 3;
+ if(p.includes('ala'))return 3;
+ if(p.includes('avançado')||p.includes('avancado'))return 4;
+ if(p.includes('pivô')||p.includes('pivo'))return 4;
+ return 9;
+}
+function squadTeamRank(team={}){
+ const sport=String(team.sports?.name||'').toLowerCase();
+ const gender=String(team.gender||'M').toUpperCase();
+ const isFootball=sport.includes('futebol')&&!sport.includes('futsal');
+ const isFutsal=sport.includes('futsal');
+ if(isFootball&&gender!=='F')return 10;
+ if(isFootball&&gender==='F')return 20;
+ if(isFutsal&&gender!=='F')return 30;
+ if(isFutsal&&gender==='F')return 40;
+ return 90;
+}
+function squadSubRank(team={}){
+ const age=String(team.age_group||'').toLowerCase();
+ if(!age||age==='seniores')return 0;
+ const m=age.match(/(\d+)/);
+ return m?100-Number(m[1]):50;
+}
 export default function App(){
  const {width,height}=useWindowDimensions();
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
@@ -255,9 +283,12 @@ export default function App(){
  const officialNews=news;
  const sports=['TODAS','FUTEBOL','FUTSAL','FUTEBOL FEMININO','FORMAÇÃO'];
  const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
- const squadTeams=[...new Map(players.filter(x=>x.team).map(x=>[x.team.id,x.team])).values()];
+ const squadTeams=[...new Map(players.filter(x=>x.team).map(x=>[x.team.id,x.team])).values()]
+  .sort((a,b)=>squadTeamRank(a)-squadTeamRank(b)||squadSubRank(a)-squadSubRank(b)||(a.name||'').localeCompare(b.name||'','pt'));
  const activeSquadId=squadTeam||String(squadTeams[0]?.id||'');
- const squadPlayers=players.filter(x=>String(x.team?.id||'')===activeSquadId);
+ const squadPlayers=players
+  .filter(x=>String(x.team?.id||'')===activeSquadId)
+  .sort((a,b)=>playerPositionRank(a.position)-playerPositionRank(b.position)||(a.shirt_number??999)-(b.shirt_number??999)||(a.name||'').localeCompare(b.name||'','pt'));
 
  function Header(){return <><RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/><View style={headerStyle}><Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text></View></>}
  function Page({children}){return <View style={s.root}><StatusBar hidden/><Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/><Header/><View style={contentStyle}><ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView></View></View>}
