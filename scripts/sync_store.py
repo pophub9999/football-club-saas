@@ -132,9 +132,6 @@ def sync():
         raise RuntimeError("No categories discovered on current Torreense store")
 
     now=datetime.now(timezone.utc).isoformat()
-    api("store_categories?source=eq.torreense_store","PATCH",{"active":False,"updated_at":now})
-    api("store_products?source=eq.torreense_store","PATCH",{"active":False,"updated_at":now})
-
     all_products={}
     category_rows={}
     expected=0
@@ -212,6 +209,19 @@ def sync():
     # Keep request bodies modest for PostgREST.
     for i in range(0,len(rows),40):
         api("store_products?on_conflict=source,source_id","POST",rows[i:i+40],"resolution=merge-duplicates,return=minimal")
+
+    # Only deactivate obsolete records after a complete successful catalog has
+    # been parsed and the current rows have been upserted. This prevents a
+    # temporary empty shop if an external fetch fails halfway through.
+    current_cat_ids={str(x["source_id"]) for x in categories}
+    for old in api("store_categories?select=id,source_id&source=eq.torreense_store") or []:
+        if str(old["source_id"]) not in current_cat_ids:
+            api("store_categories?id=eq."+str(old["id"]),"PATCH",{"active":False,"updated_at":now})
+
+    current_product_ids={str(x) for x in all_products.keys()}
+    for old in api("store_products?select=id,source_id&source=eq.torreense_store") or []:
+        if str(old["source_id"]) not in current_product_ids:
+            api("store_products?id=eq."+str(old["id"]),"PATCH",{"active":False,"updated_at":now})
 
     status={
       "source":"torreense_store",
