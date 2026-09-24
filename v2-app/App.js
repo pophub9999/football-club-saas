@@ -250,9 +250,10 @@ export default function App(){
   setCalendar(mapped.map(x=>x.cal));
 
   const now=Date.now();
-  const next=mapped.find(x=>x.raw.status!=='finished' && x.raw.starts_at && new Date(x.raw.starts_at).getTime()>=now)
-    || mapped.find(x=>x.raw.status!=='finished')
-    || mapped[mapped.length-1];
+  const primary=mapped.filter(x=>x.cal.sport==='FUTEBOL');
+  const next=primary.find(x=>x.raw.status!=='finished' && x.raw.starts_at && new Date(x.raw.starts_at).getTime()>=now)
+    || primary.find(x=>x.raw.status!=='finished')
+    || primary[primary.length-1];
   if(next)setGame(next.ev);
   else setError('Sem jogos em cache.');
  }catch(e){
