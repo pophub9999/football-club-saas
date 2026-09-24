@@ -135,7 +135,7 @@ def parse_options(soup):
         if item not in g["values"]:g["values"].append(item)
     return list(groups.values())
 
-def parse_product(url,category_id):
+def parse_product(url,category_id,listing=None):
     doc=get(url)
     soup=BeautifulSoup(doc,"html.parser")
     title=soup.find("h1")
@@ -151,13 +151,19 @@ def parse_product(url,category_id):
         try:price=float(str(raw).replace(",","."))
         except:price=None
     if price is None or price<=0:price=money(text)
+    if (price is None or price<=0) and listing and listing.get("price") is not None:
+        price=listing.get("price")
 
     sm=re.search(r"Stock:\s*(Em Stock|In Stock|Fora de stock|Out of stock|Esgotado)",text,re.I)
     stock=(sm.group(1).strip() if sm else "")
+    if not stock and listing:
+        stock=listing.get("stock_status") or ""
     in_stock=None
     if stock:
         low=stock.lower()
         in_stock=not ("fora" in low or "out of stock" in low or "esgot" in low)
+    elif listing:
+        in_stock=listing.get("in_stock")
 
     desc=""
     for selector in (".product-description",".description","#tab-description",".tab-content"):
@@ -201,24 +207,52 @@ def upsert_category(source_id,name,url,sort_order):
     return rows[0]["id"]
 
 def category_products(url):
-    found=[]
+    found={}
     for page in range(1,8):
         sep="&" if "?" in url else "?"
         u=url+sep+"limit=100&page="+str(page)
         soup=BeautifulSoup(get(u),"html.parser")
-        batch=[]
+        page_ids=set()
         for a in soup.find_all("a",href=True):
             href=urllib.parse.urljoin(STORE,a["href"])
-            if "route=product/product" not in href or "product_id=" not in href:continue
+            if "route=product/product" not in href or "product_id=" not in href:
+                continue
             pid=product_id(href)
-            if not pid:continue
-            # canonical URL without category path; easier stable unique key
+            if not pid:
+                continue
+            page_ids.add(pid)
             clean=STORE+"index.php?route=product/product&product_id="+pid
-            if clean not in batch:batch.append(clean)
-        new=[x for x in batch if x not in found]
-        found.extend(new)
-        if not new:break
-    return found
+
+            # Product listing pages contain the authoritative current display
+            # price and stock badge, even when product JSON-LD reports 0.
+            price=None; stock=""; in_stock=None
+            p=a
+            for _ in range(8):
+                p=p.parent if p else None
+                if not p:
+                    break
+                txt=p.get_text(" ",strip=True)
+                candidate_price=money(txt)
+                sm=re.search(r"Stock:\s*(Em Stock|In Stock|Fora de stock|Out of stock|Esgotado)",txt,re.I)
+                if candidate_price is not None:
+                    price=candidate_price
+                if sm:
+                    stock=sm.group(1).strip()
+                    low=stock.lower()
+                    in_stock=not ("fora" in low or "out of stock" in low or "esgot" in low)
+                if price is not None and (stock or len(txt)<1200):
+                    break
+
+            current=found.get(pid)
+            item={"url":clean,"price":price,"stock_status":stock or None,"in_stock":in_stock}
+            if current is None or (current.get("price") is None and price is not None):
+                found[pid]=item
+        if not page_ids:
+            break
+        if page>1 and not any(pid not in list(found.keys())[:-len(page_ids)] for pid in page_ids):
+            # We already requested limit=100, so a repeated page means no more.
+            break
+    return list(found.values())
 
 def main():
     all_seen=set()
@@ -227,9 +261,9 @@ def main():
         cid=upsert_category(sid,name,url,idx)
         links=category_products(url)
         print("STORE_CATEGORY",name,len(links))
-        for link in links:
+        for entry in links:
             try:
-                item=parse_product(link,cid)
+                item=parse_product(entry["url"],cid,entry)
                 if not item:continue
                 all_seen.add(item["source_id"])
                 # Upsert via unique source+source_id.
@@ -237,7 +271,7 @@ def main():
                 total+=1
                 print("STORE_PRODUCT",item["source_id"],item["name"],item["price"],item["stock_status"],"OPTIONS",len(item["options"]))
             except Exception as e:
-                print("STORE_PRODUCT_FAILED",link,repr(e))
+                print("STORE_PRODUCT_FAILED",entry.get("url"),repr(e))
     if not all_seen:
         raise RuntimeError("No Torreense store products imported")
     # Only deactivate products from categories we actively synchronize.
