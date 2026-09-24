@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: store product options
+# Deploy trigger: native checkout and full store catalog
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
