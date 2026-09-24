@@ -190,6 +190,7 @@ export default function App(){
  const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('TODAS'),[calendarLoading,setCalendarLoading]=useState(false);
  const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState('');
  const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
+ const [selectedProduct,setSelectedProduct]=useState(null),[productChoices,setProductChoices]=useState({});
  const [cart,setCart]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?JSON.parse(window.localStorage.getItem('scut_cart')||'[]'):[]}catch{return []}});
  const [syncVersion,setSyncVersion]=useState(null);
 
@@ -290,13 +291,29 @@ export default function App(){
   setCart(next);
   if(Platform.OS==='web'&&typeof window!=='undefined'){try{window.localStorage.setItem('scut_cart',JSON.stringify(next))}catch{}}
  }
- function addToCart(product){
-  if(product?.in_stock===false)return;
-  const found=cart.find(x=>x.id===product.id);
-  saveCart(found?cart.map(x=>x.id===product.id?{...x,qty:x.qty+1}:x):[...cart,{...product,qty:1}]);
+ function cartKey(product,choices={}){
+  const suffix=Object.entries(choices).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>k+'='+String(v?.value||v||'')).join('&');
+  return String(product.id)+(suffix?'|'+suffix:'');
  }
- function changeCartQty(id,delta){
-  saveCart(cart.map(x=>x.id===id?{...x,qty:Math.max(0,x.qty+delta)}:x).filter(x=>x.qty>0));
+ function addToCart(product,choices={}){
+  if(product?.in_stock===false)return;
+  const key=cartKey(product,choices);
+  const selectedLabels=Object.entries(choices).map(([field,v])=>({field,label:v?.label||String(v||''),value:v?.value||v}));
+  const found=cart.find(x=>x.key===key);
+  saveCart(found?cart.map(x=>x.key===key?{...x,qty:x.qty+1}:x):[...cart,{...product,key,selectedOptions:selectedLabels,qty:1}]);
+ }
+ function changeCartQty(key,delta){
+  saveCart(cart.map(x=>x.key===key?{...x,qty:Math.max(0,x.qty+delta)}:x).filter(x=>x.qty>0));
+ }
+ function openProduct(product){
+  setSelectedProduct(product);
+  const defaults={};
+  (product.options||[]).forEach(g=>{if(g.values?.length===1)defaults[g.field]=g.values[0]});
+  setProductChoices(defaults);
+  setScreen('product');
+ }
+ function productReady(product){
+  return (product?.options||[]).every(g=>!g.required||productChoices[g.field]);
  }
  function moneyEUR(value){
   return new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(value||0));
@@ -341,19 +358,33 @@ export default function App(){
    {storeCategories.map(cat=><Pressable key={cat.id} onPress={()=>setStoreCategory(String(cat.id))} style={[s.filter,String(storeCategory)===String(cat.id)&&s.filterOn]}><Text style={[s.filterText,String(storeCategory)===String(cat.id)&&s.filterTextOn]}>{cat.name}</Text></Pressable>)}
   </ScrollView>
   {filteredStore.length?<View style={s.storeGrid}>{filteredStore.map(p=><View key={p.id} style={s.storeCard}>
-   {p.image_url?<Image source={{uri:p.image_url}} style={s.storeImage} resizeMode="contain"/>:<View style={[s.storeImage,s.storeImageFallback]}><ShortcutIcon type="shop"/></View>}
-   <Text style={s.storeName}>{p.name}</Text>
-   <Text style={s.storePrice}>{moneyEUR(p.price)}</Text>
+   <Pressable onPress={()=>openProduct(p)}>{p.image_url?<Image source={{uri:p.image_url}} style={s.storeImage} resizeMode="contain"/>:<View style={[s.storeImage,s.storeImageFallback]}><ShortcutIcon type="shop"/></View>}</Pressable>
+   <Pressable onPress={()=>openProduct(p)}><Text style={s.storeName}>{p.name}</Text></Pressable>
+   <Text style={s.storePrice}>{Number(p.price)>0?moneyEUR(p.price):'Preço a confirmar'}</Text>
    <Text style={[s.storeStock,p.in_stock===false&&s.storeStockOut]}>{p.in_stock===false?'ESGOTADO':(p.stock_status||'DISPONÍVEL').toUpperCase()}</Text>
-   <Pressable disabled={p.in_stock===false} onPress={()=>addToCart(p)} style={[s.storeAdd,p.in_stock===false&&s.storeAddOff]}><Text style={s.storeAddText}>{p.in_stock===false?'INDISPONÍVEL':'ADICIONAR'}</Text></Pressable>
+   <Pressable disabled={p.in_stock===false} onPress={()=>((p.options||[]).length?openProduct(p):addToCart(p))} style={[s.storeAdd,p.in_stock===false&&s.storeAddOff]}><Text style={s.storeAddText}>{p.in_stock===false?'INDISPONÍVEL':((p.options||[]).length?'ESCOLHER':'ADICIONAR')}</Text></Pressable>
    <Pressable onPress={()=>openOfficialStore(p.url)}><Text style={s.storeOfficial}>VER ARTIGO ›</Text></Pressable>
   </View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>A loja está a sincronizar os artigos oficiais.</Text></View>}
  </Page>;
+ if(screen==='product')return <Page><Back title="ARTIGO" to="store"/>
+  {selectedProduct?<View style={s.productDetail}>
+   {selectedProduct.image_url?<Image source={{uri:selectedProduct.image_url}} style={s.productHero} resizeMode="contain"/>:null}
+   <Text style={s.productName}>{selectedProduct.name}</Text>
+   <Text style={s.productPrice}>{Number(selectedProduct.price)>0?moneyEUR(selectedProduct.price):'Preço a confirmar'}</Text>
+   {selectedProduct.description_text?<Text style={s.productDescription}>{selectedProduct.description_text}</Text>:null}
+   {(selectedProduct.options||[]).map(g=><View key={g.field} style={s.optionGroup}>
+    <Text style={s.optionTitle}>{g.name||'Opção'}{g.required?' *':''}</Text>
+    <View style={s.optionValues}>{(g.values||[]).map(v=><Pressable key={String(v.value)} onPress={()=>setProductChoices({...productChoices,[g.field]:v})} style={[s.optionChip,productChoices[g.field]?.value===v.value&&s.optionChipOn]}><Text style={[s.optionChipText,productChoices[g.field]?.value===v.value&&s.optionChipTextOn]}>{v.label}</Text></Pressable>)}</View>
+   </View>)}
+   <Pressable disabled={selectedProduct.in_stock===false||!productReady(selectedProduct)} onPress={()=>{addToCart(selectedProduct,productChoices);setScreen('cart')}} style={[s.productAdd,(selectedProduct.in_stock===false||!productReady(selectedProduct))&&s.storeAddOff]}><Text style={s.productAddText}>{selectedProduct.in_stock===false?'INDISPONÍVEL':productReady(selectedProduct)?'ADICIONAR AO CARRINHO':'ESCOLHE AS OPÇÕES'}</Text></Pressable>
+   <Pressable onPress={()=>openOfficialStore(selectedProduct.url)}><Text style={s.productOfficial}>VER NO SITE OFICIAL ›</Text></Pressable>
+  </View>:null}
+ </Page>;
  if(screen==='cart')return <Page><Back title="CARRINHO" to="store"/>
   {cart.length?<>
-   {cart.map(item=><View key={item.id} style={s.cartItem}>
+   {cart.map(item=><View key={item.key||item.id} style={s.cartItem}>
     {item.image_url?<Image source={{uri:item.image_url}} style={s.cartImage} resizeMode="contain"/>:null}
-    <View style={s.cartBody}><Text style={s.cartName}>{item.name}</Text><Text style={s.cartPrice}>{moneyEUR(item.price)}</Text><View style={s.qtyRow}><Pressable onPress={()=>changeCartQty(item.id,-1)} style={s.qtyBtn}><Text style={s.qtyText}>−</Text></Pressable><Text style={s.qtyValue}>{item.qty}</Text><Pressable onPress={()=>changeCartQty(item.id,1)} style={s.qtyBtn}><Text style={s.qtyText}>+</Text></Pressable></View></View>
+    <View style={s.cartBody}><Text style={s.cartName}>{item.name}</Text>{item.selectedOptions?.length?<Text style={s.cartOptions}>{item.selectedOptions.map(x=>x.label).join(' · ')}</Text>:null}<Text style={s.cartPrice}>{Number(item.price)>0?moneyEUR(item.price):'Preço a confirmar'}</Text><View style={s.qtyRow}><Pressable onPress={()=>changeCartQty(item.key||String(item.id),-1)} style={s.qtyBtn}><Text style={s.qtyText}>−</Text></Pressable><Text style={s.qtyValue}>{item.qty}</Text><Pressable onPress={()=>changeCartQty(item.key||String(item.id),1)} style={s.qtyBtn}><Text style={s.qtyText}>+</Text></Pressable></View></View>
    </View>)}
    <View style={s.cartTotalRow}><Text style={s.cartTotalLabel}>TOTAL</Text><Text style={s.cartTotalValue}>{moneyEUR(cartTotal)}</Text></View>
    <Pressable style={s.checkoutBtn} onPress={()=>openOfficialStore('https://www.torreense.com/loja/index.php?route=checkout/checkout')}><Text style={s.checkoutText}>CONTINUAR NA LOJA OFICIAL</Text></Pressable>
@@ -398,7 +429,8 @@ const s=StyleSheet.create({
  clubLine:{color:'#fff',fontSize:15,letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},quickIconFallback:{color:'#f1b94f',fontSize:22,lineHeight:26},quickText:{color:'#fff',fontSize:5.9,letterSpacing:.18,marginTop:5,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.50)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#fff',fontSize:7,letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:18},
  cartTopButton:{height:34,marginBottom:10,borderRadius:10,borderWidth:1,borderColor:'rgba(241,185,79,.55)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},cartTopText:{color:'#fff',fontSize:7.5,letterSpacing:.6,marginLeft:8,flex:1},cartBadge:{minWidth:21,height:21,borderRadius:11,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},cartBadgeText:{color:'#082b48',fontSize:7,fontWeight:'700'},cartTopArrow:{color:'#f1b94f',fontSize:18,marginLeft:6},
  storeGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},storeCard:{width:'48.5%',marginBottom:9,padding:7,borderRadius:11,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},storeImage:{width:'100%',aspectRatio:.9,borderRadius:8,backgroundColor:'#fff'},storeImageFallback:{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.06)'},storeName:{color:'#fff',fontSize:7.4,lineHeight:10,minHeight:22,marginTop:6},storePrice:{color:'#f1b94f',fontSize:8.5,fontWeight:'700',marginTop:3},storeStock:{color:'#9bd2ad',fontSize:5.6,marginTop:2},storeStockOut:{color:'#e6a4aa'},storeAdd:{height:26,borderRadius:7,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:6},storeAddOff:{opacity:.4},storeAddText:{color:'#082b48',fontSize:6.2,fontWeight:'700',letterSpacing:.25},storeOfficial:{color:'#b8c8d8',fontSize:5.8,textAlign:'center',marginTop:6},
- cartItem:{flexDirection:'row',padding:8,marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},cartImage:{width:62,height:72,borderRadius:7,backgroundColor:'#fff'},cartBody:{flex:1,paddingLeft:9},cartName:{color:'#fff',fontSize:8,lineHeight:11},cartPrice:{color:'#f1b94f',fontSize:8,marginTop:3},qtyRow:{flexDirection:'row',alignItems:'center',marginTop:8},qtyBtn:{width:24,height:22,borderRadius:6,borderWidth:1,borderColor:'rgba(241,185,79,.55)',alignItems:'center',justifyContent:'center'},qtyText:{color:'#f1b94f',fontSize:13,lineHeight:16},qtyValue:{color:'#fff',fontSize:8,minWidth:28,textAlign:'center'},cartTotalRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:10,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.15)'},cartTotalLabel:{color:'#fff',fontSize:8,letterSpacing:.6},cartTotalValue:{color:'#f1b94f',fontSize:11,fontWeight:'700'},checkoutBtn:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},checkoutText:{color:'#082b48',fontSize:7,fontWeight:'700',letterSpacing:.45},checkoutNote:{color:'#8fa8ba',fontSize:5.8,lineHeight:9,marginTop:7,textAlign:'center'},
+ productDetail:{padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.28)'},productHero:{width:'100%',aspectRatio:1,borderRadius:10,backgroundColor:'#fff'},productName:{color:'#fff',fontSize:12,lineHeight:16,marginTop:10},productPrice:{color:'#f1b94f',fontSize:13,fontWeight:'700',marginTop:4},productDescription:{color:'#c9d8e4',fontSize:7,lineHeight:11,marginTop:8},optionGroup:{marginTop:11},optionTitle:{color:'#fff',fontSize:7.3,marginBottom:6},optionValues:{flexDirection:'row',flexWrap:'wrap'},optionChip:{paddingHorizontal:10,height:27,borderRadius:14,borderWidth:1,borderColor:'rgba(241,185,79,.45)',alignItems:'center',justifyContent:'center',marginRight:6,marginBottom:6},optionChipOn:{backgroundColor:'#f1b94f'},optionChipText:{color:'#f1b94f',fontSize:6.5},optionChipTextOn:{color:'#082b48',fontWeight:'700'},productAdd:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},productAddText:{color:'#082b48',fontSize:7,fontWeight:'700',letterSpacing:.4},productOfficial:{color:'#b8c8d8',fontSize:6.2,textAlign:'center',marginTop:9},
+  cartItem:{flexDirection:'row',padding:8,marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},cartImage:{width:62,height:72,borderRadius:7,backgroundColor:'#fff'},cartBody:{flex:1,paddingLeft:9},cartName:{color:'#fff',fontSize:8,lineHeight:11},cartOptions:{color:'#9fb5c7',fontSize:6.2,marginTop:2},cartPrice:{color:'#f1b94f',fontSize:8,marginTop:3},qtyRow:{flexDirection:'row',alignItems:'center',marginTop:8},qtyBtn:{width:24,height:22,borderRadius:6,borderWidth:1,borderColor:'rgba(241,185,79,.55)',alignItems:'center',justifyContent:'center'},qtyText:{color:'#f1b94f',fontSize:13,lineHeight:16},qtyValue:{color:'#fff',fontSize:8,minWidth:28,textAlign:'center'},cartTotalRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:10,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.15)'},cartTotalLabel:{color:'#fff',fontSize:8,letterSpacing:.6},cartTotalValue:{color:'#f1b94f',fontSize:11,fontWeight:'700'},checkoutBtn:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},checkoutText:{color:'#082b48',fontSize:7,fontWeight:'700',letterSpacing:.45},checkoutNote:{color:'#8fa8ba',fontSize:5.8,lineHeight:9,marginTop:7,textAlign:'center'},
  newsSection:{marginTop:12},newsHeader:{flexDirection:'row',justifyContent:'space-between',marginBottom:7},newsHeading:{color:'#fff',fontSize:8.5,letterSpacing:.65},newsMore:{color:'#f1b94f',fontSize:6.5},newsCard:{minHeight:49,marginBottom:6,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',flexDirection:'row',alignItems:'center',overflow:'hidden'},newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},newsBody:{flex:1,paddingHorizontal:10,paddingVertical:7},newsMeta:{color:'#f1b94f',fontSize:5.8,letterSpacing:.45,marginBottom:3},newsTitle:{color:'#fff',fontSize:8,lineHeight:11},newsArrow:{color:'#9eb6c9',fontSize:18,paddingHorizontal:10},
  pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:30,lineHeight:30,paddingRight:12},pageTitle:{color:'#fff',fontSize:14,letterSpacing:.8},detailCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},kicker:{color:'#f1b94f',fontSize:7,letterSpacing:.5},detailDate:{color:'#fff',fontSize:9,marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:7.5,letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'rgba(8,43,72,.82)',borderRadius:10,padding:11,borderWidth:1,borderColor:'rgba(120,164,197,.22)'},body:{color:'#fff',fontSize:8,lineHeight:13},muted:{color:'#a9bdcd',fontSize:8,lineHeight:12},statRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.08)'},
  articleCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},articleTitle:{color:'#fff',fontSize:14,lineHeight:19,marginBottom:12},articleBody:{color:'#dce7ef',fontSize:8.5,lineHeight:14},articleParagraph:{color:'#dce7ef',fontSize:8.5,lineHeight:14,marginBottom:9},articleHeroImage:{width:'100%',height:190,borderRadius:12,marginBottom:16},articleInlineImage:{width:'100%',height:210,borderRadius:10,marginVertical:10},
