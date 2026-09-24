@@ -150,9 +150,9 @@ def parse_product(url,category_id):
         raw=meta.get("content") or meta.get("value") or meta.get_text(" ",strip=True)
         try:price=float(str(raw).replace(",","."))
         except:price=None
-    if price is None:price=money(text)
+    if price is None or price<=0:price=money(text)
 
-    sm=re.search(r"Stock:\s*([^\n\r]+?)(?=\s{2,}|\s[A-ZÁÉÍÓÚ][a-záéíóú]|\d+[,.]\d{2}\s*€|$)",text,re.I)
+    sm=re.search(r"Stock:\s*(Em Stock|In Stock|Fora de stock|Out of stock|Esgotado)",text,re.I)
     stock=(sm.group(1).strip() if sm else "")
     in_stock=None
     if stock:
