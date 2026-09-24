@@ -9,6 +9,7 @@ except ModuleNotFoundError:
 
 BASE=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+TEST_NEWS_LIMIT=1  # temporário enquanto validamos o parser
 HEAD={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"}
 UA={
  "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
@@ -249,7 +250,7 @@ def article(url):
 def main():
     urls=discover_news()
     rows=[]
-    for u in urls:
+    for u in urls[:TEST_NEWS_LIMIT]:
         try:
             item=article(u)
             if item: rows.append(item)
