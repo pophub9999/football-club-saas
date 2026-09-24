@@ -517,6 +517,7 @@ def sync_club_assets():
     sync_player_photos()
 
 def main():
+    sync_club_assets()
     urls=discover_news()
 
     # If archive discovery is temporarily incomplete, keep any URLs already
@@ -573,7 +574,6 @@ def main():
         "updated_at":now
     }
     api("sync_status?on_conflict=source","POST",[status])
-    sync_club_assets()
     api("app_sync?id=eq.1","PATCH",{"version":int(datetime.now().timestamp()),"updated_at":now})
     print("Synced",len(rows),"news items; failures",failures)
 
