@@ -10,6 +10,7 @@ except ModuleNotFoundError:
 BASE=os.environ["SUPABASE_URL"].rstrip("/")
 KEY=os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 TEST_NEWS_LIMIT=1  # temporário enquanto validamos o parser
+TEST_NEWS_URL="https://www.torreense.com/blog/bilhetesjornada2ligaeuropa"
 HEAD={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"}
 UA={
  "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
@@ -275,7 +276,9 @@ def article(url):
     }
 
 def main():
-    urls=discover_news()
+    # Durante o teste usamos uma notícia fixa. Isto evita depender da página
+    # de arquivo /blog, que por vezes devolve HTML reduzido ao GitHub runner.
+    urls=[TEST_NEWS_URL] if TEST_NEWS_URL else discover_news()
     rows=[]
     for u in urls[:TEST_NEWS_LIMIT]:
         try:
