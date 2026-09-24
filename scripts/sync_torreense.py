@@ -132,7 +132,6 @@ def article(url):
         return None
 
     useful=[]
-    content_started=False
     stop_markers=re.compile(r"^(?:Últimas\\s+Notícias|Ver\\s+todas)$",re.I)
     share_markers=re.compile(r"^(?:Partilhar\\s+notícia:?|Partilhar:?|Facebook|X|Twitter|LinkedIn)$",re.I)
     for tag,txt in blocks[start_i:]:
@@ -142,19 +141,11 @@ def article(url):
         if t and share_markers.search(t):
             continue
         if tag=="img":
-            if content_started and t and not re.search(r"logo|icon|sprite|facebook|twitter|linkedin|share",t,re.I):
+            if t and not re.search(r"logo|icon|sprite|facebook|twitter|linkedin|share",t,re.I):
                 useful.append(("img",t))
             continue
-        # Generic divs often contain the whole article plus children, causing duplicated
-        # content and large blank areas in the app. Keep semantic text blocks only.
         if tag=="div" or not t:
             continue
-        if not content_started:
-            # The actual article begins with the first paragraph after the share controls.
-            if tag=="p" and len(t)>20:
-                content_started=True
-            else:
-                continue
         useful.append((tag,t))
 
     noise={"Bilheteira","Loja","Clube","História","Palmarés","Instalações","SAD","Estatutos","Órgãos Sociais","Contactos","Partilhar notícia:","Ver todas"}
