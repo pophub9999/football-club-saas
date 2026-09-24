@@ -78,7 +78,7 @@ def article(url):
     if not title:
         m=re.search(r"<title>(.*?)</title>",doc,re.I|re.S)
         title=clean(m.group(1)) if m else ""
-    title=re.sub(r"\\s*\\|\\s*Site Oficial do Torreense\\s*$","",title,flags=re.I).strip()
+    title=re.sub(r"\\s*\\|\\s*(?:Site Oficial do )?Torreense\\s*$","",title,flags=re.I).strip()
     img=meta_value("og:image")
 
     # Remove non-content chrome first, then locate the article by visible text.
