@@ -1,5 +1,5 @@
 name: Probe Torreense Store
-# store path trigger
+# store cart endpoint trigger
 
 on:
   push:
