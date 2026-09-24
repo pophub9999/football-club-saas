@@ -66,84 +66,77 @@ def discover_news():
 
 def article(url):
     doc=get(url)
-    title=""
-    m=re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)',doc,re.I)
-    if not m:m=re.search(r"<title>(.*?)</title>",doc,re.I|re.S)
-    if m:title=clean(m.group(1)).replace(" | Torreense","")
-    img=""
-    m=re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',doc,re.I)
-    if m:img=h.unescape(m.group(1))
 
-    # Extract only the article payload. Never fall back to the complete page,
-    # otherwise header/navigation/footer get stored as article content.
-    candidates=[]
-    for pat in [
-        r"<article\\b[\\s\\S]*?</article>",
-        r'<div[^>]+(?:class|id)=["\'][^"\']*(?:blog-post|post-content|article-content|entry-content|blog-content)[^"\']*["\'][^>]*>[\\s\\S]*?</div>',
-    ]:
-        mm=re.search(pat,doc,re.I)
-        if mm:candidates.append(mm.group(0))
-    section=max(candidates,key=len) if candidates else ""
+    def meta_value(key):
+        # Attribute order on meta tags is not guaranteed.
+        for tag in re.findall(r"<meta\\b[^>]*>",doc,re.I):
+            if re.search(r'(?:property|name)=["\\']'+re.escape(key)+r'["\\']',tag,re.I):
+                m=re.search(r'content=["\\']([^"\\']*)["\\']',tag,re.I)
+                if m:return h.unescape(m.group(1)).strip()
+        return ""
 
-    if not section:
-        # JSON-LD often contains the clean article body on CMS sites.
-        jm=re.search(r'"articleBody"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"',doc,re.I)
-        if jm:
-            try:
-                body=json.loads('"'+jm.group(1)+'"')
-                section='<p>'+h.escape(body).replace('\\n\\n','</p><p>').replace('\\n','<br>')+'</p>'
-            except: section=""
+    title=meta_value("og:title")
+    if not title:
+        m=re.search(r"<title>(.*?)</title>",doc,re.I|re.S)
+        title=clean(m.group(1)) if m else ""
+    title=re.sub(r"\\s*\\|\\s*Site Oficial do Torreense\\s*$","",title,flags=re.I).strip()
+    img=meta_value("og:image")
 
-    if not section:
-        bm=re.search(r"<body\b[^>]*>([\s\S]*?)</body>",doc,re.I)
-        raw=bm.group(1) if bm else doc
-        raw=re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<nav[\s\S]*?</nav>|<footer[\s\S]*?</footer>|<header[\s\S]*?</header>|<form[\s\S]*?</form>"," ",raw,flags=re.I)
-        raw_text=clean(raw)
-        if title:
-            q=raw_text.lower().find(title.lower())
-            if q>=0: raw_text=raw_text[q+len(title):].strip()
-        stop=len(raw_text)
-        for label in ["Política de Privacidade","Termos e Condições","Todos os direitos reservados"]:
-            q=raw_text.lower().find(label.lower())
-            if q>80: stop=min(stop,q)
-        raw_text=raw_text[:stop].strip()
-        if len(raw_text)>=40: section="<p>"+h.escape(raw_text)+"</p>"
-        else:
-            print("ARTICLE_CONTENT_NOT_FOUND",url)
-            return None
+    # The Torreense CMS page has a reliable visible boundary:
+    # article starts at its H1 and ends before "Últimas Notícias".
+    # Extract this exact region instead of generic containers that include menus/footer.
+    section=""
+    h1s=list(re.finditer(r"<h1\\b[^>]*>([\\s\\S]*?)</h1>",doc,re.I))
+    chosen=None
+    for hm in h1s:
+        ht=clean(hm.group(1))
+        if title and (ht.lower()==title.lower() or title.lower() in ht.lower() or ht.lower() in title.lower()):
+            chosen=hm
+            break
+    if not chosen and h1s: chosen=h1s[0]
 
-    section=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>","",section,flags=re.I)
-    # Some Torreense pages expose a broad CMS container that also contains
-    # the site header/footer. Trim everything before the article title and
-    # remove known navigation/footer text from the plain-text fallback.
+    if chosen:
+        tail=doc[chosen.end():]
+        stop=re.search(r"<h[1-6]\\b[^>]*>\\s*(?:<[^>]+>\\s*)*Últimas\\s+Notícias(?:\\s*</[^>]+>)*\\s*</h[1-6]>",tail,re.I)
+        article_html=tail[:stop.start()] if stop else tail
+        # Remove chrome/widgets defensively.
+        article_html=re.sub(r"<script[\\s\\S]*?</script>|<style[\\s\\S]*?</style>|<nav[\\s\\S]*?</nav>|<footer[\\s\\S]*?</footer>|<header[\\s\\S]*?</header>|<form[\\s\\S]*?</form>","",article_html,flags=re.I)
+        section=article_html.strip()
+
     text=clean(section)
-    if title:
-        pos=text.lower().find(title.lower())
-        if pos>=0: text=text[pos+len(title):].strip()
-    noise=[
-      "Bilheteira","Loja","Clube História","Palmarés","Instalações","SAD",
-      "Estatutos","Órgãos Sociais","Contactos","Política de Privacidade",
-      "Termos e Condições","Cookies"
-    ]
-    for label in noise:
-        text=re.sub(r"(?:^|\\s)[•·-]?\\s*"+re.escape(label)+r"(?=\\s|$)"," ",text,flags=re.I)
-    text=re.sub(r"\\s+"," ",text).strip()
     if len(text)<40:
-        print("ARTICLE_CONTENT_TOO_SHORT",url,len(text))
+        print("ARTICLE_CONTENT_NOT_FOUND",url)
         return None
 
-    category="FUTEBOL" if re.search(r">\\s*Futebol\\s*<",section,re.I) else ("CLUBE" if re.search(r">\\s*Clube\\s*<",section,re.I) else "TORREENSE")
-    published=None
-    dm=re.search(r'<meta[^>]+(?:property|name)=["\'](?:article:published_time|datePublished)["\'][^>]+content=["\']([^"\']+)',doc,re.I)
-    if dm:
-        try: published=datetime.fromisoformat(dm.group(1).replace("Z","+00:00")).isoformat()
-        except: pass
-    if not published:
-        months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
-        dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",text,re.I)
-        if dm: published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
+    # Preserve useful article structure only. This prevents surrounding CMS UI
+    # from ever reaching the app while keeping paragraphs/headings/lists/images.
+    safe=[]
+    for m in re.finditer(r"<(h2|h3|p|li)\\b[^>]*>([\\s\\S]*?)</\\1>|<img\\b([^>]*)/?>",section,re.I):
+        if m.group(1):
+            tag=m.group(1).lower()
+            value=clean(m.group(2))
+            if value:safe.append("<"+tag+">"+h.escape(value)+"</"+tag+">")
+        else:
+            attrs=m.group(3) or ""
+            sm=re.search(r'(?:src|data-src)=["\\']([^"\\']+)["\\']',attrs,re.I)
+            if sm:
+                src=urllib.parse.urljoin("https://www.torreense.com/",h.unescape(sm.group(1)))
+                if not re.search(r"logo|icon",src,re.I):safe.append('<img src="'+h.escape(src,quote=True)+'">')
+    content_html="".join(safe)
+    if not content_html: content_html="<p>"+h.escape(text)+"</p>"
 
-    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":"<p>"+h.escape(text[:30000])+"</p>","active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
+    category="TORREENSE"
+    pre=doc[max(0,(chosen.start() if chosen else 0)-1500):(chosen.start() if chosen else 0)]
+    if re.search(r">\\s*Futebol\\s*<",pre,re.I): category="FUTEBOL"
+    elif re.search(r">\\s*Clube\\s*<",pre,re.I): category="CLUBE"
+
+    published=None
+    dm=re.search(r"\\b(\\d{1,2})\\s+de\\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+de\\s+(20\\d{2})\\b",clean(pre),re.I)
+    if dm:
+        months={"janeiro":1,"fevereiro":2,"março":3,"abril":4,"maio":5,"junho":6,"julho":7,"agosto":8,"setembro":9,"outubro":10,"novembro":11,"dezembro":12}
+        published=datetime(int(dm.group(3)),months[dm.group(2).lower()],int(dm.group(1)),12,tzinfo=timezone.utc).isoformat()
+
+    return {"source":"torreense","url":url,"slug":url.rstrip("/").split("/")[-1],"title":title or url.rstrip("/").split("/")[-1],"category":category,"published_at":published,"excerpt":text[:300],"hero_image_url":img or None,"content_text":text[:30000],"content_html":content_html[:150000],"active":True,"updated_at":datetime.now(timezone.utc).isoformat()}
 
 def main():
     urls=discover_news()
