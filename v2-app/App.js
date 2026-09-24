@@ -238,7 +238,7 @@ export default function App(){
     ev,
     cal:{
       id:String(x.id),
-      sport:(x.sports?.name||'Futebol').toUpperCase(),
+      sport:(x.raw_data?.modality||x.sports?.name||'Futebol').toUpperCase(),
       type:(x.event_type||'JOGO').toUpperCase(),
       date:x.starts_at?new Date(x.starts_at).toLocaleDateString('pt-PT',{timeZone:'Europe/Lisbon'}):'',
       round:x.round||'',
@@ -281,7 +281,7 @@ export default function App(){
   setCalendarLoading(false);
  }
  const officialNews=news;
- const sports=['TODAS','FUTEBOL','FUTSAL','FUTEBOL FEMININO','FORMAÇÃO'];
+ const sports=['TODAS','FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
  const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
  const squadTeams=[...new Map(players.filter(x=>x.team).map(x=>[x.team.id,x.team])).values()]
   .sort((a,b)=>squadTeamRank(a)-squadTeamRank(b)||squadSubRank(a)-squadSubRank(b)||(a.name||'').localeCompare(b.name||'','pt'));
