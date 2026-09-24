@@ -1,4 +1,5 @@
 name: Sync Torreense Data
+# Sync trigger: leading article images
 
 on:
   workflow_dispatch:
