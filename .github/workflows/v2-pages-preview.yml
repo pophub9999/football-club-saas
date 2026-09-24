@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: calendar squads cleanup
+# Deploy trigger: squad ordering
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
