@@ -1,7 +1,7 @@
 import '@expo/metro-runtime';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking } from 'react-native';
+import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput } from 'react-native';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
@@ -11,6 +11,15 @@ async function sb(path){
  const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:SB_HEADERS,cache:'no-store'});
  if(!r.ok)throw new Error('Supabase '+r.status);
  return r.json();
+}
+async function edge(name,options={}){
+ const r=await fetch(SUPABASE_URL+'/functions/v1/'+name,{
+  ...options,
+  headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',...(options.headers||{})}
+ });
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok){const e=new Error(data?.error||'Erro no serviço.');e.data=data;throw e}
+ return data;
 }
 
 function RemoteLogo({uri,style,alt}) {
@@ -191,6 +200,8 @@ export default function App(){
  const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState('');
  const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
  const [selectedProduct,setSelectedProduct]=useState(null),[productChoices,setProductChoices]=useState({});
+ const [shippingOptions,setShippingOptions]=useState([]),[checkoutInfo,setCheckoutInfo]=useState(null),[checkoutLoading,setCheckoutLoading]=useState(false),[checkoutMessage,setCheckoutMessage]=useState('');
+ const [checkoutForm,setCheckoutForm]=useState({name:'',email:'',phone:'',nif:'',shippingMethod:'home',street:'',number:'',postalCode:'',city:''});
  const [cart,setCart]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?JSON.parse(window.localStorage.getItem('scut_cart')||'[]'):[]}catch{return []}});
  const [syncVersion,setSyncVersion]=useState(null);
 
@@ -201,20 +212,21 @@ export default function App(){
 
  useEffect(()=>{let live=true;(async()=>{try{
   setLoading(true);
-  const [v,n,m,p,st,sc,sp]=await Promise.all([
+  const [v,n,m,p,st,sc,sp,sh]=await Promise.all([
    sb('app_sync?select=version,updated_at&id=eq.1'),
    sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&active=eq.true&order=published_at.desc.nullslast&limit=100'),
    sb('matches?select=id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,short_name,logo_url),away:teams!matches_away_team_id_fkey(name,short_name,logo_url)&order=starts_at.asc&limit=200'),
    sb('players?select=id,name,short_name,shirt_number,position,birth_date,nationality,height_cm,photo_url,team:teams!players_team_id_fkey(id,name,short_name,age_group,gender,sports(name))&active=eq.true&order=shirt_number.asc&limit=500'),
    sb('standings?select=position,played,wins,draws,losses,goals_for,goals_against,points,team:teams!standings_team_id_fkey(name)&order=position.asc&limit=50'),
    sb('store_categories?select=id,name,sort_order&active=eq.true&order=sort_order.asc'),
-   sb('store_products?select=id,source_id,category_id,name,url,description_text,price,currency,stock_status,in_stock,image_url,images,options&active=eq.true&order=name.asc&limit=250')
+   sb('store_products?select=id,source_id,category_id,name,url,description_text,price,currency,stock_status,in_stock,image_url,images,options,raw_data&active=eq.true&order=name.asc&limit=250'),
+   sb('store_shipping_options?select=code,name,description,price,sort_order&active=eq.true&order=sort_order.asc')
   ]);
   if(!live)return;
   setSyncVersion(v?.[0]?.version||1);
   setNews((n||[]).map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',html:x.content_html||'',hero:x.hero_image_url,excerpt:x.excerpt})));
   setPlayers(p||[]);
-  setStoreCategories(sc||[]);setStoreProducts(sp||[]);
+  setStoreCategories(sc||[]);setStoreProducts(sp||[]);setShippingOptions(sh||[]);
   const positions={};(st||[]).forEach(x=>{if(x.team?.name)positions[x.team.name]=x;});
 
   const mapped=(m||[]).map(x=>{
@@ -322,6 +334,31 @@ export default function App(){
   if(Platform.OS==='web'&&typeof window!=='undefined')window.open(url,'_blank');
   else await Linking.openURL(url);
  }
+ async function openCheckout(){
+  setScreen('checkout');setCheckoutMessage('');setCheckoutLoading(true);
+  try{setCheckoutInfo(await edge('store-checkout',{method:'GET'}))}
+  catch(e){setCheckoutInfo({enabled:false});setCheckoutMessage(e.message||'Não foi possível validar o pagamento.')}
+  finally{setCheckoutLoading(false)}
+ }
+ async function submitCheckout(){
+  setCheckoutMessage('');
+  if(!checkoutInfo?.enabled){setCheckoutMessage('O MB WAY ainda não está configurado para pagamentos reais.');return}
+  setCheckoutLoading(true);
+  try{
+   const result=await edge('store-checkout',{
+    method:'POST',
+    body:JSON.stringify({
+     cart:cart.map(x=>({id:x.id,qty:x.qty,selectedOptions:x.selectedOptions||[],customization:x.customization||{}})),
+     customer:{name:checkoutForm.name,email:checkoutForm.email,phone:checkoutForm.phone,nif:checkoutForm.nif},
+     shippingMethod:checkoutForm.shippingMethod,
+     shippingAddress:checkoutForm.shippingMethod==='home'?{street:checkoutForm.street,number:checkoutForm.number,postalCode:checkoutForm.postalCode,city:checkoutForm.city,country:'PT'}:{},
+     paymentMethod:'MBWAY'
+    })
+   });
+   setCheckoutMessage('Encomenda #'+result.orderNumber+' preparada.');
+  }catch(e){setCheckoutMessage(e.message||'Não foi possível finalizar a compra.')}
+  finally{setCheckoutLoading(false)}
+ }
  const officialNews=news;
  const sports=['TODAS','FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
  const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
@@ -334,6 +371,8 @@ export default function App(){
  const filteredStore=storeProducts.filter(x=>storeCategory==='TODOS'||String(x.category_id)===String(storeCategory));
  const cartCount=cart.reduce((n,x)=>n+x.qty,0);
  const cartTotal=cart.reduce((n,x)=>n+Number(x.price||0)*x.qty,0);
+ const selectedShipping=shippingOptions.find(x=>x.code===checkoutForm.shippingMethod)||{price:0};
+ const checkoutTotal=cartTotal+Number(selectedShipping.price||0);
 
  function Header(){return <><RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/><View style={headerStyle}><Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text></View></>}
  function Page({children}){return <View style={s.root}><StatusBar hidden/><Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/><Header/><View style={contentStyle}><ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView></View></View>}
@@ -387,9 +426,37 @@ export default function App(){
     <View style={s.cartBody}><Text style={s.cartName}>{item.name}</Text>{item.selectedOptions?.length?<Text style={s.cartOptions}>{item.selectedOptions.map(x=>x.label).join(' · ')}</Text>:null}<Text style={s.cartPrice}>{Number(item.price)>0?moneyEUR(item.price):'Preço a confirmar'}</Text><View style={s.qtyRow}><Pressable onPress={()=>changeCartQty(item.key||String(item.id),-1)} style={s.qtyBtn}><Text style={s.qtyText}>−</Text></Pressable><Text style={s.qtyValue}>{item.qty}</Text><Pressable onPress={()=>changeCartQty(item.key||String(item.id),1)} style={s.qtyBtn}><Text style={s.qtyText}>+</Text></Pressable></View></View>
    </View>)}
    <View style={s.cartTotalRow}><Text style={s.cartTotalLabel}>TOTAL</Text><Text style={s.cartTotalValue}>{moneyEUR(cartTotal)}</Text></View>
-   <Pressable style={s.checkoutBtn} onPress={()=>openOfficialStore('https://www.torreense.com/loja/index.php?route=checkout/checkout')}><Text style={s.checkoutText}>CONTINUAR NA LOJA OFICIAL</Text></Pressable>
-   <Text style={s.checkoutNote}>O pagamento é concluído na loja oficial do Torreense. Nesta primeira versão, os artigos do carrinho ainda não são transferidos automaticamente para o checkout oficial.</Text>
+   <Pressable style={s.checkoutBtn} onPress={openCheckout}><Text style={s.checkoutText}>FINALIZAR COMPRA</Text></Pressable>
+   <Text style={s.checkoutNote}>A compra é finalizada dentro da app.</Text>
   </>:<View style={s.infoCard}><Text style={s.muted}>O carrinho está vazio.</Text></View>}
+ </Page>;
+ if(screen==='checkout')return <Page><Back title="CHECKOUT" to="cart"/>
+  <View style={s.checkoutCard}>
+   <Text style={s.checkoutSectionTitle}>DADOS DO CLIENTE</Text>
+   <TextInput value={checkoutForm.name} onChangeText={v=>setCheckoutForm({...checkoutForm,name:v})} placeholder="Nome completo" placeholderTextColor="#7892a7" style={s.checkoutInput}/>
+   <TextInput value={checkoutForm.email} onChangeText={v=>setCheckoutForm({...checkoutForm,email:v})} placeholder="Email" placeholderTextColor="#7892a7" keyboardType="email-address" autoCapitalize="none" style={s.checkoutInput}/>
+   <TextInput value={checkoutForm.phone} onChangeText={v=>setCheckoutForm({...checkoutForm,phone:v})} placeholder="Telemóvel / MB WAY" placeholderTextColor="#7892a7" keyboardType="phone-pad" style={s.checkoutInput}/>
+   <TextInput value={checkoutForm.nif} onChangeText={v=>setCheckoutForm({...checkoutForm,nif:v})} placeholder="NIF (opcional)" placeholderTextColor="#7892a7" keyboardType="number-pad" style={s.checkoutInput}/>
+
+   <Text style={s.checkoutSectionTitle}>ENTREGA</Text>
+   <View style={s.deliveryChoices}>{shippingOptions.map(x=><Pressable key={x.code} onPress={()=>setCheckoutForm({...checkoutForm,shippingMethod:x.code})} style={[s.deliveryChoice,checkoutForm.shippingMethod===x.code&&s.deliveryChoiceOn]}><Text style={[s.deliveryChoiceText,checkoutForm.shippingMethod===x.code&&s.deliveryChoiceTextOn]}>{x.name}</Text></Pressable>)}</View>
+   {checkoutForm.shippingMethod==='home'?<>
+    <TextInput value={checkoutForm.street} onChangeText={v=>setCheckoutForm({...checkoutForm,street:v})} placeholder="Rua" placeholderTextColor="#7892a7" style={s.checkoutInput}/>
+    <View style={s.checkoutInputRow}><TextInput value={checkoutForm.number} onChangeText={v=>setCheckoutForm({...checkoutForm,number:v})} placeholder="Porta" placeholderTextColor="#7892a7" style={[s.checkoutInput,s.checkoutInputSmall]}/><TextInput value={checkoutForm.postalCode} onChangeText={v=>setCheckoutForm({...checkoutForm,postalCode:v})} placeholder="Código postal" placeholderTextColor="#7892a7" style={[s.checkoutInput,s.checkoutInputWide]}/></View>
+    <TextInput value={checkoutForm.city} onChangeText={v=>setCheckoutForm({...checkoutForm,city:v})} placeholder="Localidade" placeholderTextColor="#7892a7" style={s.checkoutInput}/>
+   </>:null}
+
+   <Text style={s.checkoutSectionTitle}>PAGAMENTO</Text>
+   <View style={s.mbwayChoice}><Text style={s.mbwayTitle}>MB WAY</Text><Text style={s.mbwayText}>O pedido de pagamento será enviado para o número indicado acima.</Text></View>
+
+   <View style={s.checkoutSummaryRow}><Text style={s.checkoutSummaryLabel}>Artigos</Text><Text style={s.checkoutSummaryValue}>{moneyEUR(cartTotal)}</Text></View>
+   <View style={s.checkoutSummaryRow}><Text style={s.checkoutSummaryLabel}>Entrega</Text><Text style={s.checkoutSummaryValue}>{Number(selectedShipping.price)>0?moneyEUR(selectedShipping.price):'Grátis'}</Text></View>
+   <View style={[s.checkoutSummaryRow,s.checkoutSummaryTotal]}><Text style={s.checkoutTotalLabel}>TOTAL</Text><Text style={s.checkoutTotalValue}>{moneyEUR(checkoutTotal)}</Text></View>
+
+   {checkoutLoading?<ActivityIndicator style={{marginTop:10}}/>:<Pressable disabled={!checkoutInfo?.enabled} onPress={submitCheckout} style={[s.checkoutBtn,!checkoutInfo?.enabled&&s.checkoutBtnOff]}><Text style={s.checkoutText}>{checkoutInfo?.enabled?'PAGAR COM MB WAY':'MB WAY EM CONFIGURAÇÃO'}</Text></Pressable>}
+   {checkoutMessage?<Text style={s.checkoutMessage}>{checkoutMessage}</Text>:null}
+   {!checkoutInfo?.enabled&&!checkoutLoading?<Text style={s.checkoutNote}>O checkout já fica dentro da app. A ativação do pagamento real depende das credenciais do fornecedor MB WAY.</Text>:null}
+  </View>
  </Page>;
  if(screen==='squads')return <Page><Back title="PLANTÉIS"/>
   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>
@@ -430,6 +497,7 @@ const s=StyleSheet.create({
  cartTopButton:{height:34,marginBottom:10,borderRadius:10,borderWidth:1,borderColor:'rgba(241,185,79,.55)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},cartTopText:{color:'#fff',fontSize:7.5,letterSpacing:.6,marginLeft:8,flex:1},cartBadge:{minWidth:21,height:21,borderRadius:11,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},cartBadgeText:{color:'#082b48',fontSize:7,fontWeight:'700'},cartTopArrow:{color:'#f1b94f',fontSize:18,marginLeft:6},
  storeGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},storeCard:{width:'48.5%',marginBottom:9,padding:7,borderRadius:11,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},storeImage:{width:'100%',aspectRatio:.9,borderRadius:8,backgroundColor:'#fff'},storeImageFallback:{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.06)'},storeName:{color:'#fff',fontSize:7.4,lineHeight:10,minHeight:22,marginTop:6},storePrice:{color:'#f1b94f',fontSize:8.5,fontWeight:'700',marginTop:3},storeStock:{color:'#9bd2ad',fontSize:5.6,marginTop:2},storeStockOut:{color:'#e6a4aa'},storeAdd:{height:26,borderRadius:7,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:6},storeAddOff:{opacity:.4},storeAddText:{color:'#082b48',fontSize:6.2,fontWeight:'700',letterSpacing:.25},storeOfficial:{color:'#b8c8d8',fontSize:5.8,textAlign:'center',marginTop:6},
  productDetail:{padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.28)'},productHero:{width:'100%',aspectRatio:1,borderRadius:10,backgroundColor:'#fff'},productName:{color:'#fff',fontSize:12,lineHeight:16,marginTop:10},productPrice:{color:'#f1b94f',fontSize:13,fontWeight:'700',marginTop:4},productDescription:{color:'#c9d8e4',fontSize:7,lineHeight:11,marginTop:8},optionGroup:{marginTop:11},optionTitle:{color:'#fff',fontSize:7.3,marginBottom:6},optionValues:{flexDirection:'row',flexWrap:'wrap'},optionChip:{paddingHorizontal:10,height:27,borderRadius:14,borderWidth:1,borderColor:'rgba(241,185,79,.45)',alignItems:'center',justifyContent:'center',marginRight:6,marginBottom:6},optionChipOn:{backgroundColor:'#f1b94f'},optionChipText:{color:'#f1b94f',fontSize:6.5},optionChipTextOn:{color:'#082b48',fontWeight:'700'},productAdd:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},productAddText:{color:'#082b48',fontSize:7,fontWeight:'700',letterSpacing:.4},productOfficial:{color:'#b8c8d8',fontSize:6.2,textAlign:'center',marginTop:9},
+  checkoutCard:{padding:11,borderRadius:12,backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.28)'},checkoutSectionTitle:{color:'#f1b94f',fontSize:7.2,letterSpacing:.65,marginTop:6,marginBottom:7},checkoutInput:{height:34,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.32)',backgroundColor:'rgba(1,23,43,.58)',color:'#fff',fontSize:7.5,paddingHorizontal:10,marginBottom:7},checkoutInputRow:{flexDirection:'row',justifyContent:'space-between'},checkoutInputSmall:{width:'31%'},checkoutInputWide:{width:'66%'},deliveryChoices:{flexDirection:'row',flexWrap:'wrap',marginBottom:8},deliveryChoice:{height:29,paddingHorizontal:10,borderRadius:15,borderWidth:1,borderColor:'rgba(241,185,79,.45)',alignItems:'center',justifyContent:'center',marginRight:6,marginBottom:5},deliveryChoiceOn:{backgroundColor:'#f1b94f'},deliveryChoiceText:{color:'#f1b94f',fontSize:6.5},deliveryChoiceTextOn:{color:'#082b48',fontWeight:'700'},mbwayChoice:{padding:9,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.45)',backgroundColor:'rgba(1,23,43,.45)',marginBottom:9},mbwayTitle:{color:'#fff',fontSize:8.5,fontWeight:'700'},mbwayText:{color:'#9fb5c7',fontSize:6.2,lineHeight:9,marginTop:3},checkoutSummaryRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4},checkoutSummaryLabel:{color:'#a9bdcd',fontSize:7},checkoutSummaryValue:{color:'#fff',fontSize:7},checkoutSummaryTotal:{borderTopWidth:1,borderTopColor:'rgba(255,255,255,.15)',marginTop:4,paddingTop:8},checkoutTotalLabel:{color:'#fff',fontSize:8,fontWeight:'700'},checkoutTotalValue:{color:'#f1b94f',fontSize:11,fontWeight:'700'},checkoutBtnOff:{opacity:.38},checkoutMessage:{color:'#fff',fontSize:6.6,lineHeight:10,textAlign:'center',marginTop:8},
   cartItem:{flexDirection:'row',padding:8,marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},cartImage:{width:62,height:72,borderRadius:7,backgroundColor:'#fff'},cartBody:{flex:1,paddingLeft:9},cartName:{color:'#fff',fontSize:8,lineHeight:11},cartOptions:{color:'#9fb5c7',fontSize:6.2,marginTop:2},cartPrice:{color:'#f1b94f',fontSize:8,marginTop:3},qtyRow:{flexDirection:'row',alignItems:'center',marginTop:8},qtyBtn:{width:24,height:22,borderRadius:6,borderWidth:1,borderColor:'rgba(241,185,79,.55)',alignItems:'center',justifyContent:'center'},qtyText:{color:'#f1b94f',fontSize:13,lineHeight:16},qtyValue:{color:'#fff',fontSize:8,minWidth:28,textAlign:'center'},cartTotalRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:10,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.15)'},cartTotalLabel:{color:'#fff',fontSize:8,letterSpacing:.6},cartTotalValue:{color:'#f1b94f',fontSize:11,fontWeight:'700'},checkoutBtn:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},checkoutText:{color:'#082b48',fontSize:7,fontWeight:'700',letterSpacing:.45},checkoutNote:{color:'#8fa8ba',fontSize:5.8,lineHeight:9,marginTop:7,textAlign:'center'},
  newsSection:{marginTop:12},newsHeader:{flexDirection:'row',justifyContent:'space-between',marginBottom:7},newsHeading:{color:'#fff',fontSize:8.5,letterSpacing:.65},newsMore:{color:'#f1b94f',fontSize:6.5},newsCard:{minHeight:49,marginBottom:6,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',flexDirection:'row',alignItems:'center',overflow:'hidden'},newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},newsBody:{flex:1,paddingHorizontal:10,paddingVertical:7},newsMeta:{color:'#f1b94f',fontSize:5.8,letterSpacing:.45,marginBottom:3},newsTitle:{color:'#fff',fontSize:8,lineHeight:11},newsArrow:{color:'#9eb6c9',fontSize:18,paddingHorizontal:10},
  pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:30,lineHeight:30,paddingRight:12},pageTitle:{color:'#fff',fontSize:14,letterSpacing:.8},detailCard:{backgroundColor:'rgba(8,43,72,.90)',borderRadius:14,padding:14,borderWidth:1,borderColor:'rgba(120,164,197,.3)'},kicker:{color:'#f1b94f',fontSize:7,letterSpacing:.5},detailDate:{color:'#fff',fontSize:9,marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:7.5,letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'rgba(8,43,72,.82)',borderRadius:10,padding:11,borderWidth:1,borderColor:'rgba(120,164,197,.22)'},body:{color:'#fff',fontSize:8,lineHeight:13},muted:{color:'#a9bdcd',fontSize:8,lineHeight:12},statRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.08)'},
