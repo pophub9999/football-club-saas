@@ -110,7 +110,7 @@ def article(url):
         visible=clean(body)
         low=visible.lower()
         t=title.lower().strip()
-        p=low.find(t) if t else -1
+        p=low.rfind(t) if t else -1
         q=low.find("últimas notícias",p+len(t)) if p>=0 else -1
         if p>=0:
             rawtxt=visible[p+len(title): q if q>p else None].strip()
