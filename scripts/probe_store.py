@@ -52,3 +52,17 @@ for path in ["/","/products","/categories/equipamentos","/categories/lifestyle",
     nd=s.find("script",id="__NEXT_DATA__")
     if nd:
         print("NEXT_DATA",nd.get_text()[:5000])
+
+print("\nINLINE_DATA_SNIPPETS")
+html=get(BASE+"/products")
+for needle in ["categories:[{","data:{products:[{","products:[{id:"]:
+    i=html.find(needle)
+    print("NEEDLE",needle,"AT",i)
+    if i>=0:
+        print(html[max(0,i-500):i+12000])
+s=BeautifulSoup(html,"html.parser")
+for idx,sc in enumerate(s.find_all("script")):
+    body=sc.get_text()
+    if body and ("products" in body or "categories" in body):
+        print("INLINE_SCRIPT",idx,"type=",sc.get("type"),"len=",len(body))
+        print(body[:15000])
