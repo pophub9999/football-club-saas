@@ -122,25 +122,16 @@ function articleBlocks(html='',fallback='',url=''){
  }
  let out=blocks.length?blocks:(fallback?[{type:'p',text:cleanNewsText(fallback)}]:[]);
  if(/\/blog\/bilhetesjornada2ligaeuropa\/?$/i.test(url||'')){
-  const hasImg=out.some(x=>x.type==='img');
-  if(!hasImg){
-   const price='https://www.torreense.com/source/Captura%20de%20ecra%CC%83%202026-09-23%2C%20a%CC%80s%2021.18.46.png';
-   const map='https://www.torreense.com/source/MapaEstadioLeiria.jpg';
-   const withImgs=[];
-   let priceDone=false,mapDone=false;
-   for(const b of out){
-    withImgs.push(b);
-    if(!priceDone&&b.type!=='img'&&/Os preços são os seguintes:/i.test(b.text||'')){
-      withImgs.push({type:'img',src:price}); priceDone=true;
-    }
-    if(!mapDone&&b.type!=='img'&&/consulte o mapa:/i.test(b.text||'')){
-      withImgs.push({type:'img',src:map}); mapDone=true;
-    }
-   }
-   if(!priceDone)withImgs.push({type:'img',src:price});
-   if(!mapDone)withImgs.push({type:'img',src:map});
-   out=withImgs;
+  const price='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/torreense/bilhetesjornada2ligaeuropa/prices.png';
+  const map='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/torreense/bilhetesjornada2ligaeuropa/map.jpg';
+  out=out.filter(b=>b.type!=='img');
+  const withImgs=[];
+  for(const b of out){
+   withImgs.push(b);
+   if(/Os preços são os seguintes:/i.test(b.text||''))withImgs.push({type:'img',src:price});
+   if(/consulte o mapa:/i.test(b.text||''))withImgs.push({type:'img',src:map});
   }
+  out=withImgs;
  }
  return out;
 }
