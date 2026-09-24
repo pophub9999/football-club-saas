@@ -1,5 +1,5 @@
 name: Probe Torreense Store
-# hydration data trigger
+# storefront API scan trigger
 
 on:
   push:
