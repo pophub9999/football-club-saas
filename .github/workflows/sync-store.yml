@@ -1,5 +1,5 @@
 name: Sync Torreense Store
-# store sync trigger: current catalog string fix
+# store sync trigger: product detail options
 
 on:
   workflow_dispatch:
