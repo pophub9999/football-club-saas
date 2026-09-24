@@ -393,6 +393,129 @@ def article(url):
         "updated_at":datetime.now(timezone.utc).isoformat()
     }
 
+def page_image_url(img):
+    if img is None:
+        return None
+    candidates=[]
+    for attr in ("data-src","data-lazy-src","data-original","data-image","src"):
+        v=img.get(attr)
+        if v:
+            candidates.append(v)
+    for attr in ("data-srcset","srcset"):
+        ss=img.get(attr)
+        if ss:
+            vals=[x.strip().split(" ")[0] for x in ss.split(",") if x.strip()]
+            if vals:
+                candidates=vals[::-1]+candidates
+    pic=img.find_parent("picture")
+    if pic:
+        for source in pic.find_all("source"):
+            ss=source.get("data-srcset") or source.get("srcset")
+            if ss:
+                vals=[x.strip().split(" ")[0] for x in ss.split(",") if x.strip()]
+                if vals:
+                    candidates=vals[::-1]+candidates
+    for src in candidates:
+        src=h.unescape(str(src)).strip()
+        if not src or src.startswith(("data:","blob:")):
+            continue
+        if src.startswith("//"):
+            src="https:"+src
+        elif not re.match(r"^https?://",src,re.I):
+            src=urllib.parse.urljoin("https://www.torreense.com/",src.lstrip("/"))
+        return src
+    return None
+
+def safe_asset_name(value):
+    s=value.casefold()
+    s=re.sub(r"[^a-z0-9]+","-",s)
+    return s.strip("-") or "asset"
+
+def cache_page_image(remote_url,object_prefix,name):
+    if not remote_url:
+        return None
+    ext=os.path.splitext(urllib.parse.urlparse(remote_url).path)[1].lower()
+    if ext not in (".png",".jpg",".jpeg",".webp",".gif",".svg"):
+        ext=".jpg"
+    return cache_image(remote_url,object_prefix+"/"+safe_asset_name(name)+ext)
+
+def sync_team_logos():
+    urls=[
+        "https://www.torreense.com/futebol-profissional/equipa-principal/calendario",
+        "https://www.torreense.com/futebol-profissional/equipa-principal/classificacao",
+    ]
+    teams=json.loads(api("teams?select=id,name&sport_id=eq.1&limit=200"))
+    by_name={x["name"].casefold():x for x in teams}
+    found=0
+    for url in urls:
+        try:
+            soup=BeautifulSoup(get(url),"html.parser")
+        except Exception as e:
+            print("TEAM_LOGO_PAGE_FAILED",url,repr(e))
+            continue
+        for img in soup.find_all("img"):
+            alt=(img.get("alt") or "").strip()
+            team=by_name.get(alt.casefold())
+            if not team:
+                continue
+            src=page_image_url(img)
+            if not src:
+                continue
+            try:
+                cached=cache_page_image(src,"club-assets/teams",team["name"])
+                api("teams?id=eq."+str(team["id"]),"PATCH",{"logo_url":cached,"updated_at":datetime.now(timezone.utc).isoformat()})
+                found+=1
+                print("TEAM_LOGO_CACHED",team["name"],cached)
+            except Exception as e:
+                print("TEAM_LOGO_FAILED",team["name"],src,repr(e))
+    print("TEAM_LOGOS_UPDATED",found)
+
+def sync_player_photos():
+    squad_pages={
+        "SCU Torreense":"https://www.torreense.com/futebol-profissional/equipa-principal/plantel",
+        "SCU Torreense Sub-23":"https://www.torreense.com/futebol-profissional/sub-23-masculino/plantel",
+        "SCU Torreense Futsal Masculino":"https://www.torreense.com/futsal/seniores-futsal-masculinos/plantel",
+        "SCU Torreense Futsal Feminino":"https://www.torreense.com/futsal/seniores-feminino-futsal/plantel",
+    }
+    teams=json.loads(api("teams?select=id,name&limit=200"))
+    team_by_name={x["name"]:x["id"] for x in teams}
+    total=0
+    for team_name,url in squad_pages.items():
+        team_id=team_by_name.get(team_name)
+        if not team_id:
+            print("PLAYER_PHOTO_TEAM_MISSING",team_name)
+            continue
+        try:
+            soup=BeautifulSoup(get(url),"html.parser")
+        except Exception as e:
+            print("PLAYER_PHOTO_PAGE_FAILED",url,repr(e))
+            continue
+        players=json.loads(api("players?select=id,name&team_id=eq."+str(team_id)+"&active=eq.true&limit=200"))
+        player_by_name={x["name"].casefold():x for x in players}
+        seen=set()
+        for img in soup.find_all("img"):
+            alt=(img.get("alt") or "").strip()
+            player=player_by_name.get(alt.casefold())
+            if not player or player["id"] in seen:
+                continue
+            src=page_image_url(img)
+            if not src:
+                continue
+            try:
+                cached=cache_page_image(src,"club-assets/players/"+str(team_id),player["name"])
+                api("players?id=eq."+str(player["id"]),"PATCH",{"photo_url":cached,"updated_at":datetime.now(timezone.utc).isoformat()})
+                seen.add(player["id"])
+                total+=1
+                print("PLAYER_PHOTO_CACHED",team_name,player["name"],cached)
+            except Exception as e:
+                print("PLAYER_PHOTO_FAILED",team_name,player["name"],src,repr(e))
+        print("PLAYER_PHOTOS_TEAM",team_name,len(seen),"/",len(players))
+    print("PLAYER_PHOTOS_UPDATED",total)
+
+def sync_club_assets():
+    sync_team_logos()
+    sync_player_photos()
+
 def main():
     urls=discover_news()
 
@@ -450,6 +573,7 @@ def main():
         "updated_at":now
     }
     api("sync_status?on_conflict=source","POST",[status])
+    sync_club_assets()
     api("app_sync?id=eq.1","PATCH",{"version":int(datetime.now().timestamp()),"updated_at":now})
     print("Synced",len(rows),"news items; failures",failures)
 
