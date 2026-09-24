@@ -21,3 +21,22 @@ for sc in s.find_all("script"):
     txt=sc.string or sc.get_text() or ""
     if any(k in txt.lower() for k in ["parceir","partner","supabase","api/","google maps"]):
         print("SCRIPT",re.sub(r"\s+"," ",txt)[:4000])
+
+print("\nOFFICIAL_ADVANTAGES_PAGE")
+U2="https://www.torreense.com/socio-vantagens"
+req=urllib.request.Request(U2,headers={"User-Agent":"Mozilla/5.0","Accept":"text/html,*/*","Accept-Language":"pt-PT,pt;q=0.9"})
+with urllib.request.urlopen(req,timeout=30) as r:
+    h2=r.read().decode("utf-8","ignore")
+print("OFF_BYTES",len(h2))
+s2=BeautifulSoup(h2,"html.parser")
+for img in s2.find_all("img"):
+    alt=(img.get("alt") or "").strip()
+    if alt:
+        p=img
+        for _ in range(5):
+            p=p.parent if p else None
+            if not p: break
+            txt=" ".join(p.get_text(" ",strip=True).split())
+            if ("Desconto" in txt or "Vantagens" in txt or "Oferta" in txt) and len(txt)<900:
+                print("OFFCARD","ALT",repr(alt),"TAG",p.name,"CLASS",p.get("class"),"TXT",txt[:700])
+                break
