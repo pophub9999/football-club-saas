@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: multi-modality calendar and women squad
+# Deploy trigger: final multi-modality calendar
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
