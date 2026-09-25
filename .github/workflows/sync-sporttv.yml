@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '*/30 * * * *'
 
-# Sync trigger: initial SPORT TV summaries import
+# Sync trigger: score-and-order highlight matching
 jobs:
   sync:
     runs-on: ubuntu-latest
