@@ -2,6 +2,10 @@ name: Sync SCUTV Streams
 
 on:
   workflow_dispatch:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/sync-scutv.yml'
   schedule:
     - cron: '*/5 * * * *'
 
