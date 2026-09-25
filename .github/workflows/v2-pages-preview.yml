@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: calendar spacing and futsal logos
+# Deploy trigger: standings modality and competition filters
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
