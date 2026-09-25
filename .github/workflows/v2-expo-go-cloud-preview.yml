@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-cloud-preview.yml'
 
-# Publish trigger: calendar tabs and rich past match details
+# Publish trigger: stable Expo Go branch preview
 jobs:
   publish:
     name: Publish Expo Go preview
@@ -41,4 +41,12 @@ jobs:
 
       - name: Publish Expo Go preview
         working-directory: v2-app
-        run: eas update --branch expo-go-preview --message "SCU Torreense cloud preview" --environment preview --non-interactive
+        run: eas update --branch expo-go-preview --message "SCU Torreense cloud preview" --environment preview --clear-cache --non-interactive
+
+      - name: Show Expo Go preview branch
+        working-directory: v2-app
+        run: |
+          echo "=== expo-go-preview branch ==="
+          eas branch:view expo-go-preview --json --non-interactive
+          echo "=== latest expo-go-preview update ==="
+          eas update:list --branch expo-go-preview --limit 1 --json --non-interactive
