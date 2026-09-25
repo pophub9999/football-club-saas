@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: brighter mobile background image
+# Deploy trigger: lighter castle blue burgundy background
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
