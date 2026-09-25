@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '*/30 * * * *'
 
-# Sync trigger: score-and-order highlight matching
+# Sync trigger: normalized club aliases
 jobs:
   sync:
     runs-on: ubuntu-latest
