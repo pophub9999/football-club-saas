@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: white cards theme
+# Deploy trigger: navigation photo picker contrast refinements
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
