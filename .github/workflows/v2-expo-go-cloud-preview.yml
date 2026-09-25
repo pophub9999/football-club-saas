@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-cloud-preview.yml'
 
-# Publish trigger: Expo Go SDK runtime
+# Publish trigger: current Expo Go SDK57 preview
 jobs:
   publish:
     name: Publish Expo Go preview
