@@ -338,6 +338,7 @@ export default function App(){
  const [shippingOptions,setShippingOptions]=useState([]),[checkoutInfo,setCheckoutInfo]=useState(null),[checkoutLoading,setCheckoutLoading]=useState(false),[checkoutMessage,setCheckoutMessage]=useState('');
  const [checkoutForm,setCheckoutForm]=useState({name:'',email:'',phone:'',nif:'',shippingMethod:'home',street:'',number:'',postalCode:'',city:''});
  const [cart,setCart]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?JSON.parse(window.localStorage.getItem('scut_cart')||'[]'):[]}catch{return []}});
+ const [cartNotice,setCartNotice]=useState(''),cartNoticeTimer=useRef(null);
  const [syncVersion,setSyncVersion]=useState(null);
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
 
@@ -530,6 +531,9 @@ export default function App(){
   const selectedLabels=Object.entries(choices).map(([field,v])=>({field,label:v?.label||String(v||''),value:v?.value||v}));
   const found=cart.find(x=>x.key===key);
   saveCart(found?cart.map(x=>x.key===key?{...x,qty:x.qty+1}:x):[...cart,{...product,key,selectedOptions:selectedLabels,qty:1}]);
+  if(cartNoticeTimer.current)clearTimeout(cartNoticeTimer.current);
+  setCartNotice('✓ '+(product?.name||'Produto')+' adicionado ao carrinho');
+  cartNoticeTimer.current=setTimeout(()=>setCartNotice(''),2200);
  }
  function changeCartQty(key,delta){
   saveCart(cart.map(x=>x.key===key?{...x,qty:Math.max(0,x.qty+delta)}:x).filter(x=>x.qty>0));
@@ -732,6 +736,10 @@ export default function App(){
  const memberPaymentAmount=memberFeeAmount(memberCategory,memberPaymentPlan);
  const memberNeedsGuardian=memberAge!=null&&memberAge<16;
 
+ function CartNotice(){
+  return cartNotice?<View style={s.cartNotice}><Text style={s.cartNoticeIcon}>✓</Text><Text style={s.cartNoticeText}>{cartNotice.replace(/^✓\s*/,'')}</Text></View>:null;
+ }
+
  function swipeBack(){
   if(screen==='home')return;
   const fixed={
@@ -909,7 +917,7 @@ export default function App(){
    {selectedBenefit.source_url?<Pressable onPress={()=>openOfficialStore(selectedBenefit.source_url)} style={s.benefitAction}><Text style={s.benefitActionText}>VER NO SITE OFICIAL</Text><Text style={s.benefitActionArrow}>›</Text></Pressable>:null}
   </View>:<View style={s.infoCard}><Text style={s.muted}>Vantagem indisponível.</Text></View>}
  </Page>;
- if(screen==='store')return <Page><Back title="LOJA"/>
+ if(screen==='store')return <Page><Back title="LOJA"/><CartNotice/>
   <Pressable style={s.cartTopButton} onPress={()=>setScreen('cart')}><ShortcutIcon type="shop"/><Text style={s.cartTopText}>CARRINHO</Text><View style={s.cartBadge}><Text style={s.cartBadgeText}>{cartCount}</Text></View><Text style={s.cartTopArrow}>›</Text></Pressable>
   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>
    <Pressable onPress={()=>setStoreCategory('TODOS')} style={[s.filter,storeCategory==='TODOS'&&s.filterOn]}><Text style={[s.filterText,storeCategory==='TODOS'&&s.filterTextOn]}>TODOS</Text></Pressable>
@@ -924,7 +932,7 @@ export default function App(){
    <Pressable onPress={()=>openOfficialStore(p.url)}><Text style={s.storeOfficial}>VER ARTIGO ›</Text></Pressable>
   </View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>A loja está a sincronizar os artigos oficiais.</Text></View>}
  </Page>;
- if(screen==='product')return <Page><Back title="ARTIGO" to="store"/>
+ if(screen==='product')return <Page><Back title="ARTIGO" to="store"/><CartNotice/>
   {selectedProduct?<View style={s.productDetail}>
    {selectedProduct.image_url?<Image source={{uri:selectedProduct.image_url}} style={s.productHero} resizeMode="contain"/>:null}
    <Text style={s.productName}>{selectedProduct.name}</Text>
@@ -938,7 +946,7 @@ export default function App(){
    <Pressable onPress={()=>openOfficialStore(selectedProduct.url)}><Text style={s.productOfficial}>VER NO SITE OFICIAL ›</Text></Pressable>
   </View>:null}
  </Page>;
- if(screen==='cart')return <Page><Back title="CARRINHO" to="store"/>
+ if(screen==='cart')return <Page><Back title="CARRINHO" to="store"/><CartNotice/>
   {cart.length?<>
    {cart.map(item=><View key={item.key||item.id} style={s.cartItem}>
     {item.image_url?<Image source={{uri:item.image_url}} style={s.cartImage} resizeMode="contain"/>:null}
@@ -1147,6 +1155,7 @@ const s=StyleSheet.create({
  benefitSearch:{height:30,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.34)',backgroundColor:'#f3f6f8',color:'#fff',fontSize:fs(6.8),paddingHorizontal:9,marginBottom:7},benefitFilters:{marginBottom:8},benefitResultHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:-1,marginBottom:5},benefitResultCount:{color:'#17324a',fontSize:fs(5.9),letterSpacing:.35},benefitSource:{color:'#f1b94f',fontSize:fs(5.9),letterSpacing:.25},
  benefitRow:{minHeight:48,marginBottom:5,borderRadius:9,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',paddingHorizontal:7,paddingVertical:5},benefitAvatar:{width:31,height:31,borderRadius:8,backgroundColor:'rgba(241,185,79,.13)',borderWidth:1,borderColor:'rgba(241,185,79,.32)',alignItems:'center',justifyContent:'center'},benefitAvatarText:{color:'#f1b94f',fontSize:fs(11),fontWeight:'800'},benefitRowBody:{flex:1,paddingLeft:8,paddingRight:6},benefitName:{color:'#17324a',fontSize:fs(7.8),lineHeight:fs(10.5),fontWeight:'600'},benefitRowMeta:{color:'#667b8c',fontSize:fs(5.8),lineHeight:fs(8),marginTop:2},benefitDiscountCompact:{maxWidth:72,minWidth:38,minHeight:23,paddingHorizontal:6,borderRadius:7,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},benefitDiscountCompactText:{color:'#082b48',fontSize:fs(6.8),fontWeight:'800',textAlign:'center'},benefitRowArrow:{color:'#17324a',fontSize:fs(16),lineHeight:fs(18),marginLeft:5},
  benefitDetailCard:{padding:12,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},benefitDetailTop:{flexDirection:'row',alignItems:'center',marginBottom:12},benefitDetailAvatar:{width:42,height:42,borderRadius:11,backgroundColor:'rgba(241,185,79,.13)',borderWidth:1,borderColor:'rgba(241,185,79,.35)',alignItems:'center',justifyContent:'center'},benefitDetailAvatarText:{color:'#f1b94f',fontSize:fs(15),fontWeight:'800'},benefitDetailNameWrap:{flex:1,paddingHorizontal:9},benefitDetailName:{color:'#17324a',fontSize:fs(10.5),lineHeight:fs(14),fontWeight:'700'},benefitDetailCategory:{color:'#667b8c',fontSize:fs(6.2),marginTop:2},benefitDiscount:{minWidth:44,minHeight:28,paddingHorizontal:7,borderRadius:8,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},benefitDiscountText:{color:'#082b48',fontSize:fs(8.1),fontWeight:'800',textAlign:'center'},benefitDetailLabel:{color:'#f1b94f',fontSize:fs(6),letterSpacing:.55,marginTop:8,marginBottom:4},benefitDetailText:{color:'#17324a',fontSize:fs(7.2),lineHeight:fs(11)},benefitAction:{height:31,borderRadius:8,borderWidth:1,borderColor:'rgba(241,185,79,.43)',marginTop:9,paddingHorizontal:10,flexDirection:'row',alignItems:'center'},benefitActionText:{color:'#f1b94f',fontSize:fs(6.4),letterSpacing:.35,flex:1},benefitActionArrow:{color:'#f1b94f',fontSize:fs(17)},
+  cartNotice:{minHeight:34,marginBottom:9,borderRadius:9,backgroundColor:'#eaf6ee',borderWidth:1,borderColor:'#b9dfc5',paddingHorizontal:10,paddingVertical:7,flexDirection:'row',alignItems:'center'},cartNoticeIcon:{color:'#23854a',fontSize:fs(9),fontWeight:'900',marginRight:7},cartNoticeText:{flex:1,color:'#195d35',fontSize:fs(6.7),fontWeight:'700',lineHeight:fs(9)},
   cartTopButton:{height:34,marginBottom:10,borderRadius:10,borderWidth:1,borderColor:'#d7e0e7',backgroundColor:'#ffffff',flexDirection:'row',alignItems:'center',paddingHorizontal:10},cartTopText:{color:'#17324a',fontSize:fs(7.5),letterSpacing:.6,marginLeft:8,flex:1},cartBadge:{minWidth:21,height:21,borderRadius:11,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},cartBadgeText:{color:'#082b48',fontSize:fs(7),fontWeight:'700'},cartTopArrow:{color:'#f1b94f',fontSize:fs(18),marginLeft:6},
  storeGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},storeCard:{width:'48.5%',marginBottom:9,padding:7,borderRadius:11,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},storeImage:{width:'100%',aspectRatio:.9,borderRadius:8,backgroundColor:'#fff'},storeImageFallback:{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.06)'},storeName:{color:'#17324a',fontSize:fs(7.4),lineHeight:fs(10),minHeight:22,marginTop:6},storePrice:{color:'#f1b94f',fontSize:fs(8.5),fontWeight:'700',marginTop:3},storeStock:{color:'#9bd2ad',fontSize:fs(5.6),marginTop:2},storeStockOut:{color:'#e6a4aa'},storeAdd:{height:26,borderRadius:7,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:6},storeAddOff:{opacity:.4},storeAddText:{color:'#082b48',fontSize:fs(6.2),fontWeight:'700',letterSpacing:.25},storeOfficial:{color:'#667b8c',fontSize:fs(5.8),textAlign:'center',marginTop:6},
  productDetail:{padding:10,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},productHero:{width:'100%',aspectRatio:1,borderRadius:10,backgroundColor:'#fff'},productName:{color:'#17324a',fontSize:fs(12),lineHeight:fs(16),marginTop:10},productPrice:{color:'#f1b94f',fontSize:fs(13),fontWeight:'700',marginTop:4},productDescription:{color:'#667b8c',fontSize:fs(7),lineHeight:fs(11),marginTop:8},optionGroup:{marginTop:11},optionTitle:{color:'#17324a',fontSize:fs(7.3),marginBottom:6},optionValues:{flexDirection:'row',flexWrap:'wrap'},optionChip:{paddingHorizontal:10,height:27,borderRadius:14,borderWidth:1,borderColor:'rgba(241,185,79,.45)',alignItems:'center',justifyContent:'center',marginRight:6,marginBottom:6},optionChipOn:{backgroundColor:'#f1b94f'},optionChipText:{color:'#f1b94f',fontSize:fs(6.5)},optionChipTextOn:{color:'#082b48',fontWeight:'700'},productAdd:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},productAddText:{color:'#082b48',fontSize:fs(7),fontWeight:'700',letterSpacing:.4},productOfficial:{color:'#667b8c',fontSize:fs(6.2),textAlign:'center',marginTop:9},
