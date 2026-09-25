@@ -1,7 +1,7 @@
 import '@expo/metro-runtime';
 import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput } from 'react-native';
+import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput, PanResponder } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { WebView } from 'react-native-webview';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
@@ -61,13 +61,26 @@ function YouTubeBadge({onPress,summary=false,label='Abrir vídeo no YouTube'}){
   <View style={s.youtubeIcon}><Text style={s.youtubePlay}>▶</Text>{summary?<View style={s.youtubeSummaryMark}><Text style={s.youtubeSummaryMarkText}>R</Text></View>:null}</View>
  </Pressable>;
 }
+let APP_SWIPE_BACK=null;
 function Page({children,scroll=true}){
  const {width,height}=useWindowDimensions();
+ const swipeBackResponder=useRef(PanResponder.create({
+  onMoveShouldSetPanResponder:(evt,g)=>{
+   if(Platform.OS==='web')return false;
+   const fromLeftEdge=Number(g.x0||0)<=32;
+   const horizontal=g.dx>10&&Math.abs(g.dx)>Math.abs(g.dy)*1.35;
+   return fromLeftEdge&&horizontal;
+  },
+  onPanResponderTerminationRequest:()=>false,
+  onPanResponderRelease:(evt,g)=>{
+   if(g.dx>=72&&(g.vx>=0.12||g.dx>=110))APP_SWIPE_BACK?.();
+  }
+ })).current;
  const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
  const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
  const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
  const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
- return <View style={s.root}>
+ return <View style={s.root} {...(Platform.OS==='web'?{}:swipeBackResponder.panHandlers)}>
   <StatusBar hidden/>
   <Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>
   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={logoStyle} alt="SCU Torreense"/>
@@ -420,7 +433,7 @@ export default function App(){
  }})();return()=>{live=false}},[]);
 
  async function openGame(){
-  setScreen('game');setGameTab('RESUMO');
+  setPreviousScreen('home');setScreen('game');setGameTab('RESUMO');
   setGameInfo({event:game,stats:[],lineup:[],timeline:[],results:[]});
   setGameLoading(false);
  }
@@ -441,11 +454,13 @@ export default function App(){
  }
  function openCalendarGame(item){
   if(!item?.ev)return;
+  setPreviousScreen('calendar');
   setGame(item.ev);setGameTab('RESUMO');
   setGameInfo({event:item.ev,stats:[],lineup:[],timeline:[],results:[]});
   setScreen('game');
  }
  function openPlayer(player){
+  setPreviousScreen(screen);
   setSelectedPlayer(player);setPlayerDetailTab('ESTATÍSTICAS');setScreen('playerDetail');
  }
  function openScutv(video,provider='SCUTV'){
@@ -671,6 +686,21 @@ export default function App(){
  const memberCurrentFee=memberFee(memberCategory);
  const memberPaymentAmount=memberFeeAmount(memberCategory,memberPaymentPlan);
  const memberNeedsGuardian=memberAge!=null&&memberAge<16;
+
+ function swipeBack(){
+  if(screen==='home')return;
+  const fixed={
+   news:'home',members:'home',benefits:'home',store:'home',calendar:'home',squads:'home',
+   benefitDetail:'benefits',product:'store',cart:'store',checkout:'cart'
+  };
+  let target=fixed[screen];
+  if(screen==='article')target=previousScreen==='news'?'news':'home';
+  if(screen==='game')target=previousScreen==='calendar'?'calendar':'home';
+  if(screen==='playerDetail')target=previousScreen||'calendar';
+  if(screen==='scutv')target=previousScreen||'calendar';
+  if(target&&target!==screen)setScreen(target);
+ }
+ APP_SWIPE_BACK=swipeBack;
 
  function Back({title,to='home'}){return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={s.back}>‹</Text></Pressable><Text style={s.pageTitle}>{title}</Text></View>}
 
