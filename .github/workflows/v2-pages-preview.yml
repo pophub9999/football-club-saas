@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: open SPORT TV summaries in YouTube
+# Deploy trigger: native readability and image fixes
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
