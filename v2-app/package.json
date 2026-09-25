@@ -20,7 +20,8 @@
     "react-native-web": "^0.21.2",
     "@expo/metro-runtime": "~57.0.16",
     "expo-image-picker": "~57.0.20",
-    "react-native-webview": "13.16.1"
+    "react-native-webview": "13.16.1",
+    "expo-updates": "~57.0.23"
   },
   "devDependencies": {}
 }
