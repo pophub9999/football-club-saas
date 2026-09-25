@@ -346,7 +346,7 @@ export default function App(){
   const [v,n,m,p,st,sc,sp,sh,bf,tv,hl]=await Promise.all([
    sb('app_sync?select=version,updated_at&id=eq.1'),
    sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&active=eq.true&order=published_at.desc.nullslast&limit=100'),
-   sb('matches?select=id,competition_id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,short_name,logo_url),away:teams!matches_away_team_id_fkey(name,short_name,logo_url)&order=starts_at.asc&limit=300'),
+   sb('matches?select=id,competition_id,home_team_id,away_team_id,event_type,round,starts_at,status,venue,city,home_score,away_score,attendance,summary,video_url,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,short_name,logo_url),away:teams!matches_away_team_id_fkey(name,short_name,logo_url)&order=starts_at.asc&limit=300'),
    sb('players?select=id,name,short_name,shirt_number,position,position_detail,birth_date,nationality,height_cm,preferred_foot,birth_place,market_value_text,contract_until,season_matches,season_minutes,season_goals,season_assists,season_goalkeeper_conceded,biography,palmares,career_history,profile_source_url,photo_url,team:teams!players_team_id_fkey(id,name,short_name,age_group,gender,sports(name))&active=eq.true&order=shirt_number.asc&limit=500'),
    sb('standings?select=id,competition_id,position,played,wins,draws,losses,goals_for,goals_against,goal_difference,points,form,competition:competitions(name),team:teams!standings_team_id_fkey(id,name,short_name,logo_url,gender,sports(name))&order=competition_id.asc,position.asc&limit=200'),
    sb('store_categories?select=id,name,sort_order&active=eq.true&order=sort_order.asc'),
@@ -381,6 +381,11 @@ export default function App(){
    const ev={
     idEvent:String(x.id),
     dbId:x.id,
+    _homeTeamId:x.home_team_id,
+    _awayTeamId:x.away_team_id,
+    _summary:x.summary||'',
+    _attendance:x.attendance,
+    _videoUrl:x.video_url||null,
     strLeague:x.competitions?.name||'COMPETIÇÃO',
     intRound:(x.round||'').replace(/^J/i,''),
     strTimestamp:x.starts_at,
@@ -446,10 +451,35 @@ export default function App(){
   if(live)setLoading(false);
  }})();return()=>{live=false}},[]);
 
+ async function loadGameDetails(ev){
+  if(!ev)return;
+  const matchId=ev.dbId||ev.idEvent;
+  setGameLoading(true);
+  try{
+   const [statsRows,lineupRows,eventRows]=await Promise.all([
+    sb('match_statistics?select=id,team_id,stat_type,value,display_value&match_id=eq.'+encodeURIComponent(matchId)+'&order=id.asc'),
+    sb('lineups?select=id,team_id,player_id,player_name,shirt_number,position,lineup_type,formation_position,team:teams!lineups_team_id_fkey(name,short_name),player:players!lineups_player_id_fkey(name,short_name,photo_url)&match_id=eq.'+encodeURIComponent(matchId)+'&order=team_id.asc,lineup_type.asc,formation_position.asc,id.asc'),
+    sb('match_events?select=id,team_id,player_id,minute,extra_minute,event_type,description,video_url,team:teams!match_events_team_id_fkey(name,short_name),player:players!match_events_player_id_fkey(name,short_name)&match_id=eq.'+encodeURIComponent(matchId)+'&order=minute.asc,extra_minute.asc,id.asc')
+   ]);
+   const grouped={};
+   (statsRows||[]).forEach(x=>{
+    const key=String(x.stat_type||'Estatística');
+    if(!grouped[key])grouped[key]={label:key.replace(/_/g,' '),home:'—',away:'—'};
+    const value=x.display_value!=null&&x.display_value!==''?String(x.display_value):(x.value!=null?String(x.value):'—');
+    if(String(x.team_id)===String(ev._homeTeamId))grouped[key].home=value;
+    else if(String(x.team_id)===String(ev._awayTeamId))grouped[key].away=value;
+   });
+   setGameInfo({event:ev,stats:Object.values(grouped),lineup:lineupRows||[],timeline:eventRows||[],results:[]});
+  }catch(e){
+   setGameInfo({event:ev,stats:[],lineup:[],timeline:[],results:[]});
+  }finally{
+   setGameLoading(false);
+  }
+ }
  async function openGame(){
   setPreviousScreen('home');setScreen('game');setGameTab('RESUMO');
   setGameInfo({event:game,stats:[],lineup:[],timeline:[],results:[]});
-  setGameLoading(false);
+  await loadGameDetails(game);
  }
  async function openArticle(item){
   setPreviousScreen(screen);setSelectedNews(item);setScreen('article');
@@ -466,12 +496,13 @@ export default function App(){
   setScreen('calendar');
   setCalendarLoading(false);
  }
- function openCalendarGame(item){
+ async function openCalendarGame(item){
   if(!item?.ev)return;
   setPreviousScreen('calendar');
   setGame(item.ev);setGameTab('RESUMO');
   setGameInfo({event:item.ev,stats:[],lineup:[],timeline:[],results:[]});
   setScreen('game');
+  await loadGameDetails(item.ev);
  }
  function openPlayer(player){
   setPreviousScreen(screen);
@@ -720,12 +751,38 @@ export default function App(){
 
  if(screen==='game'){
   const ev=gameInfo.event||game,home={name:ev?.strHomeTeam,logo:ev?.strHomeTeamBadge||ev?.strHomeTeamLogo},away={name:ev?.strAwayTeam,logo:ev?.strAwayTeamBadge||ev?.strAwayTeamLogo};
+  const scoreKnown=ev?.intHomeScore!=null&&ev?.intAwayScore!=null;
+  const summaryText=ev?._summary||(ev?.strStatus==='finished'&&scoreKnown
+   ?('Resultado final: '+home.name+' '+ev.intHomeScore+'–'+ev.intAwayScore+' '+away.name+'.'+(ev?.intRound?' Encontro da jornada '+ev.intRound+' da '+(ev?.strLeague||'competição')+'.':''))
+   :('Jogo da '+(ev?.intRound?'jornada '+ev.intRound:'competição')+' entre '+(home.name||'')+' e '+(away.name||'')+'.'));
+  const homeLineup=gameInfo.lineup.filter(x=>String(x.team_id)===String(ev?._homeTeamId));
+  const awayLineup=gameInfo.lineup.filter(x=>String(x.team_id)===String(ev?._awayTeamId));
+  const lineupTeams=[{name:home.name,rows:homeLineup},{name:away.name,rows:awayLineup}];
   return <Page><Back title="JOGO"/>{gameLoading?<ActivityIndicator/>:<>
    <View style={s.detailCard}><Text style={s.kicker}>{ev?.strLeague||'COMPETIÇÃO'} · {ev?.intRound?'JORNADA '+ev.intRound:''}</Text><Text style={s.detailDate}>{fmtGameDate(ev)}</Text><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.bigLogo}/><Text style={s.teamName}>{home.name}</Text>{ev?._homeStanding&&<Text style={s.teamStanding}>{ev._homeStanding.position}.º · {ev._homeStanding.points} pts</Text>}</View><Text style={s.score}>{ev?.intHomeScore!=null?ev.intHomeScore+' - '+ev.intAwayScore:'VS'}</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.bigLogo}/><Text style={s.teamName}>{away.name}</Text>{ev?._awayStanding&&<Text style={s.teamStanding}>{ev._awayStanding.position}.º · {ev._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {ev?.strVenue||'Local a confirmar'}{ev?.raw?.city?' · '+ev.raw.city:''}</Text><View style={s.gameStatusRow}><Text style={s.gameStatus}>{ev?.strStatus==='scheduled'?'Agendado':ev?.strStatus==='finished'?'Terminado':ev?.strStatus||''}</Text>{ev?.scutvVideo&&((ev.strStatus==='finished')||ev.scutvVideo.live_status==='is_live')?<YouTubeBadge label="Abrir SCUTV" onPress={()=>openScutv(ev.scutvVideo,'SCUTV')}/>:null}{ev?.sporttvHighlight?<YouTubeBadge summary label="Ver resumo SPORT TV" onPress={()=>openScutv(ev.sporttvHighlight,'SPORT TV')}/>:null}</View></View>
    <View style={s.gameTabs}>{['RESUMO','ESTATÍSTICAS','ONZE'].map(t=><Pressable key={t} onPress={()=>setGameTab(t)} style={[s.gameTab,gameTab===t&&s.gameTabOn]}><Text style={[s.gameTabText,gameTab===t&&s.gameTabTextOn]}>{t}</Text></Pressable>)}</View>
-   {gameTab==='RESUMO'&&<View style={s.infoCard}><Text style={s.body}>{ev?.strDescriptionEN||('Jogo da '+(ev?.intRound?'jornada '+ev.intRound:'competição')+' entre '+(ev?.strHomeTeam||'')+' e '+(ev?.strAwayTeam||'')+'.')}</Text>{ev?._homeStanding&&ev?._awayStanding&&<Text style={[s.muted,{marginTop:8}]}>Classificação atual: {ev.strHomeTeam} {ev._homeStanding.position}.º ({ev._homeStanding.points} pts) · {ev.strAwayTeam} {ev._awayStanding.position}.º ({ev._awayStanding.points} pts)</Text>}{gameInfo.timeline.length>0&&<View style={s.timeline}>{gameInfo.timeline.map((x,i)=><Text key={i} style={s.body}>{x.strTimeline||x.strEvent||x.strPlayer||''}</Text>)}</View>}</View>}
-   {gameTab==='ESTATÍSTICAS'&&<View style={s.infoCard}>{gameInfo.stats.length?gameInfo.stats.map((x,i)=><View key={i} style={s.statRow}><Text style={s.body}>{x.strStat||x.strStatType||'Estatística'}</Text><Text style={s.body}>{x.intHome||x.strHome||''}  {x.intAway||x.strAway||''}</Text></View>):<Text style={s.muted}>As estatísticas aparecem aqui quando forem disponibilizadas pela fonte.</Text>}</View>}
-   {gameTab==='ONZE'&&<View style={s.infoCard}>{gameInfo.lineup.length?gameInfo.lineup.map((x,i)=><Text key={i} style={s.body}>{x.strPlayer||x.strPlayerName||x.strHomeTeam||''}</Text>):<Text style={s.muted}>O onze aparece aqui quando for disponibilizado pela fonte.</Text>}</View>}
+   {gameTab==='RESUMO'&&<View style={s.infoCard}>
+    <Text style={s.body}>{summaryText}</Text>
+    {ev?._attendance!=null?<Text style={[s.muted,{marginTop:7}]}>Assistência: {Number(ev._attendance).toLocaleString('pt-PT')} espectadores</Text>:null}
+    {ev?._homeStanding&&ev?._awayStanding&&<Text style={[s.muted,{marginTop:7}]}>Classificação atual: {ev.strHomeTeam} {ev._homeStanding.position}.º ({ev._homeStanding.points} pts) · {ev.strAwayTeam} {ev._awayStanding.position}.º ({ev._awayStanding.points} pts)</Text>}
+    {gameInfo.timeline.length>0&&<View style={s.timeline}><Text style={s.gameSectionLabel}>MOMENTOS DO JOGO</Text>{gameInfo.timeline.map((x,i)=>{
+     const minute=x.minute!=null?String(x.minute)+(x.extra_minute?'+'+x.extra_minute:'')+'′':'';
+     const who=x.player?.short_name||x.player?.name||'';
+     const detail=x.description||String(x.event_type||'').replace(/_/g,' ');
+     return <View key={x.id||i} style={s.gameEventRow}><Text style={s.gameEventMinute}>{minute}</Text><View style={s.gameEventBody}><Text style={s.gameEventTitle}>{who||detail}</Text>{who&&detail?<Text style={s.gameEventDetail}>{detail}</Text>:null}</View></View>;
+    })}</View>}
+   </View>}
+   {gameTab==='ESTATÍSTICAS'&&<View style={s.infoCard}>{gameInfo.stats.length?<><View style={s.gameStatsHead}><Text style={s.gameStatsTeam}>{home.name}</Text><Text style={s.gameStatsLabel}>ESTATÍSTICA</Text><Text style={s.gameStatsTeam}>{away.name}</Text></View>{gameInfo.stats.map((x,i)=><View key={i} style={s.statRow}><Text style={s.gameStatValue}>{x.home}</Text><Text style={s.gameStatName}>{x.label}</Text><Text style={s.gameStatValue}>{x.away}</Text></View>)}</>:<Text style={s.muted}>Ainda não existem estatísticas oficiais carregadas para este jogo.</Text>}</View>}
+   {gameTab==='ONZE'&&<View style={s.infoCard}>{gameInfo.lineup.length?lineupTeams.map(team=>{
+    const starters=team.rows.filter(x=>!x.lineup_type||/titular|starter|initial/i.test(x.lineup_type));
+    const subs=team.rows.filter(x=>x.lineup_type&&/suplente|sub|bench/i.test(x.lineup_type));
+    const other=team.rows.filter(x=>!starters.includes(x)&&!subs.includes(x));
+    const groups=[['ONZE INICIAL',starters],['SUPLENTES',subs],['OUTROS JOGADORES',other]].filter(g=>g[1].length);
+    return <View key={team.name} style={s.lineupTeamBlock}><Text style={s.lineupTeamTitle}>{team.name}</Text>{groups.map(([label,rows])=><View key={label}><Text style={s.lineupGroupTitle}>{label}</Text>{rows.map((x,i)=>{
+     const p=x.player||{name:x.player_name,short_name:x.player_name,photo_url:null};
+     return <View key={x.id||i} style={s.lineupPlayerRow}><View style={s.lineupPhoto}><PlayerPhoto player={p} compact/></View><Text style={s.lineupNumber}>{x.shirt_number??'—'}</Text><View style={s.lineupPlayerBody}><Text style={s.lineupPlayerName}>{p.short_name||p.name||x.player_name||'Jogador'}</Text>{x.position?<Text style={s.lineupPosition}>{x.position}</Text>:null}</View></View>;
+    })}</View>)}</View>;
+   }):<Text style={s.muted}>Ainda não existe um onze oficial carregado para este jogo.</Text>}</View>}
   </>}</Page>
  }
  if(screen==='scutv')return <Page scroll={false}><Back title={selectedScutv?.live_status==='is_live'?'SCUTV · DIRETO':'SCUTV'} to={previousScreen||'calendar'}/>
@@ -975,9 +1032,9 @@ export default function App(){
  </Page>;
  if(screen==='calendar')return <Page scroll={false}>
   <Back title="CALENDÁRIO"/>
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.calendarTabs} contentContainerStyle={s.calendarTabsContent}>
-   {['CALENDÁRIO','CLASSIFICAÇÃO','PLANTEL','ESTATÍSTICAS'].map(tab=><Pressable key={tab} onPress={()=>setCalendarTab(tab)} style={[s.calendarTopTab,calendarTab===tab&&s.calendarTopTabOn]}><Text style={[s.calendarTopTabText,calendarTab===tab&&s.calendarTopTabTextOn]}>{tab}</Text></Pressable>)}
-  </ScrollView>
+  <View style={s.calendarTabs}>
+   {['CALENDÁRIO','CLASSIFICAÇÃO','PLANTEL','ESTATÍSTICAS'].map(tab=><Pressable key={tab} onPress={()=>setCalendarTab(tab)} style={[s.calendarTopTab,calendarTab===tab&&s.calendarTopTabOn]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.86} style={[s.calendarTopTabText,calendarTab===tab&&s.calendarTopTabTextOn]}>{tab}</Text></Pressable>)}
+  </View>
 
   {calendarTab==='CALENDÁRIO'?<>
    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.calendarSportBar} contentContainerStyle={s.filtersContent}>
@@ -1096,10 +1153,10 @@ const s=StyleSheet.create({
   checkoutCard:{padding:11,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},checkoutSectionTitle:{color:'#f1b94f',fontSize:fs(7.2),letterSpacing:.65,marginTop:6,marginBottom:7},checkoutInput:{height:34,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.32)',backgroundColor:'#f3f6f8',color:'#17324a',fontSize:fs(7.5),paddingHorizontal:10,marginBottom:7},checkoutInputRow:{flexDirection:'row',justifyContent:'space-between'},checkoutInputSmall:{width:'31%'},checkoutInputWide:{width:'66%'},deliveryChoices:{flexDirection:'row',flexWrap:'wrap',marginBottom:8},deliveryChoice:{height:29,paddingHorizontal:10,borderRadius:15,borderWidth:1,borderColor:'rgba(241,185,79,.45)',alignItems:'center',justifyContent:'center',marginRight:6,marginBottom:5},deliveryChoiceOn:{backgroundColor:'#f1b94f'},deliveryChoiceText:{color:'#f1b94f',fontSize:fs(6.5)},deliveryChoiceTextOn:{color:'#082b48',fontWeight:'700'},mbwayChoice:{padding:9,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.45)',backgroundColor:'#f3f6f8',marginBottom:9},mbwayTitle:{color:'#17324a',fontSize:fs(8.5),fontWeight:'700'},mbwayText:{color:'#667b8c',fontSize:fs(6.2),lineHeight:fs(9),marginTop:3},checkoutSummaryRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4},checkoutSummaryLabel:{color:'#667b8c',fontSize:fs(7)},checkoutSummaryValue:{color:'#17324a',fontSize:fs(7)},checkoutSummaryTotal:{borderTopWidth:1,borderTopColor:'#dce4ea',marginTop:4,paddingTop:8},checkoutTotalLabel:{color:'#17324a',fontSize:fs(8),fontWeight:'700'},checkoutTotalValue:{color:'#f1b94f',fontSize:fs(11),fontWeight:'700'},checkoutBtnOff:{opacity:.38},checkoutMessage:{color:'#17324a',fontSize:fs(6.6),lineHeight:fs(10),textAlign:'center',marginTop:8},
   cartItem:{flexDirection:'row',padding:8,marginBottom:7,borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},cartImage:{width:62,height:72,borderRadius:7,backgroundColor:'#fff'},cartBody:{flex:1,paddingLeft:9},cartName:{color:'#17324a',fontSize:fs(8),lineHeight:fs(11)},cartOptions:{color:'#667b8c',fontSize:fs(6.2),marginTop:2},cartPrice:{color:'#f1b94f',fontSize:fs(8),marginTop:3},qtyRow:{flexDirection:'row',alignItems:'center',marginTop:8},qtyBtn:{width:24,height:22,borderRadius:6,borderWidth:1,borderColor:'rgba(241,185,79,.55)',alignItems:'center',justifyContent:'center'},qtyText:{color:'#f1b94f',fontSize:fs(13),lineHeight:fs(16)},qtyValue:{color:'#17324a',fontSize:fs(8),minWidth:28,textAlign:'center'},cartTotalRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:10,borderTopWidth:1,borderTopColor:'#dce4ea'},cartTotalLabel:{color:'#17324a',fontSize:fs(8),letterSpacing:.6},cartTotalValue:{color:'#f1b94f',fontSize:fs(11),fontWeight:'700'},checkoutBtn:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},checkoutText:{color:'#082b48',fontSize:fs(7),fontWeight:'700',letterSpacing:.45},checkoutNote:{color:'#667b8c',fontSize:fs(5.8),lineHeight:fs(9),marginTop:7,textAlign:'center'},
  newsSection:{marginTop:12},newsHeader:{flexDirection:'row',justifyContent:'space-between',marginBottom:7},newsHeading:{color:'#fff',fontSize:fs(8.5),letterSpacing:.65},newsMore:{color:'#f1b94f',fontSize:fs(6.5)},newsCard:{minHeight:58,marginBottom:6,borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',overflow:'hidden'},newsAccent:{width:3,alignSelf:'stretch',backgroundColor:'#a91f42'},newsThumb:{width:74,height:58,backgroundColor:'rgba(255,255,255,.06)'},newsThumbFallback:{alignItems:'center',justifyContent:'center'},newsThumbLogo:{width:34,height:40},newsBody:{flex:1,paddingHorizontal:9,paddingVertical:7},newsMeta:{color:'#f1b94f',fontSize:fs(5.8),letterSpacing:.45,marginBottom:3},newsTitle:{color:'#17324a',fontSize:fs(8),lineHeight:fs(11)},newsArrow:{color:'#17324a',fontSize:fs(18),paddingHorizontal:8},
- pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:fs(30),lineHeight:fs(30),paddingRight:12},pageTitle:{color:'#fff',fontSize:fs(14),letterSpacing:.8},detailCard:{backgroundColor:'#ffffff',borderRadius:14,padding:14,borderWidth:1,borderColor:'#d7e0e7'},kicker:{color:'#f1b94f',fontSize:fs(7),letterSpacing:.5},detailDate:{color:'#17324a',fontSize:fs(9),marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:fs(7.5),letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'#ffffff',borderRadius:10,padding:11,borderWidth:1,borderColor:'#d7e0e7'},body:{color:'#17324a',fontSize:fs(8),lineHeight:fs(13)},muted:{color:'#667b8c',fontSize:fs(8),lineHeight:fs(12)},statRow:{flexDirection:'row',justifyContent:'space-between',paddingVertical:4,borderBottomWidth:1,borderBottomColor:'#e5ebf0'},
+ pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:fs(30),lineHeight:fs(30),paddingRight:12},pageTitle:{color:'#fff',fontSize:fs(14),letterSpacing:.8},detailCard:{backgroundColor:'#ffffff',borderRadius:14,padding:14,borderWidth:1,borderColor:'#d7e0e7'},kicker:{color:'#f1b94f',fontSize:fs(7),letterSpacing:.5},detailDate:{color:'#17324a',fontSize:fs(9),marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:fs(7.5),letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'#ffffff',borderRadius:10,padding:11,borderWidth:1,borderColor:'#d7e0e7'},body:{color:'#17324a',fontSize:fs(8),lineHeight:fs(13)},muted:{color:'#667b8c',fontSize:fs(8),lineHeight:fs(12)},statRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingVertical:5,borderBottomWidth:1,borderBottomColor:'#e5ebf0'},gameSectionLabel:{color:'#f1b94f',fontSize:fs(6.1),fontWeight:'800',letterSpacing:.55,marginBottom:6},gameEventRow:{flexDirection:'row',alignItems:'flex-start',paddingVertical:5,borderBottomWidth:1,borderBottomColor:'#e5ebf0'},gameEventMinute:{width:34,color:'#f1b94f',fontSize:fs(6.6),fontWeight:'800'},gameEventBody:{flex:1},gameEventTitle:{color:'#17324a',fontSize:fs(7),fontWeight:'700'},gameEventDetail:{color:'#667b8c',fontSize:fs(5.9),lineHeight:fs(8.5),marginTop:1},gameStatsHead:{flexDirection:'row',alignItems:'center',paddingBottom:7,borderBottomWidth:1,borderBottomColor:'#dce4ea'},gameStatsTeam:{flex:1,color:'#17324a',fontSize:fs(5.8),fontWeight:'800',textAlign:'center'},gameStatsLabel:{width:'42%',color:'#667b8c',fontSize:fs(5.4),fontWeight:'700',textAlign:'center'},gameStatValue:{width:'24%',color:'#17324a',fontSize:fs(7.4),fontWeight:'800',textAlign:'center'},gameStatName:{flex:1,color:'#667b8c',fontSize:fs(5.7),textAlign:'center',textTransform:'capitalize'},lineupTeamBlock:{marginBottom:11},lineupTeamTitle:{color:'#17324a',fontSize:fs(8.2),fontWeight:'900',paddingBottom:5,borderBottomWidth:1,borderBottomColor:'#dce4ea'},lineupGroupTitle:{color:'#f1b94f',fontSize:fs(5.5),fontWeight:'800',letterSpacing:.55,marginTop:7,marginBottom:3},lineupPlayerRow:{minHeight:40,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:'#e9eef2',paddingVertical:4},lineupPhoto:{width:31,height:34,borderRadius:6,overflow:'hidden',backgroundColor:'#f3f6f8'},lineupNumber:{width:31,color:'#f1b94f',fontSize:fs(7.4),fontWeight:'800',textAlign:'center'},lineupPlayerBody:{flex:1},lineupPlayerName:{color:'#17324a',fontSize:fs(6.8),fontWeight:'700'},lineupPosition:{color:'#667b8c',fontSize:fs(5.5),marginTop:1},
  articleCard:{backgroundColor:'#ffffff',borderRadius:14,padding:14,borderWidth:1,borderColor:'#d7e0e7'},articleTitle:{color:'#17324a',fontSize:fs(14),lineHeight:fs(19),marginBottom:12},articleBody:{color:'#17324a',fontSize:fs(8.5),lineHeight:fs(14)},articleParagraph:{color:'#17324a',fontSize:fs(8.5),lineHeight:fs(14),marginBottom:9},articleHeroImage:{width:'100%',height:190,borderRadius:12,marginBottom:16},articleInlineImage:{width:'100%',height:210,borderRadius:10,marginVertical:10},
  calendarTabBody:{flex:1,minHeight:0},calendarSportBar:{height:36,maxHeight:36,flexGrow:0,flexShrink:0,marginBottom:7},calendarTimeline:{flex:1,minHeight:0},calendarTimelineContent:{paddingBottom:18},calendarBoundaryNote:{marginBottom:8},
- calendarTabs:{height:40,maxHeight:40,flexGrow:0,flexShrink:0,marginBottom:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.10)'},calendarTabsContent:{height:40,alignItems:'center',paddingRight:18},calendarTopTab:{height:39,justifyContent:'center',marginRight:18,borderBottomWidth:2,borderBottomColor:'transparent'},calendarTopTabOn:{borderBottomColor:'#f1b94f'},calendarTopTabText:{color:'#dce8ef',fontSize:fs(6.8),fontWeight:'700',letterSpacing:.55},calendarTopTabTextOn:{color:'#fff'},
+ calendarTabs:{height:40,maxHeight:40,flexGrow:0,flexShrink:0,flexDirection:'row',alignItems:'center',marginBottom:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.10)'},calendarTabsContent:{height:40,alignItems:'center'},calendarTopTab:{flex:1,height:39,justifyContent:'center',alignItems:'center',paddingHorizontal:1,borderBottomWidth:2,borderBottomColor:'transparent'},calendarTopTabOn:{borderBottomColor:'#f1b94f'},calendarTopTabText:{width:'100%',color:'#dce8ef',fontSize:fs(5.8),fontWeight:'700',letterSpacing:.18,textAlign:'center'},calendarTopTabTextOn:{color:'#fff'},
  calendarLastCard:{padding:9,borderRadius:10,backgroundColor:'rgba(255,255,255,.96)',marginBottom:8},calendarCompetitionInline:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginBottom:5},calendarCardCompetition:{color:'#7e8790',fontSize:fs(6.1),fontWeight:'700',textAlign:'center'},calendarLastRow:{flexDirection:'row',alignItems:'center',justifyContent:'center'},calendarLastTeam:{width:'34%',flexDirection:'row',alignItems:'center',justifyContent:'flex-end'},calendarLastTeamName:{color:'#6f7880',fontSize:fs(7.5),fontWeight:'700',textAlign:'right',flexShrink:1},calendarLastLogo:{width:28,height:32,marginHorizontal:5},calendarLastScoreBox:{width:'25%',alignItems:'center'},calendarLastScore:{color:'#313a42',fontSize:fs(13),fontWeight:'800'},calendarLastDate:{color:'#7e8790',fontSize:fs(6.2),fontWeight:'700',marginTop:1},
  calendarNextCard:{padding:12,borderRadius:12,backgroundColor:'rgba(255,255,255,.98)',marginBottom:10},calendarNextCompetitionRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginBottom:10},calendarNextCompetition:{color:'#17212a',fontSize:fs(8.3),fontWeight:'800',textAlign:'center'},calendarNextTeams:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},calendarNextTeam:{width:'27%',alignItems:'center'},calendarNextLogo:{width:58,height:64},calendarNextTeamCode:{color:'#17212a',fontSize:fs(7.5),fontWeight:'800',marginTop:4},calendarNextCenter:{width:'40%',alignItems:'center'},calendarNextDate:{color:'#111',fontSize:fs(14),fontWeight:'900'},calendarNextTime:{color:'#111',fontSize:fs(8),fontWeight:'700',marginTop:1},calendarNextVenue:{color:'#4b545b',fontSize:fs(5.7),lineHeight:fs(8),textAlign:'center',marginTop:3},calendarNextMatchup:{color:'#111',fontSize:fs(16),lineHeight:fs(19),fontWeight:'900',textAlign:'center',marginTop:12},
  calendarSectionTitle:{color:'#fff',fontSize:fs(7.2),fontWeight:'800',letterSpacing:.6,marginTop:10,marginBottom:6},calendarUpcomingCard:{flexDirection:'row',borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',marginBottom:6,overflow:'hidden'},calendarUpcomingDate:{width:61,alignItems:'center',justifyContent:'center',backgroundColor:'#f3f6f8',padding:7},calendarUpcomingDay:{color:'#17324a',fontSize:fs(7),fontWeight:'800'},calendarUpcomingTime:{color:'#f1b94f',fontSize:fs(6.3),marginTop:2},calendarUpcomingBody:{flex:1,padding:7},calendarUpcomingCompetitionRow:{flexDirection:'row',alignItems:'center',marginBottom:4},calendarUpcomingCompetition:{color:'#667b8c',fontSize:fs(5.7)},calendarUpcomingTeams:{flexDirection:'row',alignItems:'center'},calendarUpcomingLogo:{width:22,height:24},calendarUpcomingTitle:{flex:1,color:'#17324a',fontSize:fs(7.3),fontWeight:'700',textAlign:'center'},calendarUpcomingVenue:{color:'#667b8c',fontSize:fs(5.3),textAlign:'center',marginTop:4},
