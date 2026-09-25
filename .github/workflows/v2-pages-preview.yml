@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: classification competitions and cup routes
+# Deploy trigger: active competition filters and Europa League
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
