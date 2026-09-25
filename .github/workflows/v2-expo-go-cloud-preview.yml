@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-cloud-preview.yml'
 
-# Publish trigger: lighter castle blue burgundy background
+# Publish trigger: white cards theme
 jobs:
   publish:
     name: Publish Expo Go preview
