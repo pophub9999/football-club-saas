@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-cloud-preview.yml'
 
-# Publish trigger: brighter native mobile theme
+# Publish trigger: news images and thumbnails
 jobs:
   publish:
     name: Publish Expo Go preview
