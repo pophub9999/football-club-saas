@@ -528,7 +528,13 @@ export default function App(){
   if(/taça da liga/.test(v))return 4;
   return 9;
  };
- const classificationCompetitions=[...new Set(calendar.filter(x=>x.sport===classificationSport).map(x=>x.competition).filter(Boolean))]
+ const activeClassificationNames=new Set([
+  ...calendar.filter(x=>!calendarIsPast(x)).map(x=>x.competition).filter(Boolean),
+  ...standings.map(x=>x.competition?.name).filter(Boolean)
+ ]);
+ const classificationCompetitions=[...new Set(calendar
+  .filter(x=>x.sport===classificationSport&&activeClassificationNames.has(x.competition))
+  .map(x=>x.competition).filter(Boolean))]
   .sort((a,b)=>classificationCompetitionRank(a)-classificationCompetitionRank(b)||a.localeCompare(b,'pt'));
  const activeClassificationCompetition=classificationCompetitions.includes(classificationCompetition)
   ? classificationCompetition
