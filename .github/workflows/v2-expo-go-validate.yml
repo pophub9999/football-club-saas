@@ -1,0 +1,31 @@
+name: V2 Expo Go Validate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/v2-expo-go-validate.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: v2-app/package-lock.json
+      - name: Install dependencies
+        working-directory: v2-app
+        run: npm ci
+      - name: Expo Doctor
+        working-directory: v2-app
+        run: npx expo-doctor
+      - name: Export native bundles
+        working-directory: v2-app
+        run: npx expo export --platform android --platform ios --output-dir dist-native-check
