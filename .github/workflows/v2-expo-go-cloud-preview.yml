@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-cloud-preview.yml'
 
-# Publish trigger: navigation photo picker contrast refinements
+# Publish trigger: calendar tabs and rich past match details
 jobs:
   publish:
     name: Publish Expo Go preview
