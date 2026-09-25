@@ -212,6 +212,37 @@ function benefitDiscountLabel(benefit={}){
  if(match)return '−'+match[1].replace(',','.')+'%';
  return label?label.toUpperCase():'VANTAGEM';
 }
+const EMPTY_MEMBER_FORM={firstName:'',lastName:'',birthDate:'',nif:'',email:'',phone:'',address:'',postalCode:'',city:'',guardianName:'',guardianEmail:''};
+function memberAgeFromBirthDate(value=''){
+ const m=String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+ if(!m)return null;
+ const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]);
+ const born=new Date(y,mo-1,d);
+ if(born.getFullYear()!==y||born.getMonth()!==mo-1||born.getDate()!==d)return null;
+ const now=new Date();
+ if(born>now)return null;
+ let age=now.getFullYear()-y;
+ const beforeBirthday=(now.getMonth()<mo-1)||(now.getMonth()===mo-1&&now.getDate()<d);
+ if(beforeBirthday)age--;
+ return age>=0?age:null;
+}
+function memberCategoryFromBirthDate(value=''){
+ const age=memberAgeFromBirthDate(value);
+ if(age==null)return null;
+ if(age<=3)return 'Sócio Infantil';
+ if(age<=14)return 'Sócio Juvenil';
+ if(age<=70)return 'Sócio Efetivo';
+ return 'Sócio +70';
+}
+function memberFee(category=''){
+ const fees={
+  'Sócio Infantil':{monthly:'0€',annual:'0€'},
+  'Sócio Juvenil':{monthly:'3€',annual:'36€'},
+  'Sócio Efetivo':{monthly:'6€',annual:'72€'},
+  'Sócio +70':{monthly:'3€',annual:'36€'}
+ };
+ return fees[category]||null;
+}
 export default function App(){
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
@@ -220,6 +251,7 @@ export default function App(){
  const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('TODAS'),[calendarLoading,setCalendarLoading]=useState(false);
  const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState('');
  const [benefits,setBenefits]=useState([]),[benefitCategory,setBenefitCategory]=useState('TODAS'),[benefitSearch,setBenefitSearch]=useState(''),[selectedBenefit,setSelectedBenefit]=useState(null);
+ const [memberForm,setMemberForm]=useState({...EMPTY_MEMBER_FORM}),[memberPrivacy,setMemberPrivacy]=useState(false),[memberSubmitting,setMemberSubmitting]=useState(false),[memberMessage,setMemberMessage]=useState('');
  const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
  const [selectedProduct,setSelectedProduct]=useState(null),[productChoices,setProductChoices]=useState({});
  const [shippingOptions,setShippingOptions]=useState([]),[checkoutInfo,setCheckoutInfo]=useState(null),[checkoutLoading,setCheckoutLoading]=useState(false),[checkoutMessage,setCheckoutMessage]=useState('');
@@ -377,6 +409,37 @@ export default function App(){
   }catch(e){setCheckoutMessage(e.message||'Não foi possível finalizar a compra.')}
   finally{setCheckoutLoading(false)}
  }
+ async function submitMemberApplication(){
+  setMemberMessage('');
+  const f=memberForm,age=memberAgeFromBirthDate(f.birthDate),category=memberCategoryFromBirthDate(f.birthDate);
+  if(!f.firstName.trim()||!f.lastName.trim()||!f.email.trim()||!f.phone.trim()||!f.birthDate.trim()||!f.nif.trim()||!f.address.trim()||!f.postalCode.trim()||!f.city.trim()){
+   setMemberMessage('Preenche todos os campos obrigatórios.');return;
+  }
+  if(age==null||!category){setMemberMessage('Indica a data de nascimento no formato AAAA-MM-DD.');return}
+  if(!/^\d{9}$/.test(f.nif.trim())){setMemberMessage('O NIF deve ter 9 dígitos.');return}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())){setMemberMessage('Indica um email válido.');return}
+  if(age<16&&(!f.guardianName.trim()||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.guardianEmail.trim()))){
+   setMemberMessage('Para menores de 16 anos indica o nome e email do responsável.');return;
+  }
+  if(!memberPrivacy){setMemberMessage('É necessário aceitar a Política de Privacidade para enviar o pedido.');return}
+  setMemberSubmitting(true);
+  try{
+   const r=await fetch(SUPABASE_URL+'/rest/v1/member_applications',{
+    method:'POST',
+    headers:{...SB_HEADERS,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({
+     first_name:f.firstName.trim(),last_name:f.lastName.trim(),birth_date:f.birthDate.trim(),nif:f.nif.trim(),
+     email:f.email.trim().toLowerCase(),phone:f.phone.trim(),address:f.address.trim(),postal_code:f.postalCode.trim(),
+     city:f.city.trim(),category,guardian_name:age<16?f.guardianName.trim()||null:null,
+     guardian_email:age<16?f.guardianEmail.trim().toLowerCase()||null:null,privacy_accepted:true
+    })
+   });
+   if(!r.ok){const data=await r.json().catch(()=>({}));throw new Error(data?.message||'Não foi possível enviar o pedido.')}
+   setMemberForm({...EMPTY_MEMBER_FORM});setMemberPrivacy(false);
+   setMemberMessage('Pedido de adesão enviado com sucesso. A equipa de sócios irá validar os dados.');
+  }catch(e){setMemberMessage(e.message||'Não foi possível enviar o pedido de adesão.')}
+  finally{setMemberSubmitting(false)}
+ }
  const officialNews=news;
  const sports=['TODAS','FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
  const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
@@ -399,6 +462,10 @@ export default function App(){
  const cartTotal=cart.reduce((n,x)=>n+Number(x.price||0)*x.qty,0);
  const selectedShipping=shippingOptions.find(x=>x.code===checkoutForm.shippingMethod)||{price:0};
  const checkoutTotal=cartTotal+Number(selectedShipping.price||0);
+ const memberAge=memberAgeFromBirthDate(memberForm.birthDate);
+ const memberCategory=memberCategoryFromBirthDate(memberForm.birthDate);
+ const memberCurrentFee=memberFee(memberCategory);
+ const memberNeedsGuardian=memberAge!=null&&memberAge<16;
 
  function Back({title,to='home'}){return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={s.back}>‹</Text></Pressable><Text style={s.pageTitle}>{title}</Text></View>}
 
@@ -414,6 +481,56 @@ export default function App(){
  }
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
  if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{cleanNewsTitle(selectedNews?.title||'')}</Text>{selectedNews?.hero?<ArticleImage uri={selectedNews.hero} hero version={syncVersion}/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body,selectedNews?.url).map((b,i)=>b.type==='img'?<ArticleImage key={i} uri={b.src} version={syncVersion}/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
+ if(screen==='members')return <Page><Back title="SÓCIOS"/>
+  <View style={s.memberHero}>
+   <View style={s.memberHeroIcon}><ShortcutIcon type="members"/></View>
+   <View style={s.memberHeroText}><Text style={s.memberHeroTitle}>FAZ-TE SÓCIO</Text><Text style={s.memberHeroSub}>Junta-te à família Torreense e usufrui das vantagens de sócio.</Text></View>
+  </View>
+  <View style={s.memberFees}>
+   {[
+    ['Sócio Infantil','0–3','0€','0€'],
+    ['Sócio Juvenil','4–14','3€','36€'],
+    ['Sócio Efetivo','15–70','6€','72€'],
+    ['Sócio +70','>70','3€','36€']
+   ].map(x=><View key={x[0]} style={s.memberFeeRow}><View style={s.memberFeeMain}><Text style={s.memberFeeName}>{x[0]}</Text><Text style={s.memberFeeAge}>{x[1]} anos</Text></View><Text style={s.memberFeeValue}>{x[2]} / mês</Text><Text style={s.memberFeeAnnual}>{x[3]} / ano</Text></View>)}
+  </View>
+  <View style={s.memberFormCard}>
+   <Text style={s.memberSectionTitle}>DADOS PESSOAIS</Text>
+   <View style={s.memberInputRow}>
+    <TextInput value={memberForm.firstName} onChangeText={v=>setMemberForm({...memberForm,firstName:v})} placeholder="Nome *" placeholderTextColor="#7892a7" style={[s.memberInput,s.memberInputHalf]}/>
+    <TextInput value={memberForm.lastName} onChangeText={v=>setMemberForm({...memberForm,lastName:v})} placeholder="Apelido *" placeholderTextColor="#7892a7" style={[s.memberInput,s.memberInputHalf]}/>
+   </View>
+   <TextInput value={memberForm.birthDate} onChangeText={v=>setMemberForm({...memberForm,birthDate:v})} placeholder="Data de nascimento * (AAAA-MM-DD)" placeholderTextColor="#7892a7" style={s.memberInput}/>
+   <TextInput value={memberForm.nif} onChangeText={v=>setMemberForm({...memberForm,nif:v.replace(/\D/g,'').slice(0,9)})} placeholder="NIF *" placeholderTextColor="#7892a7" keyboardType="number-pad" style={s.memberInput}/>
+   {memberCategory?<View style={s.memberCategoryBox}><View><Text style={s.memberCategoryLabel}>CATEGORIA</Text><Text style={s.memberCategoryName}>{memberCategory}</Text></View>{memberCurrentFee?<View style={s.memberCategoryPrice}><Text style={s.memberCategoryMonthly}>{memberCurrentFee.monthly}/mês</Text><Text style={s.memberCategoryAnnual}>{memberCurrentFee.annual}/ano</Text></View>:null}</View>:null}
+
+   <Text style={s.memberSectionTitle}>CONTACTOS</Text>
+   <TextInput value={memberForm.email} onChangeText={v=>setMemberForm({...memberForm,email:v})} placeholder="Email *" placeholderTextColor="#7892a7" keyboardType="email-address" autoCapitalize="none" style={s.memberInput}/>
+   <TextInput value={memberForm.phone} onChangeText={v=>setMemberForm({...memberForm,phone:v})} placeholder="Telemóvel *" placeholderTextColor="#7892a7" keyboardType="phone-pad" style={s.memberInput}/>
+
+   <Text style={s.memberSectionTitle}>MORADA</Text>
+   <TextInput value={memberForm.address} onChangeText={v=>setMemberForm({...memberForm,address:v})} placeholder="Morada *" placeholderTextColor="#7892a7" style={s.memberInput}/>
+   <View style={s.memberInputRow}>
+    <TextInput value={memberForm.postalCode} onChangeText={v=>setMemberForm({...memberForm,postalCode:v})} placeholder="Código postal *" placeholderTextColor="#7892a7" style={[s.memberInput,s.memberInputHalf]}/>
+    <TextInput value={memberForm.city} onChangeText={v=>setMemberForm({...memberForm,city:v})} placeholder="Localidade *" placeholderTextColor="#7892a7" style={[s.memberInput,s.memberInputHalf]}/>
+   </View>
+
+   {memberNeedsGuardian?<>
+    <Text style={s.memberSectionTitle}>RESPONSÁVEL LEGAL</Text>
+    <Text style={s.memberGuardianNote}>Necessário para menores de 16 anos.</Text>
+    <TextInput value={memberForm.guardianName} onChangeText={v=>setMemberForm({...memberForm,guardianName:v})} placeholder="Nome do responsável *" placeholderTextColor="#7892a7" style={s.memberInput}/>
+    <TextInput value={memberForm.guardianEmail} onChangeText={v=>setMemberForm({...memberForm,guardianEmail:v})} placeholder="Email do responsável *" placeholderTextColor="#7892a7" keyboardType="email-address" autoCapitalize="none" style={s.memberInput}/>
+   </>:null}
+
+   <Pressable onPress={()=>setMemberPrivacy(!memberPrivacy)} style={s.memberConsent}>
+    <View style={[s.memberCheck,memberPrivacy&&s.memberCheckOn]}>{memberPrivacy?<Text style={s.memberCheckMark}>✓</Text>:null}</View>
+    <Text style={s.memberConsentText}>Li e aceito a Política de Privacidade e autorizo o tratamento dos dados para este pedido de adesão.</Text>
+   </Pressable>
+   {memberSubmitting?<ActivityIndicator style={{marginTop:10}}/>:<Pressable onPress={submitMemberApplication} style={s.memberSubmit}><Text style={s.memberSubmitText}>ENVIAR ADESÃO</Text></Pressable>}
+   {memberMessage?<Text style={s.memberMessage}>{memberMessage}</Text>:null}
+   <Text style={s.memberFootnote}>O pedido fica registado na app e sujeito à validação final pelo SCU Torreense.</Text>
+  </View>
+ </Page>;
  if(screen==='benefits')return <Page><Back title="VANTAGENS"/>
   <View style={s.benefitMiniHead}>
    <Text style={s.benefitMiniTitle}>BENEFÍCIOS EXCLUSIVOS PARA SÓCIOS</Text>
@@ -539,7 +656,7 @@ export default function App(){
    <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
    <Pressable style={s.quickCard} onPress={()=>setScreen('news')}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
    <Pressable style={s.quickCard} onPress={()=>setScreen('store')}><ShortcutIcon type="shop"/><Text style={s.quickText}>LOJA</Text></Pressable>
-   <Pressable style={s.quickCard} onPress={()=>openOfficialStore('https://2ticket.pt/torreense/become-member')}><ShortcutIcon type="members"/><Text style={s.quickText}>SÓCIOS</Text></Pressable>
+   <Pressable style={s.quickCard} onPress={()=>{setMemberMessage('');setScreen('members')}}><ShortcutIcon type="members"/><Text style={s.quickText}>SÓCIOS</Text></Pressable>
    <Pressable style={s.quickCard} onPress={()=>setScreen('benefits')}><ShortcutIcon type="star"/><Text style={s.quickText}>VANTAGENS</Text></Pressable>
   </View></View>
   <View style={s.newsSection}><View style={s.newsHeader}><Text style={s.newsHeading}>ÚLTIMAS NOTÍCIAS</Text><Text style={s.newsMore}>VER TODAS ›</Text></View>{officialNews.slice(0,3).map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</View>
@@ -552,6 +669,10 @@ const s=StyleSheet.create({
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#b7cee2',fontSize:8,letterSpacing:.55},round:{color:'#fff',fontSize:8.5,marginTop:3},date:{color:'#fff',fontSize:8},
  teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamLogoFallback:{borderRadius:999,backgroundColor:'rgba(255,255,255,.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'rgba(255,255,255,.18)'},teamLogoFallbackText:{color:'#dce7ef',fontSize:8,fontWeight:'700'},teamName:{color:'#fff',fontSize:8,marginTop:3,textAlign:'center',minHeight:16},teamStanding:{color:'#91abc0',fontSize:6,marginTop:1},vs:{color:'#93abc1',fontSize:12},score:{color:'#fff',fontSize:19},stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:4},gameStatus:{color:'#f1b94f',fontSize:6,textAlign:'center',marginTop:3},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#b7c9d9',fontSize:24},
  clubLine:{color:'#fff',fontSize:15,letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},quickIconFallback:{color:'#f1b94f',fontSize:22,lineHeight:26},quickText:{color:'#fff',fontSize:5.9,letterSpacing:.18,marginTop:5,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.50)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#fff',fontSize:7,letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:18},
+ memberHero:{flexDirection:'row',alignItems:'center',padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(241,185,79,.28)',marginBottom:8},memberHeroIcon:{width:36,height:36,borderRadius:10,backgroundColor:'rgba(241,185,79,.10)',alignItems:'center',justifyContent:'center'},memberHeroText:{flex:1,paddingLeft:9},memberHeroTitle:{color:'#fff',fontSize:9.5,fontWeight:'700',letterSpacing:.55},memberHeroSub:{color:'#9fb5c7',fontSize:6.3,lineHeight:9,marginTop:2},
+ memberFees:{borderRadius:10,overflow:'hidden',borderWidth:1,borderColor:'rgba(120,164,197,.24)',marginBottom:8},memberFeeRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.07)',backgroundColor:'rgba(8,43,72,.76)'},memberFeeMain:{flex:1},memberFeeName:{color:'#fff',fontSize:6.7,fontWeight:'600'},memberFeeAge:{color:'#8fa9bc',fontSize:5.4,marginTop:1},memberFeeValue:{width:58,color:'#f1b94f',fontSize:6.1,textAlign:'right'},memberFeeAnnual:{width:58,color:'#b8c8d8',fontSize:5.8,textAlign:'right'},
+ memberFormCard:{padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},memberSectionTitle:{color:'#f1b94f',fontSize:6.4,letterSpacing:.6,marginTop:5,marginBottom:6},memberInput:{height:32,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.32)',backgroundColor:'rgba(1,23,43,.58)',color:'#fff',fontSize:6.9,paddingHorizontal:9,marginBottom:6},memberInputRow:{flexDirection:'row',justifyContent:'space-between'},memberInputHalf:{width:'49%'},memberCategoryBox:{minHeight:40,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.38)',backgroundColor:'rgba(241,185,79,.08)',paddingHorizontal:9,paddingVertical:6,flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:7},memberCategoryLabel:{color:'#9fb5c7',fontSize:5.3,letterSpacing:.4},memberCategoryName:{color:'#fff',fontSize:7.4,fontWeight:'700',marginTop:2},memberCategoryPrice:{alignItems:'flex-end'},memberCategoryMonthly:{color:'#f1b94f',fontSize:7.4,fontWeight:'700'},memberCategoryAnnual:{color:'#9fb5c7',fontSize:5.7,marginTop:1},memberGuardianNote:{color:'#9fb5c7',fontSize:5.8,marginTop:-3,marginBottom:6},
+ memberConsent:{flexDirection:'row',alignItems:'flex-start',marginTop:8},memberCheck:{width:17,height:17,borderRadius:4,borderWidth:1,borderColor:'rgba(241,185,79,.60)',alignItems:'center',justifyContent:'center',marginRight:7,marginTop:1},memberCheckOn:{backgroundColor:'#f1b94f'},memberCheckMark:{color:'#082b48',fontSize:10,fontWeight:'800'},memberConsentText:{flex:1,color:'#afc0ce',fontSize:5.8,lineHeight:9},memberSubmit:{height:34,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},memberSubmitText:{color:'#082b48',fontSize:6.8,fontWeight:'800',letterSpacing:.45},memberMessage:{color:'#fff',fontSize:6.3,lineHeight:9.5,textAlign:'center',marginTop:8},memberFootnote:{color:'#7892a7',fontSize:5.4,lineHeight:8,textAlign:'center',marginTop:7},
  benefitMiniHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:7,paddingHorizontal:1},benefitMiniTitle:{color:'#fff',fontSize:6.8,letterSpacing:.45},benefitMiniCount:{color:'#f1b94f',fontSize:6.1},
  benefitSearch:{height:30,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.34)',backgroundColor:'rgba(1,23,43,.62)',color:'#fff',fontSize:6.8,paddingHorizontal:9,marginBottom:7},benefitFilters:{marginBottom:8},benefitResultHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:-1,marginBottom:5},benefitResultCount:{color:'#9fb5c7',fontSize:5.9,letterSpacing:.35},benefitSource:{color:'#f1b94f',fontSize:5.9,letterSpacing:.25},
  benefitRow:{minHeight:48,marginBottom:5,borderRadius:9,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.23)',flexDirection:'row',alignItems:'center',paddingHorizontal:7,paddingVertical:5},benefitAvatar:{width:31,height:31,borderRadius:8,backgroundColor:'rgba(241,185,79,.13)',borderWidth:1,borderColor:'rgba(241,185,79,.32)',alignItems:'center',justifyContent:'center'},benefitAvatarText:{color:'#f1b94f',fontSize:11,fontWeight:'800'},benefitRowBody:{flex:1,paddingLeft:8,paddingRight:6},benefitName:{color:'#fff',fontSize:7.8,lineHeight:10.5,fontWeight:'600'},benefitRowMeta:{color:'#92aabd',fontSize:5.8,lineHeight:8,marginTop:2},benefitDiscountCompact:{maxWidth:72,minWidth:38,minHeight:23,paddingHorizontal:6,borderRadius:7,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},benefitDiscountCompactText:{color:'#082b48',fontSize:6.8,fontWeight:'800',textAlign:'center'},benefitRowArrow:{color:'#8fa9bc',fontSize:16,lineHeight:18,marginLeft:5},
