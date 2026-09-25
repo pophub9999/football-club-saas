@@ -148,7 +148,9 @@ function ArticleImage({uri,hero=false}){
    ? imageWidth/(1000/170)
    : isMap
      ? imageWidth/(1000/920)
-     : imageWidth/1.8;
+     : hero&&Platform.OS!=='web'
+       ? imageWidth/1.55
+       : imageWidth/1.8;
 
  const frameStyle={
   width:'100%',
@@ -177,13 +179,13 @@ function ArticleImage({uri,hero=false}){
  }
 
  return <View style={[frameStyle,{backgroundColor:'rgba(255,255,255,.035)'}]}>
-  {!loaded?<View style={[StyleSheet.absoluteFillObject,{alignItems:'center',justifyContent:'center'}]}><ActivityIndicator/></View>:null}
   <Image
-   source={{uri,cache:'force-cache'}}
+   key={uri}
+   source={{uri}}
    resizeMode="contain"
    onLoad={()=>setLoaded(true)}
    onError={()=>setFailed(true)}
-   style={StyleSheet.absoluteFillObject}
+   style={{width:'100%',height:targetHeight}}
   />
  </View>;
 }
