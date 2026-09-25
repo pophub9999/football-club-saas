@@ -45,6 +45,9 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Expo identity
+        run: eas whoami
+
       - name: Publish SDK 54 Expo Go preview
         working-directory: v2-app
         env:
