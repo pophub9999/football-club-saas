@@ -31,7 +31,7 @@ jobs:
       - name: Prepare Expo SDK 54 compatibility
         working-directory: v2-app
         run: |
-          npm install expo@~54.0.0 react@19.1.0 react-native@0.81.5 react-native-web@0.21.0 --save
+          npm install expo@~54.0.0 react@19.1.0 react-dom@19.1.0 react-native@0.81.5 react-native-web@0.21.0 --save --legacy-peer-deps
           npx expo install expo-image-picker react-native-webview expo-updates
           npx expo install --fix
 
