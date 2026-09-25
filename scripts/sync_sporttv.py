@@ -44,11 +44,15 @@ def iso_upload(v):
 def aliases(name):
     n=norm(name)
     vals={n}
-    for token in ("scu ","sc ","sl ","fc ","cf ","ud ","cd ","afc "," clube"," futebol"," feminino"," futsal masculino"," futsal feminino"," futsal"):
-        n=n.replace(token," ")
-    n=" ".join(n.split())
-    if n:vals.add(n)
-    if "torreense" in norm(name):vals.update({"torreense","scu torreense"})
+    generic={"scu","sc","sl","fc","cf","ud","cd","afc","clube","futebol","feminino","futsal","masculino","l"}
+    words=[w for w in n.split() if w not in generic]
+    if words:
+        vals.add(" ".join(words))
+        # Club suffix/prefixes in the database often disappear from YouTube titles.
+        for w in words:
+            if len(w)>=5:
+                vals.add(w)
+    if "torreense" in n:vals.update({"torreense","scu torreense"})
     return [x for x in vals if len(x)>=4]
 
 def extract_scores(title):
