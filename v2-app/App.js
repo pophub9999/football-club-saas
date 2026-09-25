@@ -49,12 +49,12 @@ function TeamLogo({name,uri,style}){
  const initials=(name||'?').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
  return <View style={[style,s.teamLogoFallback]}><Text style={s.teamLogoFallbackText}>{initials}</Text></View>;
 }
-function PlayerPhoto({player,compact=false,detail=false}){
+function PlayerPhoto({player,compact=false,detail=false,teamName='SCU Torreense',teamLogo=null}){
  const [failed,setFailed]=useState(false);
- useEffect(()=>setFailed(false),[player?.photo_url,player?.id]);
+ useEffect(()=>setFailed(false),[player?.photo_url,player?.id,teamName,teamLogo]);
  const style=detail?s.playerPhotoDetail:compact?s.playerPhotoCompact:s.playerPhoto;
  if(player?.photo_url&&!failed)return <Image source={{uri:player.photo_url}} style={style} resizeMode={detail?'contain':'cover'} onError={()=>setFailed(true)}/>;
- return <View style={[style,s.playerPhotoFallback]}><TeamLogo name="SCU Torreense" style={detail?s.playerPhotoLogo:s.playerPhotoLogoCompact}/></View>;
+ return <View style={[style,s.playerPhotoFallback]}><TeamLogo name={teamName} uri={teamLogo} style={detail?s.playerPhotoLogo:s.playerPhotoLogoCompact}/></View>;
 }
 function YouTubeBadge({onPress,summary=false,label='Abrir vídeo no YouTube'}){
  return <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={7} onPress={e=>{e?.stopPropagation?.();onPress?.()}} style={s.youtubeBadge}>
@@ -757,7 +757,7 @@ export default function App(){
    :('Jogo da '+(ev?.intRound?'jornada '+ev.intRound:'competição')+' entre '+(home.name||'')+' e '+(away.name||'')+'.'));
   const homeLineup=gameInfo.lineup.filter(x=>String(x.team_id)===String(ev?._homeTeamId));
   const awayLineup=gameInfo.lineup.filter(x=>String(x.team_id)===String(ev?._awayTeamId));
-  const lineupTeams=[{name:home.name,rows:homeLineup},{name:away.name,rows:awayLineup}];
+  const lineupTeams=[{name:home.name,logo:home.logo,rows:homeLineup},{name:away.name,logo:away.logo,rows:awayLineup}];
   return <Page><Back title="JOGO"/>{gameLoading?<ActivityIndicator/>:<>
    <View style={s.detailCard}><Text style={s.kicker}>{ev?.strLeague||'COMPETIÇÃO'} · {ev?.intRound?'JORNADA '+ev.intRound:''}</Text><Text style={s.detailDate}>{fmtGameDate(ev)}</Text><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.bigLogo}/><Text style={s.teamName}>{home.name}</Text>{ev?._homeStanding&&<Text style={s.teamStanding}>{ev._homeStanding.position}.º · {ev._homeStanding.points} pts</Text>}</View><Text style={s.score}>{ev?.intHomeScore!=null?ev.intHomeScore+' - '+ev.intAwayScore:'VS'}</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.bigLogo}/><Text style={s.teamName}>{away.name}</Text>{ev?._awayStanding&&<Text style={s.teamStanding}>{ev._awayStanding.position}.º · {ev._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {ev?.strVenue||'Local a confirmar'}{ev?.raw?.city?' · '+ev.raw.city:''}</Text><View style={s.gameStatusRow}><Text style={s.gameStatus}>{ev?.strStatus==='scheduled'?'Agendado':ev?.strStatus==='finished'?'Terminado':ev?.strStatus||''}</Text>{ev?.scutvVideo&&((ev.strStatus==='finished')||ev.scutvVideo.live_status==='is_live')?<YouTubeBadge label="Abrir SCUTV" onPress={()=>openScutv(ev.scutvVideo,'SCUTV')}/>:null}{ev?.sporttvHighlight?<YouTubeBadge summary label="Ver resumo SPORT TV" onPress={()=>openScutv(ev.sporttvHighlight,'SPORT TV')}/>:null}</View></View>
    <View style={s.gameTabs}>{['RESUMO','ESTATÍSTICAS','ONZE'].map(t=><Pressable key={t} onPress={()=>setGameTab(t)} style={[s.gameTab,gameTab===t&&s.gameTabOn]}><Text style={[s.gameTabText,gameTab===t&&s.gameTabTextOn]}>{t}</Text></Pressable>)}</View>
@@ -780,7 +780,7 @@ export default function App(){
     const groups=[['ONZE INICIAL',starters],['SUPLENTES',subs],['OUTROS JOGADORES',other]].filter(g=>g[1].length);
     return <View key={team.name} style={s.lineupTeamBlock}><Text style={s.lineupTeamTitle}>{team.name}</Text>{groups.map(([label,rows])=><View key={label}><Text style={s.lineupGroupTitle}>{label}</Text>{rows.map((x,i)=>{
      const p=x.player||{name:x.player_name,short_name:x.player_name,photo_url:null};
-     return <View key={x.id||i} style={s.lineupPlayerRow}><View style={s.lineupPhoto}><PlayerPhoto player={p} compact/></View><Text style={s.lineupNumber}>{x.shirt_number??'—'}</Text><View style={s.lineupPlayerBody}><Text style={s.lineupPlayerName}>{p.short_name||p.name||x.player_name||'Jogador'}</Text>{x.position?<Text style={s.lineupPosition}>{x.position}</Text>:null}</View></View>;
+     return <View key={x.id||i} style={s.lineupPlayerRow}><View style={s.lineupPhoto}><PlayerPhoto player={p} compact teamName={team.name} teamLogo={team.logo}/></View><Text style={s.lineupNumber}>{x.shirt_number??'—'}</Text><View style={s.lineupPlayerBody}><Text style={s.lineupPlayerName}>{p.short_name||p.name||x.player_name||'Jogador'}</Text>{x.position?<Text style={s.lineupPosition}>{x.position}</Text>:null}</View></View>;
     })}</View>)}</View>;
    }):<Text style={s.muted}>Ainda não existe um onze oficial carregado para este jogo.</Text>}</View>}
   </>}</Page>
