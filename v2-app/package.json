@@ -7,7 +7,7 @@
     "start": "expo start",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
-    "go": "expo start --tunnel",
+    "go": "expo start --tunnel --go",
     "go:lan": "expo start --lan",
     "doctor": "expo-doctor"
   },
