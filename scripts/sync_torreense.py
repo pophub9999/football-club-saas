@@ -474,6 +474,7 @@ def sync_player_photos():
     squad_pages={
         "SCU Torreense":"https://www.torreense.com/futebol-profissional/equipa-principal/plantel",
         "SCU Torreense Sub-23":"https://www.torreense.com/futebol-profissional/sub-23-masculino/plantel",
+        "SCU Torreense Feminino":"https://torreense.com/futebol-profissional/seniores-feminino/plantel",
         "SCU Torreense Futsal Masculino":"https://www.torreense.com/futsal/seniores-futsal-masculinos/plantel",
         "SCU Torreense Futsal Feminino":"https://www.torreense.com/futsal/seniores-feminino-futsal/plantel",
     }
