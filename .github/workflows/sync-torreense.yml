@@ -1,5 +1,5 @@
 name: Sync Torreense Data
-# Sync trigger: assets-first refresh
+# Sync trigger: refreshed 2026-27 senior squads
 
 on:
   workflow_dispatch:
