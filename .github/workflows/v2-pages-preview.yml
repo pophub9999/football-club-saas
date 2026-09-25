@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: native readability and image fixes
+# Deploy trigger: retry native readability web deploy
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
