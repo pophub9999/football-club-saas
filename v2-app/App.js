@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { WebView } from 'react-native-webview';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const LOGO_NATIVE_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/teams/scu-torreense.png';
@@ -75,19 +76,17 @@ function Page({children,scroll=true}){
  </View>;
 }
 function ShortcutIcon({type}) {
- const gold='#f1b94f';
- if(Platform.OS==='web'){
-  const paths={
-   calendar:'<rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v6M16 3v6M4 10h16"/>',
-   news:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4v4H7zM14 9h4M14 12h4M7 16h11"/>',
-   shop:'<path d="M6 8h12l1 12H5L6 8zM9 9V7a3 3 0 0 1 6 0v2"/>',
-   members:'<circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 6a3 3 0 0 1 0 6M17 14c2.5.4 4 2.3 4 5"/>',
-   star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3z"/>'
-  };
-  return React.createElement('svg',{width:27,height:27,viewBox:'0 0 24 24',fill:'none',stroke:gold,strokeWidth:1.35,strokeLinecap:'round',strokeLinejoin:'round',dangerouslySetInnerHTML:{__html:paths[type]}});
- }
- const glyph={calendar:'▣',news:'▤',shop:'♧',members:'♙',star:'☆'}[type];
- return <Text style={s.quickIconFallback}>{glyph}</Text>;
+ const gold='#f1b94f',common={stroke:gold,strokeWidth:1.35,strokeLinecap:'round',strokeLinejoin:'round',fill:'none'};
+ return <Svg width={27} height={27} viewBox="0 0 24 24">
+  {type==='calendar'?<><Rect x="4" y="6" width="16" height="14" rx="2" {...common}/><Path d="M8 3v6M16 3v6M4 10h16" {...common}/></>:null}
+  {type==='news'?<><Rect x="3" y="5" width="18" height="14" rx="2" {...common}/><Path d="M7 9h4v4H7zM14 9h4M14 12h4M7 16h11" {...common}/></>:null}
+  {type==='shop'?<Path d="M6 8h12l1 12H5L6 8zM9 9V7a3 3 0 0 1 6 0v2" {...common}/>:null}
+  {type==='members'?<><Circle cx="9" cy="8" r="3" {...common}/><Path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 6a3 3 0 0 1 0 6M17 14c2.5.4 4 2.3 4 5" {...common}/></>:null}
+  {type==='star'?<Path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3z" {...common}/>:null}
+ </Svg>;
+}
+function QuickLabel({children}){
+ return <Text style={s.quickText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>{children}</Text>;
 }
 function fmtDate(iso){
  if(!iso)return '';
@@ -1019,11 +1018,11 @@ export default function App(){
  return <Page>
   <Pressable style={s.card} onPress={openGame}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error?<Text style={s.muted}>Não foi possível atualizar o jogo.</Text>:<><View style={s.header}><View><Text style={s.competition}>{game?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{game?.intRound?'Jornada '+game.intRound:'Próximo jogo'}</Text></View><View style={s.homeDateRow}><Text style={s.date}>{fmtGameDate(game)}</Text>{game?.scutvVideo?.live_status==='is_live'?<YouTubeBadge onPress={()=>openScutv(game.scutvVideo)}/>:null}</View></View><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text>{game?._homeStanding&&<Text style={s.teamStanding}>{game._homeStanding.position}.º · {game._homeStanding.points} pts</Text>}</View><Text style={s.vs}>VS</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text>{game?._awayStanding&&<Text style={s.teamStanding}>{game._awayStanding.position}.º · {game._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {game?.strVenue||'Local a confirmar'}</Text><Text style={s.detailsArrow}>›</Text></>}</Pressable>
   <View style={s.quickSection}><View style={s.quickRow}>
-   <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
-   <Pressable style={s.quickCard} onPress={()=>setScreen('news')}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
-   <Pressable style={s.quickCard} onPress={()=>setScreen('store')}><ShortcutIcon type="shop"/><Text style={s.quickText}>LOJA</Text></Pressable>
-   <Pressable style={s.quickCard} onPress={()=>{setMemberMessage('');setScreen('members')}}><ShortcutIcon type="members"/><Text style={s.quickText}>SÓCIOS</Text></Pressable>
-   <Pressable style={s.quickCard} onPress={()=>setScreen('benefits')}><ShortcutIcon type="star"/><Text style={s.quickText}>VANTAGENS</Text></Pressable>
+   <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><QuickLabel>CALENDÁRIO</QuickLabel></Pressable>
+   <Pressable style={s.quickCard} onPress={()=>setScreen('news')}><ShortcutIcon type="news"/><QuickLabel>NOTÍCIAS</QuickLabel></Pressable>
+   <Pressable style={s.quickCard} onPress={()=>setScreen('store')}><ShortcutIcon type="shop"/><QuickLabel>LOJA</QuickLabel></Pressable>
+   <Pressable style={s.quickCard} onPress={()=>{setMemberMessage('');setScreen('members')}}><ShortcutIcon type="members"/><QuickLabel>SÓCIOS</QuickLabel></Pressable>
+   <Pressable style={s.quickCard} onPress={()=>setScreen('benefits')}><ShortcutIcon type="star"/><QuickLabel>VANTAGENS</QuickLabel></Pressable>
   </View></View>
   <View style={s.newsSection}><View style={s.newsHeader}><Text style={s.newsHeading}>ÚLTIMAS NOTÍCIAS</Text><Text style={s.newsMore}>VER TODAS ›</Text></View>{officialNews.slice(0,3).map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</View>
  </Page>
@@ -1036,7 +1035,7 @@ const s=StyleSheet.create({
  teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamLogoFallback:{borderRadius:999,backgroundColor:'rgba(255,255,255,.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'rgba(255,255,255,.18)'},teamLogoFallbackText:{color:'#dce7ef',fontSize:fs(8),fontWeight:'700'},teamName:{color:'#fff',fontSize:fs(8),marginTop:3,textAlign:'center',minHeight:16},teamStanding:{color:'#91abc0',fontSize:fs(6),marginTop:1},vs:{color:'#93abc1',fontSize:fs(12)},score:{color:'#fff',fontSize:fs(19)},stadium:{color:'#b8c8d8',fontSize:fs(8),textAlign:'center',marginTop:4},gameStatus:{color:'#f1b94f',fontSize:fs(6),textAlign:'center'},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#b7c9d9',fontSize:fs(24)},
  youtubeBadge:{width:15,height:11,alignItems:'center',justifyContent:'center',marginLeft:5},youtubeIcon:{width:15,height:10,borderRadius:3,backgroundColor:'#ff0033',alignItems:'center',justifyContent:'center',position:'relative'},youtubePlay:{color:'#fff',fontSize:fs(4.7),lineHeight:fs(6),fontWeight:'900',marginLeft:1},youtubeSummaryMark:{position:'absolute',right:-3,bottom:-3,width:7,height:7,borderRadius:4,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#fff'},youtubeSummaryMarkText:{color:'#17212a',fontSize:fs(3.8),fontWeight:'900',lineHeight:fs(5)},homeDateRow:{flexDirection:'row',alignItems:'center'},gameStatusRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginTop:3},
  scutvScreen:{flex:1},scutvPlayer:{width:'100%',aspectRatio:16/9,borderRadius:12,overflow:'hidden',backgroundColor:'#000'},scutvWebView:{flex:1,backgroundColor:'#000'},scutvInfo:{paddingTop:10},scutvTitleRow:{flexDirection:'row',alignItems:'center'},scutvTitle:{flex:1,color:'#fff',fontSize:fs(8.2),fontWeight:'700',lineHeight:fs(11)},scutvLive:{color:'#ff4967',fontSize:fs(6.4),fontWeight:'800',marginTop:7},scutvReplay:{color:'#8fa9bc',fontSize:fs(6.1),fontWeight:'700',marginTop:7},
- clubLine:{color:'#fff',fontSize:fs(15),letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},quickIconFallback:{color:'#f1b94f',fontSize:fs(22),lineHeight:fs(26)},quickText:{color:'#fff',fontSize:fs(5.9),letterSpacing:.18,marginTop:5,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.50)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#fff',fontSize:fs(7),letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:fs(18)},
+ clubLine:{color:'#fff',fontSize:fs(15),letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:1,overflow:'hidden'},quickIconFallback:{color:'#f1b94f',fontSize:fs(22),lineHeight:fs(26)},quickText:{width:'100%',color:'#fff',fontSize:Platform.OS==='web'?5.9:7.2,lineHeight:Platform.OS==='web'?7.5:9,letterSpacing:Platform.OS==='web'?.18:0,marginTop:4,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.50)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#fff',fontSize:fs(7),letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:fs(18)},
  memberHero:{flexDirection:'row',alignItems:'center',padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(241,185,79,.28)',marginBottom:8},memberHeroIcon:{width:36,height:36,borderRadius:10,backgroundColor:'rgba(241,185,79,.10)',alignItems:'center',justifyContent:'center'},memberHeroText:{flex:1,paddingLeft:9},memberHeroTitle:{color:'#fff',fontSize:fs(9.5),fontWeight:'700',letterSpacing:.55},memberHeroSub:{color:'#9fb5c7',fontSize:fs(6.3),lineHeight:fs(9),marginTop:2},
  memberFees:{borderRadius:10,overflow:'hidden',borderWidth:1,borderColor:'rgba(120,164,197,.24)',marginBottom:8},memberFeeRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.07)',backgroundColor:'rgba(8,43,72,.76)'},memberFeeMain:{flex:1},memberFeeName:{color:'#fff',fontSize:fs(6.7),fontWeight:'600'},memberFeeAge:{color:'#8fa9bc',fontSize:fs(5.4),marginTop:1},memberFeeValue:{width:58,color:'#f1b94f',fontSize:fs(6.1),textAlign:'right'},memberFeeAnnual:{width:58,color:'#b8c8d8',fontSize:fs(5.8),textAlign:'right'},
  memberFormCard:{padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},memberSectionTitle:{color:'#f1b94f',fontSize:fs(6.4),letterSpacing:.6,marginTop:5,marginBottom:6},memberInput:{height:32,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.32)',backgroundColor:'rgba(1,23,43,.58)',color:'#fff',fontSize:fs(6.9),paddingHorizontal:9,marginBottom:6},memberInputRow:{flexDirection:'row',justifyContent:'space-between'},memberInputHalf:{width:'49%'},memberCategoryBox:{minHeight:40,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.38)',backgroundColor:'rgba(241,185,79,.08)',paddingHorizontal:9,paddingVertical:6,flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:7},memberCategoryLabel:{color:'#9fb5c7',fontSize:fs(5.3),letterSpacing:.4},memberCategoryName:{color:'#fff',fontSize:fs(7.4),fontWeight:'700',marginTop:2},memberCategoryPrice:{alignItems:'flex-end'},memberCategoryMonthly:{color:'#f1b94f',fontSize:fs(7.4),fontWeight:'700'},memberCategoryAnnual:{color:'#9fb5c7',fontSize:fs(5.7),marginTop:1},memberGuardianNote:{color:'#9fb5c7',fontSize:fs(5.8),marginTop:-3,marginBottom:6},
