@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SaaS team",
-    "slug": "saas-team",
+    "name": "SCU Torreense",
+    "slug": "scu-torreense",
     "owner": "nextits-team",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -30,6 +30,8 @@
           "microphonePermission": false
         }
       ]
-    ]
+    ],
+    "scheme": "scutorreense",
+    "description": "Aplicação oficial SCU Torreense"
   }
 }
