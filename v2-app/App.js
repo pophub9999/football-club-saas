@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { WebView } from 'react-native-webview';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
@@ -37,6 +38,12 @@ function PlayerPhoto({player,compact=false}){
  const style=compact?s.playerPhotoCompact:s.playerPhoto;
  if(player?.photo_url)return <Image source={{uri:player.photo_url}} style={style} resizeMode="cover"/>;
  return <View style={[style,s.playerPhotoFallback]}><TeamLogo name="SCU Torreense" style={compact?s.playerPhotoLogoCompact:s.playerPhotoLogo}/></View>;
+}
+function YouTubeBadge({live=false,onPress,light=false}){
+ return <Pressable onPress={e=>{e?.stopPropagation?.();onPress?.()}} style={[s.youtubeBadge,light&&s.youtubeBadgeLight]}>
+  <View style={s.youtubeIcon}><Text style={s.youtubePlay}>▶</Text></View>
+  <Text style={[s.youtubeBadgeText,light&&s.youtubeBadgeTextLight]}>{live?'DIRETO':'VER NO SCUTV'}</Text>
+ </Pressable>;
 }
 function Page({children,scroll=true}){
  const {width,height}=useWindowDimensions();
@@ -290,10 +297,11 @@ export default function App(){
  const [checkoutForm,setCheckoutForm]=useState({name:'',email:'',phone:'',nif:'',shippingMethod:'home',street:'',number:'',postalCode:'',city:''});
  const [cart,setCart]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?JSON.parse(window.localStorage.getItem('scut_cart')||'[]'):[]}catch{return []}});
  const [syncVersion,setSyncVersion]=useState(null);
+ const [scutvVideos,setScutvVideos]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
 
  useEffect(()=>{let live=true;(async()=>{try{
   setLoading(true);
-  const [v,n,m,p,st,sc,sp,sh,bf]=await Promise.all([
+  const [v,n,m,p,st,sc,sp,sh,bf,tv]=await Promise.all([
    sb('app_sync?select=version,updated_at&id=eq.1'),
    sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&active=eq.true&order=published_at.desc.nullslast&limit=100'),
    sb('matches?select=id,competition_id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,short_name,logo_url),away:teams!matches_away_team_id_fkey(name,short_name,logo_url)&order=starts_at.asc&limit=300'),
@@ -302,13 +310,21 @@ export default function App(){
    sb('store_categories?select=id,name,sort_order&active=eq.true&order=sort_order.asc'),
    sb('store_products?select=id,source_id,category_id,name,url,description_text,price,currency,stock_status,in_stock,image_url,images,options,raw_data&active=eq.true&order=name.asc&limit=250'),
    sb('store_shipping_options?select=code,name,description,price,sort_order&active=eq.true&order=sort_order.asc'),
-   sb('member_benefits?select=id,source_id,business_name,category,discount_pct,discount_label,discount_conditions,address,locality,latitude,longitude,maps_url,source_url&active=eq.true&order=business_name.asc&limit=500')
+   sb('member_benefits?select=id,source_id,business_name,category,discount_pct,discount_label,discount_conditions,address,locality,latitude,longitude,maps_url,source_url&active=eq.true&order=business_name.asc&limit=500'),
+   sb('scutv_videos?select=video_id,title,youtube_url,thumbnail_url,live_status,published_at,scheduled_start,match_id,match_confidence,last_seen_at&order=last_seen_at.desc&limit=200')
   ]);
   if(!live)return;
   setSyncVersion(v?.[0]?.version||1);
   setNews((n||[]).map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',html:x.content_html||'',hero:x.hero_image_url,excerpt:x.excerpt})));
   setPlayers(p||[]);setStandings(st||[]);
-  setStoreCategories(sc||[]);setStoreProducts(sp||[]);setShippingOptions(sh||[]);setBenefits(bf||[]);
+  setStoreCategories(sc||[]);setStoreProducts(sp||[]);setShippingOptions(sh||[]);setBenefits(bf||[]);setScutvVideos(tv||[]);
+  const tvByMatch={};
+  const tvRank=x=>x?.live_status==='is_live'?4:x?.live_status==='is_upcoming'?3:(x?.live_status==='was_live'||x?.live_status==='post_live'?2:1);
+  (tv||[]).forEach(x=>{
+   if(x.match_id==null)return;
+   const key=String(x.match_id),prev=tvByMatch[key];
+   if(!prev||tvRank(x)>tvRank(prev)||(tvRank(x)===tvRank(prev)&&String(x.last_seen_at||'')>String(prev.last_seen_at||'')))tvByMatch[key]=x;
+  });
   const positions={};(st||[]).forEach(x=>{if(x.team?.name)positions[String(x.competition_id)+'|'+x.team.name]=x;});
 
   const mapped=(m||[]).map(x=>{
@@ -331,7 +347,8 @@ export default function App(){
     strStatus:x.status,
     _homeStanding:positions[String(x.competition_id)+'|'+(x.home?.name||'')]||null,
     _awayStanding:positions[String(x.competition_id)+'|'+(x.away?.name||'')]||null,
-    raw:x
+    raw:x,
+    scutvVideo:tvByMatch[String(x.id)]||null
    };
    return {
     raw:x,
@@ -358,6 +375,7 @@ export default function App(){
       homeScore:x.home_score,
       awayScore:x.away_score,
       timeConfirmed,
+      scutvVideo:tvByMatch[String(x.id)]||null,
       ev
     }
    };
@@ -405,6 +423,10 @@ export default function App(){
  }
  function openPlayer(player){
   setSelectedPlayer(player);setPlayerDetailTab('ESTATÍSTICAS');setScreen('playerDetail');
+ }
+ function openScutv(video){
+  if(!video)return;
+  setPreviousScreen(screen);setSelectedScutv(video);setScreen('scutv');
  }
  function saveCart(next){
   setCart(next);
@@ -611,13 +633,23 @@ export default function App(){
  if(screen==='game'){
   const ev=gameInfo.event||game,home={name:ev?.strHomeTeam,logo:ev?.strHomeTeamBadge||ev?.strHomeTeamLogo},away={name:ev?.strAwayTeam,logo:ev?.strAwayTeamBadge||ev?.strAwayTeamLogo};
   return <Page><Back title="JOGO"/>{gameLoading?<ActivityIndicator/>:<>
-   <View style={s.detailCard}><Text style={s.kicker}>{ev?.strLeague||'COMPETIÇÃO'} · {ev?.intRound?'JORNADA '+ev.intRound:''}</Text><Text style={s.detailDate}>{fmtGameDate(ev)}</Text><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.bigLogo}/><Text style={s.teamName}>{home.name}</Text>{ev?._homeStanding&&<Text style={s.teamStanding}>{ev._homeStanding.position}.º · {ev._homeStanding.points} pts</Text>}</View><Text style={s.score}>{ev?.intHomeScore!=null?ev.intHomeScore+' - '+ev.intAwayScore:'VS'}</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.bigLogo}/><Text style={s.teamName}>{away.name}</Text>{ev?._awayStanding&&<Text style={s.teamStanding}>{ev._awayStanding.position}.º · {ev._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {ev?.strVenue||'Local a confirmar'}{ev?.raw?.city?' · '+ev.raw.city:''}</Text><Text style={s.gameStatus}>{ev?.strStatus==='scheduled'?'Agendado':ev?.strStatus==='finished'?'Terminado':ev?.strStatus||''}</Text></View>
+   <View style={s.detailCard}><Text style={s.kicker}>{ev?.strLeague||'COMPETIÇÃO'} · {ev?.intRound?'JORNADA '+ev.intRound:''}</Text><Text style={s.detailDate}>{fmtGameDate(ev)}</Text><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.bigLogo}/><Text style={s.teamName}>{home.name}</Text>{ev?._homeStanding&&<Text style={s.teamStanding}>{ev._homeStanding.position}.º · {ev._homeStanding.points} pts</Text>}</View><Text style={s.score}>{ev?.intHomeScore!=null?ev.intHomeScore+' - '+ev.intAwayScore:'VS'}</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.bigLogo}/><Text style={s.teamName}>{away.name}</Text>{ev?._awayStanding&&<Text style={s.teamStanding}>{ev._awayStanding.position}.º · {ev._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {ev?.strVenue||'Local a confirmar'}{ev?.raw?.city?' · '+ev.raw.city:''}</Text><Text style={s.gameStatus}>{ev?.strStatus==='scheduled'?'Agendado':ev?.strStatus==='finished'?'Terminado':ev?.strStatus||''}</Text>{ev?.scutvVideo&&((ev.strStatus==='finished')||ev.scutvVideo.live_status==='is_live')?<View style={s.youtubeCenter}><YouTubeBadge live={ev.scutvVideo.live_status==='is_live'} onPress={()=>openScutv(ev.scutvVideo)}/></View>:null}</View>
    <View style={s.gameTabs}>{['RESUMO','ESTATÍSTICAS','ONZE'].map(t=><Pressable key={t} onPress={()=>setGameTab(t)} style={[s.gameTab,gameTab===t&&s.gameTabOn]}><Text style={[s.gameTabText,gameTab===t&&s.gameTabTextOn]}>{t}</Text></Pressable>)}</View>
    {gameTab==='RESUMO'&&<View style={s.infoCard}><Text style={s.body}>{ev?.strDescriptionEN||('Jogo da '+(ev?.intRound?'jornada '+ev.intRound:'competição')+' entre '+(ev?.strHomeTeam||'')+' e '+(ev?.strAwayTeam||'')+'.')}</Text>{ev?._homeStanding&&ev?._awayStanding&&<Text style={[s.muted,{marginTop:8}]}>Classificação atual: {ev.strHomeTeam} {ev._homeStanding.position}.º ({ev._homeStanding.points} pts) · {ev.strAwayTeam} {ev._awayStanding.position}.º ({ev._awayStanding.points} pts)</Text>}{gameInfo.timeline.length>0&&<View style={s.timeline}>{gameInfo.timeline.map((x,i)=><Text key={i} style={s.body}>{x.strTimeline||x.strEvent||x.strPlayer||''}</Text>)}</View>}</View>}
    {gameTab==='ESTATÍSTICAS'&&<View style={s.infoCard}>{gameInfo.stats.length?gameInfo.stats.map((x,i)=><View key={i} style={s.statRow}><Text style={s.body}>{x.strStat||x.strStatType||'Estatística'}</Text><Text style={s.body}>{x.intHome||x.strHome||''}  {x.intAway||x.strAway||''}</Text></View>):<Text style={s.muted}>As estatísticas aparecem aqui quando forem disponibilizadas pela fonte.</Text>}</View>}
    {gameTab==='ONZE'&&<View style={s.infoCard}>{gameInfo.lineup.length?gameInfo.lineup.map((x,i)=><Text key={i} style={s.body}>{x.strPlayer||x.strPlayerName||x.strHomeTeam||''}</Text>):<Text style={s.muted}>O onze aparece aqui quando for disponibilizado pela fonte.</Text>}</View>}
   </>}</Page>
  }
+ if(screen==='scutv')return <Page scroll={false}><Back title={selectedScutv?.live_status==='is_live'?'SCUTV · DIRETO':'SCUTV'} to={previousScreen||'calendar'}/>
+  {selectedScutv?<View style={s.scutvScreen}>
+   <View style={s.scutvPlayer}>
+    {Platform.OS==='web'
+     ?React.createElement('iframe',{src:'https://www.youtube.com/embed/'+selectedScutv.video_id+'?autoplay=1&playsinline=1&rel=0',title:selectedScutv.title,allow:'autoplay; encrypted-media; picture-in-picture; fullscreen',allowFullScreen:true,style:{width:'100%',height:'100%',border:0,backgroundColor:'#000'}})
+     :<WebView source={{uri:'https://www.youtube.com/embed/'+selectedScutv.video_id+'?autoplay=1&playsinline=1&rel=0',headers:{Referer:'https://torreense.app'}}} style={s.scutvWebView} mediaPlaybackRequiresUserAction={false} allowsFullscreenVideo allowsInlineMediaPlayback javaScriptEnabled domStorageEnabled/>}
+   </View>
+   <View style={s.scutvInfo}><View style={s.scutvTitleRow}><View style={s.youtubeIcon}><Text style={s.youtubePlay}>▶</Text></View><Text style={s.scutvTitle}>{selectedScutv.title}</Text></View>{selectedScutv.live_status==='is_live'?<Text style={s.scutvLive}>● DIRETO AGORA</Text>:<Text style={s.scutvReplay}>GRAVAÇÃO SCUTV</Text>}</View>
+  </View>:<View style={s.infoCard}><Text style={s.muted}>Vídeo SCUTV indisponível.</Text></View>}
+ </Page>;
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
  if(screen==='article')return <Page><Back title="NOTÍCIAS" to={previousScreen==='news'?'news':'home'}/><View style={s.articleCard}><Text style={s.newsMeta}>{selectedNews?.category}</Text><Text style={s.articleTitle}>{cleanNewsTitle(selectedNews?.title||'')}</Text>{selectedNews?.hero?<ArticleImage uri={selectedNews.hero} hero version={syncVersion}/>:null}{articleLoading?<ActivityIndicator/>:<><View>{articleBlocks(selectedNews?.html,selectedNews?.body,selectedNews?.url).map((b,i)=>b.type==='img'?<ArticleImage key={i} uri={b.src} version={syncVersion}/>:<Text key={i} style={b.type==='h'?[s.articleParagraph,{fontSize:18,fontWeight:'700',marginTop:12}]:b.type==='li'?[s.articleParagraph,{paddingLeft:10}]:s.articleParagraph}>{b.type==='li'?'• '+b.text:b.text}</Text>)}</View><Pressable style={s.sourceButton} onPress={()=>Platform.OS==='web'&&window.open(selectedNews?.url,'_blank')}><Text style={s.sourceButtonText}>VER NO SITE OFICIAL</Text></Pressable></>}</View></Page>;
  if(screen==='members')return <Page><Back title="SÓCIOS"/>
@@ -868,6 +900,7 @@ export default function App(){
      {olderCalendarMatches.length?olderCalendarMatches.map(x=><Pressable key={x.id} style={s.calendarHistoryCard} onPress={()=>openCalendarGame(x)}>
       <View style={s.calendarHistoryMeta}><Text style={s.calendarHistoryDate}>{x.date}</Text><Text style={s.calendarHistoryCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text></View>
       <View style={s.calendarHistoryScoreRow}><Text style={s.calendarHistoryTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.calendarHistoryLogo}/><Text style={s.calendarHistoryScore}>{x.homeScore!=null?x.homeScore:'–'} - {x.awayScore!=null?x.awayScore:'–'}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.calendarHistoryLogo}/><Text style={[s.calendarHistoryTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
+      {x.scutvVideo?<View style={s.youtubeHistory}><YouTubeBadge onPress={()=>openScutv(x.scutvVideo)}/></View>:null}
      </Pressable>):null}
 
      <View onLayout={e=>{
@@ -884,6 +917,7 @@ export default function App(){
         <View style={s.calendarLastScoreBox}><Text style={s.calendarLastScore}>{lastCalendarMatch.homeScore} - {lastCalendarMatch.awayScore}</Text><Text style={s.calendarLastDate}>{lastCalendarMatch.date}</Text></View>
         <View style={[s.calendarLastTeam,{justifyContent:'flex-start'}]}><TeamLogo name={lastCalendarMatch.awayFullName} uri={lastCalendarMatch.awayLogo} style={s.calendarLastLogo}/><Text style={[s.calendarLastTeamName,{textAlign:'left'}]}>{lastCalendarMatch.awayName}</Text></View>
        </View>
+       {lastCalendarMatch.scutvVideo?<View style={s.youtubeCenter}><YouTubeBadge light onPress={()=>openScutv(lastCalendarMatch.scutvVideo)}/></View>:null}
       </Pressable>:<View style={s.calendarBoundaryNote}><Text style={s.muted}>Ainda não existem resultados anteriores para esta modalidade.</Text></View>}
      </View>
 
@@ -895,11 +929,12 @@ export default function App(){
        <View style={s.calendarNextTeam}><TeamLogo name={nextCalendarMatch.awayFullName} uri={nextCalendarMatch.awayLogo} style={s.calendarNextLogo}/><Text style={s.calendarNextTeamCode}>{nextCalendarMatch.awayName}</Text></View>
       </View>
       <Text style={s.calendarNextMatchup}>{nextCalendarMatch.homeName}{'\n'}{nextCalendarMatch.awayName}</Text>
+      {nextCalendarMatch.scutvVideo?.live_status==='is_live'?<View style={s.youtubeCenter}><YouTubeBadge live light onPress={()=>openScutv(nextCalendarMatch.scutvVideo)}/></View>:null}
      </Pressable>:<View style={s.infoCard}><Text style={s.muted}>Não existem próximos jogos publicados para esta modalidade.</Text></View>}
 
      {upcomingCalendarMatches.length?<><Text style={s.calendarSectionTitle}>PRÓXIMOS JOGOS</Text>{upcomingCalendarMatches.map(x=><Pressable key={x.id} style={s.calendarUpcomingCard} onPress={()=>openCalendarGame(x)}>
       <View style={s.calendarUpcomingDate}><Text style={s.calendarUpcomingDay}>{x.startsAt?new Date(x.startsAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',timeZone:'Europe/Lisbon'}).toUpperCase():x.date}</Text><Text style={s.calendarUpcomingTime}>{x.time}</Text></View>
-      <View style={s.calendarUpcomingBody}><Text style={s.calendarUpcomingCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text><View style={s.calendarUpcomingTeams}><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.calendarUpcomingLogo}/><Text style={s.calendarUpcomingTitle}>{x.homeName}  ×  {x.awayName}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.calendarUpcomingLogo}/></View><Text style={s.calendarUpcomingVenue}>{x.venue}</Text></View>
+      <View style={s.calendarUpcomingBody}><Text style={s.calendarUpcomingCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text><View style={s.calendarUpcomingTeams}><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.calendarUpcomingLogo}/><Text style={s.calendarUpcomingTitle}>{x.homeName}  ×  {x.awayName}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.calendarUpcomingLogo}/></View><Text style={s.calendarUpcomingVenue}>{x.venue}</Text>{x.scutvVideo?.live_status==='is_live'?<View style={s.youtubeInline}><YouTubeBadge live onPress={()=>openScutv(x.scutvVideo)}/></View>:null}</View>
      </Pressable>)}</>:null}
     </>}
    </ScrollView>
@@ -940,7 +975,7 @@ export default function App(){
 
  const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
  return <Page>
-  <Pressable style={s.card} onPress={openGame}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error?<Text style={s.muted}>Não foi possível atualizar o jogo.</Text>:<><View style={s.header}><View><Text style={s.competition}>{game?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{game?.intRound?'Jornada '+game.intRound:'Próximo jogo'}</Text></View><Text style={s.date}>{fmtGameDate(game)}</Text></View><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text>{game?._homeStanding&&<Text style={s.teamStanding}>{game._homeStanding.position}.º · {game._homeStanding.points} pts</Text>}</View><Text style={s.vs}>VS</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text>{game?._awayStanding&&<Text style={s.teamStanding}>{game._awayStanding.position}.º · {game._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {game?.strVenue||'Local a confirmar'}</Text><Text style={s.detailsArrow}>›</Text></>}</Pressable>
+  <Pressable style={s.card} onPress={openGame}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error?<Text style={s.muted}>Não foi possível atualizar o jogo.</Text>:<><View style={s.header}><View><Text style={s.competition}>{game?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{game?.intRound?'Jornada '+game.intRound:'Próximo jogo'}</Text></View><Text style={s.date}>{fmtGameDate(game)}</Text></View><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text>{game?._homeStanding&&<Text style={s.teamStanding}>{game._homeStanding.position}.º · {game._homeStanding.points} pts</Text>}</View><Text style={s.vs}>VS</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text>{game?._awayStanding&&<Text style={s.teamStanding}>{game._awayStanding.position}.º · {game._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {game?.strVenue||'Local a confirmar'}</Text>{game?.scutvVideo?.live_status==='is_live'?<View style={s.youtubeCenter}><YouTubeBadge live onPress={()=>openScutv(game.scutvVideo)}/></View>:null}<Text style={s.detailsArrow}>›</Text></>}</Pressable>
   <View style={s.quickSection}><View style={s.quickRow}>
    <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.quickText}>CALENDÁRIO</Text></Pressable>
    <Pressable style={s.quickCard} onPress={()=>setScreen('news')}><ShortcutIcon type="news"/><Text style={s.quickText}>NOTÍCIAS</Text></Pressable>
@@ -957,6 +992,8 @@ const s=StyleSheet.create({
  card:{width:'100%',backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(120,164,197,.34)',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#b7cee2',fontSize:8,letterSpacing:.55},round:{color:'#fff',fontSize:8.5,marginTop:3},date:{color:'#fff',fontSize:8},
  teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamLogoFallback:{borderRadius:999,backgroundColor:'rgba(255,255,255,.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'rgba(255,255,255,.18)'},teamLogoFallbackText:{color:'#dce7ef',fontSize:8,fontWeight:'700'},teamName:{color:'#fff',fontSize:8,marginTop:3,textAlign:'center',minHeight:16},teamStanding:{color:'#91abc0',fontSize:6,marginTop:1},vs:{color:'#93abc1',fontSize:12},score:{color:'#fff',fontSize:19},stadium:{color:'#b8c8d8',fontSize:8,textAlign:'center',marginTop:4},gameStatus:{color:'#f1b94f',fontSize:6,textAlign:'center',marginTop:3},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#b7c9d9',fontSize:24},
+ youtubeBadge:{alignSelf:'center',minHeight:24,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderRadius:12,backgroundColor:'rgba(255,255,255,.08)',borderWidth:1,borderColor:'rgba(255,255,255,.16)'},youtubeBadgeLight:{backgroundColor:'rgba(255,255,255,.92)',borderColor:'rgba(0,0,0,.08)'},youtubeIcon:{width:22,height:15,borderRadius:4,backgroundColor:'#ff0033',alignItems:'center',justifyContent:'center',marginRight:6},youtubePlay:{color:'#fff',fontSize:7,lineHeight:9,fontWeight:'900',marginLeft:1},youtubeBadgeText:{color:'#fff',fontSize:5.7,fontWeight:'800',letterSpacing:.35},youtubeBadgeTextLight:{color:'#17212a'},youtubeCenter:{alignItems:'center',marginTop:7},youtubeHistory:{alignItems:'flex-end',marginTop:5},youtubeInline:{alignItems:'flex-start',marginTop:5},
+ scutvScreen:{flex:1},scutvPlayer:{width:'100%',aspectRatio:16/9,borderRadius:12,overflow:'hidden',backgroundColor:'#000'},scutvWebView:{flex:1,backgroundColor:'#000'},scutvInfo:{paddingTop:10},scutvTitleRow:{flexDirection:'row',alignItems:'center'},scutvTitle:{flex:1,color:'#fff',fontSize:8.2,fontWeight:'700',lineHeight:11},scutvLive:{color:'#ff4967',fontSize:6.4,fontWeight:'800',marginTop:7},scutvReplay:{color:'#8fa9bc',fontSize:6.1,fontWeight:'700',marginTop:7},
  clubLine:{color:'#fff',fontSize:15,letterSpacing:.2},clubLight:{color:'#b9cadb'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'rgba(5,35,62,.72)',borderWidth:1,borderColor:'rgba(120,164,197,.30)'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(79,139,181,.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},quickIconFallback:{color:'#f1b94f',fontSize:22,lineHeight:26},quickText:{color:'#fff',fontSize:5.9,letterSpacing:.18,marginTop:5,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.50)',backgroundColor:'rgba(8,43,72,.86)',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#fff',fontSize:7,letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:18},
  memberHero:{flexDirection:'row',alignItems:'center',padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(241,185,79,.28)',marginBottom:8},memberHeroIcon:{width:36,height:36,borderRadius:10,backgroundColor:'rgba(241,185,79,.10)',alignItems:'center',justifyContent:'center'},memberHeroText:{flex:1,paddingLeft:9},memberHeroTitle:{color:'#fff',fontSize:9.5,fontWeight:'700',letterSpacing:.55},memberHeroSub:{color:'#9fb5c7',fontSize:6.3,lineHeight:9,marginTop:2},
  memberFees:{borderRadius:10,overflow:'hidden',borderWidth:1,borderColor:'rgba(120,164,197,.24)',marginBottom:8},memberFeeRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.07)',backgroundColor:'rgba(8,43,72,.76)'},memberFeeMain:{flex:1},memberFeeName:{color:'#fff',fontSize:6.7,fontWeight:'600'},memberFeeAge:{color:'#8fa9bc',fontSize:5.4,marginTop:1},memberFeeValue:{width:58,color:'#f1b94f',fontSize:6.1,textAlign:'right'},memberFeeAnnual:{width:58,color:'#b8c8d8',fontSize:5.8,textAlign:'right'},
