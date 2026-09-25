@@ -6,7 +6,10 @@
   "scripts": {
     "start": "expo start",
     "web": "expo start --web",
-    "export:web": "expo export --platform web"
+    "export:web": "expo export --platform web",
+    "go": "expo start --tunnel",
+    "go:lan": "expo start --lan",
+    "doctor": "expo-doctor"
   },
   "dependencies": {
     "expo": "~57.0.0",
