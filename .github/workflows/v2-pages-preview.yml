@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: inline SCUTV icon
+# Deploy trigger: SPORT TV summary icons
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
