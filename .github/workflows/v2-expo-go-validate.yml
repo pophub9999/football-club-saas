@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-validate.yml'
 
-# Validate trigger: SDK 57 dependency alignment
+# Validate trigger: calendar tabs and rich past match details
 jobs:
   validate:
     runs-on: ubuntu-latest
