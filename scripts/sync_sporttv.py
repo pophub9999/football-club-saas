@@ -71,30 +71,39 @@ def candidate_match(video,matches):
         away=(m.get("away") or {}).get("name") or ""
         if "torreense" not in norm(home) and "torreense" not in norm(away):
             continue
-        if not any(a in title for a in aliases("Torreense")):
+
+        home_hits=[title.find(a) for a in aliases(home) if a in title]
+        away_hits=[title.find(a) for a in aliases(away) if a in title]
+        if not home_hits or not away_hits:
             continue
-        opp=away if "torreense" in norm(home) else home
-        if not any(a in title for a in aliases(opp)):
-            continue
+
         start=dt(m.get("starts_at"))
         if not start:continue
-        day_gap=abs((published.date()-start.date()).days) if published else 999
-        if day_gap>7:continue
-        confidence=0.74
+        confidence=0.72
         reasons=["duas equipas no título"]
-        if day_gap<=1:
-            confidence+=0.18;reasons.append("data compatível")
-        elif day_gap<=3:
-            confidence+=0.10;reasons.append("data próxima")
-        elif day_gap<=7:
-            confidence+=0.04
+
         if score_pair and m.get("home_score") is not None and m.get("away_score") is not None:
             hs,as_=int(m["home_score"]),int(m["away_score"])
-            if score_pair==(hs,as_) or score_pair==(as_,hs):
-                confidence+=0.08;reasons.append("resultado compatível")
-            else:
-                confidence-=0.25
-        if confidence>=0.80 and (best is None or confidence>best[1]):
+            home_first=min(home_hits)<min(away_hits)
+            expected=(hs,as_) if home_first else (as_,hs)
+            if score_pair!=expected:
+                continue
+            confidence+=0.22;reasons.append("resultado e ordem compatíveis")
+        else:
+            # Without a score, require publication date proximity.
+            if not published:
+                continue
+
+        if published:
+            day_gap=abs((published.date()-start.date()).days)
+            if day_gap>7:
+                continue
+            if day_gap<=1:
+                confidence+=0.06;reasons.append("data compatível")
+            elif day_gap<=3:
+                confidence+=0.03
+
+        if confidence>=0.88 and (best is None or confidence>best[1]):
             best=(m["id"],min(confidence,1.0),", ".join(reasons))
     return best or (None,None,None)
 
@@ -120,12 +129,12 @@ def main():
         except Exception:
             info=e
         title=info.get("title") or e.get("title") or ""
-        # SPORT TV match highlight titles normally begin with "Resumo:".
-        # Require either that explicit marker or a clearly short match clip.
-        is_summary="resumo" in norm(title)
-        duration=info.get("duration")
-        if not is_summary and duration and duration>900:
+        # Only keep official match-summary clips, never flash interviews or shows.
+        title_norm=norm(title)
+        is_summary=("resumo" in title_norm or "highlights" in title_norm)
+        if not is_summary:
             continue
+        duration=info.get("duration")
         published=iso_ts(info.get("timestamp") or info.get("release_timestamp")) or iso_upload(info.get("upload_date"))
         row={
             "video_id":vid,
