@@ -504,7 +504,7 @@ export default function App(){
   finally{setMemberSubmitting(false)}
  }
  const officialNews=news;
- const sports=['FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO','TODAS'];
+ const sports=['TODAS','FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
  const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
  const calendarNow=Date.now();
  const calendarIsPast=x=>{
