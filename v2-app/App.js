@@ -2,6 +2,7 @@ import '@expo/metro-runtime';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
@@ -243,6 +244,11 @@ function memberFee(category=''){
  };
  return fees[category]||null;
 }
+function memberFeeAmount(category='',plan='annual'){
+ const monthly={'Sócio Infantil':0,'Sócio Juvenil':3,'Sócio Efetivo':6,'Sócio +70':3}[category];
+ if(monthly==null)return 0;
+ return plan==='annual'?monthly*12:monthly;
+}
 export default function App(){
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
@@ -252,6 +258,7 @@ export default function App(){
  const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState('');
  const [benefits,setBenefits]=useState([]),[benefitCategory,setBenefitCategory]=useState('TODAS'),[benefitSearch,setBenefitSearch]=useState(''),[selectedBenefit,setSelectedBenefit]=useState(null);
  const [memberForm,setMemberForm]=useState({...EMPTY_MEMBER_FORM}),[memberPrivacy,setMemberPrivacy]=useState(false),[memberSubmitting,setMemberSubmitting]=useState(false),[memberMessage,setMemberMessage]=useState('');
+ const [memberPhoto,setMemberPhoto]=useState(null),[memberPaymentPlan,setMemberPaymentPlan]=useState('annual'),[memberPaymentMethod,setMemberPaymentMethod]=useState('MBWAY');
  const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
  const [selectedProduct,setSelectedProduct]=useState(null),[productChoices,setProductChoices]=useState({});
  const [shippingOptions,setShippingOptions]=useState([]),[checkoutInfo,setCheckoutInfo]=useState(null),[checkoutLoading,setCheckoutLoading]=useState(false),[checkoutMessage,setCheckoutMessage]=useState('');
@@ -409,6 +416,19 @@ export default function App(){
   }catch(e){setCheckoutMessage(e.message||'Não foi possível finalizar a compra.')}
   finally{setCheckoutLoading(false)}
  }
+ async function pickMemberPhoto(source='library'){
+  setMemberMessage('');
+  try{
+   if(source==='camera'){
+    const permission=await ImagePicker.requestCameraPermissionsAsync();
+    if(!permission.granted){setMemberMessage('É necessário permitir o acesso à câmara.');return}
+   }
+   const result=source==='camera'
+    ?await ImagePicker.launchCameraAsync({mediaTypes:['images'],allowsEditing:true,aspect:[1,1],quality:.82})
+    :await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[1,1],quality:.82});
+   if(!result.canceled&&result.assets?.[0])setMemberPhoto(result.assets[0]);
+  }catch(e){setMemberMessage('Não foi possível selecionar a fotografia.')}
+ }
  async function submitMemberApplication(){
   setMemberMessage('');
   const f=memberForm,age=memberAgeFromBirthDate(f.birthDate),category=memberCategoryFromBirthDate(f.birthDate);
@@ -421,22 +441,41 @@ export default function App(){
   if(age<16&&(!f.guardianName.trim()||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.guardianEmail.trim()))){
    setMemberMessage('Para menores de 16 anos indica o nome e email do responsável.');return;
   }
+  if(!memberPhoto){setMemberMessage('Adiciona a fotografia de sócio.');return}
   if(!memberPrivacy){setMemberMessage('É necessário aceitar a Política de Privacidade para enviar o pedido.');return}
+  const amount=memberFeeAmount(category,memberPaymentPlan);
+  if(amount>0&&!['MBWAY','CARD'].includes(memberPaymentMethod)){setMemberMessage('Seleciona um método de pagamento.');return}
   setMemberSubmitting(true);
   try{
-   const r=await fetch(SUPABASE_URL+'/rest/v1/member_applications',{
+   const form=new FormData();
+   form.append('application',JSON.stringify({
+    ...f,privacyAccepted:true,paymentPlan:memberPaymentPlan,paymentMethod:amount>0?memberPaymentMethod:null
+   }));
+   if(Platform.OS==='web'){
+    let file=memberPhoto.file;
+    if(!file){
+     const blob=await (await fetch(memberPhoto.uri)).blob();
+     file=new File([blob],memberPhoto.fileName||'foto-socio.jpg',{type:memberPhoto.mimeType||blob.type||'image/jpeg'});
+    }
+    form.append('photo',file,memberPhoto.fileName||file.name||'foto-socio.jpg');
+   }else{
+    form.append('photo',{uri:memberPhoto.uri,name:memberPhoto.fileName||'foto-socio.jpg',type:memberPhoto.mimeType||'image/jpeg'});
+   }
+   const r=await fetch(SUPABASE_URL+'/functions/v1/member-application',{
     method:'POST',
-    headers:{...SB_HEADERS,'Content-Type':'application/json','Prefer':'return=minimal'},
-    body:JSON.stringify({
-     first_name:f.firstName.trim(),last_name:f.lastName.trim(),birth_date:f.birthDate.trim(),nif:f.nif.trim(),
-     email:f.email.trim().toLowerCase(),phone:f.phone.trim(),address:f.address.trim(),postal_code:f.postalCode.trim(),
-     city:f.city.trim(),category,guardian_name:age<16?f.guardianName.trim()||null:null,
-     guardian_email:age<16?f.guardianEmail.trim().toLowerCase()||null:null,privacy_accepted:true
-    })
+    headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY},
+    body:form
    });
-   if(!r.ok){const data=await r.json().catch(()=>({}));throw new Error(data?.message||'Não foi possível enviar o pedido.')}
-   setMemberForm({...EMPTY_MEMBER_FORM});setMemberPrivacy(false);
-   setMemberMessage('Pedido de adesão enviado com sucesso. A equipa de sócios irá validar os dados.');
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(data?.error||'Não foi possível enviar o pedido.');
+   setMemberForm({...EMPTY_MEMBER_FORM});setMemberPrivacy(false);setMemberPhoto(null);
+   if(Number(data.amount||0)===0){
+    setMemberMessage('Adesão enviada com sucesso. Esta categoria não tem quota a pagar.');
+   }else if(data.paymentReady){
+    setMemberMessage('Pedido criado. O pagamento de '+moneyEUR(data.amount)+' ficou preparado para '+(data.paymentMethod==='CARD'?'cartão':'MB WAY')+'.');
+   }else{
+    setMemberMessage('Pedido e fotografia guardados. O pagamento de '+moneyEUR(data.amount)+' ainda não pode ser cobrado porque o gateway SIBS está em configuração.');
+   }
   }catch(e){setMemberMessage(e.message||'Não foi possível enviar o pedido de adesão.')}
   finally{setMemberSubmitting(false)}
  }
@@ -465,6 +504,7 @@ export default function App(){
  const memberAge=memberAgeFromBirthDate(memberForm.birthDate);
  const memberCategory=memberCategoryFromBirthDate(memberForm.birthDate);
  const memberCurrentFee=memberFee(memberCategory);
+ const memberPaymentAmount=memberFeeAmount(memberCategory,memberPaymentPlan);
  const memberNeedsGuardian=memberAge!=null&&memberAge<16;
 
  function Back({title,to='home'}){return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={s.back}>‹</Text></Pressable><Text style={s.pageTitle}>{title}</Text></View>}
@@ -495,6 +535,16 @@ export default function App(){
    ].map(x=><View key={x[0]} style={s.memberFeeRow}><View style={s.memberFeeMain}><Text style={s.memberFeeName}>{x[0]}</Text><Text style={s.memberFeeAge}>{x[1]} anos</Text></View><Text style={s.memberFeeValue}>{x[2]} / mês</Text><Text style={s.memberFeeAnnual}>{x[3]} / ano</Text></View>)}
   </View>
   <View style={s.memberFormCard}>
+   <Text style={s.memberSectionTitle}>FOTOGRAFIA DE SÓCIO</Text>
+   <View style={s.memberPhotoRow}>
+    <View style={s.memberPhotoFrame}>{memberPhoto?<Image source={{uri:memberPhoto.uri}} style={s.memberPhotoImage} resizeMode="cover"/>:<View style={s.memberPhotoEmpty}><ShortcutIcon type="members"/><Text style={s.memberPhotoEmptyText}>SEM FOTO</Text></View>}</View>
+    <View style={s.memberPhotoActions}>
+     <Pressable onPress={()=>pickMemberPhoto('library')} style={s.memberPhotoBtn}><Text style={s.memberPhotoBtnText}>ESCOLHER FOTO</Text></Pressable>
+     <Pressable onPress={()=>pickMemberPhoto('camera')} style={s.memberPhotoBtn}><Text style={s.memberPhotoBtnText}>TIRAR FOTO</Text></Pressable>
+     <Text style={s.memberPhotoHint}>Foto frontal, bem iluminada e com o rosto visível. Máx. 5 MB.</Text>
+    </View>
+   </View>
+
    <Text style={s.memberSectionTitle}>DADOS PESSOAIS</Text>
    <View style={s.memberInputRow}>
     <TextInput value={memberForm.firstName} onChangeText={v=>setMemberForm({...memberForm,firstName:v})} placeholder="Nome *" placeholderTextColor="#7892a7" style={[s.memberInput,s.memberInputHalf]}/>
@@ -522,13 +572,31 @@ export default function App(){
     <TextInput value={memberForm.guardianEmail} onChangeText={v=>setMemberForm({...memberForm,guardianEmail:v})} placeholder="Email do responsável *" placeholderTextColor="#7892a7" keyboardType="email-address" autoCapitalize="none" style={s.memberInput}/>
    </>:null}
 
+   <Text style={s.memberSectionTitle}>PAGAMENTO DA QUOTA</Text>
+   {memberCategory?<View style={s.memberPaymentBox}>
+    <Text style={s.memberPaymentLabel}>PERIODICIDADE</Text>
+    <View style={s.memberPaymentOptions}>
+     <Pressable onPress={()=>setMemberPaymentPlan('monthly')} style={[s.memberPaymentOption,memberPaymentPlan==='monthly'&&s.memberPaymentOptionOn]}><Text style={[s.memberPaymentOptionText,memberPaymentPlan==='monthly'&&s.memberPaymentOptionTextOn]}>MENSAL · {memberCurrentFee?.monthly||'—'}</Text></Pressable>
+     <Pressable onPress={()=>setMemberPaymentPlan('annual')} style={[s.memberPaymentOption,memberPaymentPlan==='annual'&&s.memberPaymentOptionOn]}><Text style={[s.memberPaymentOptionText,memberPaymentPlan==='annual'&&s.memberPaymentOptionTextOn]}>ANUAL · {memberCurrentFee?.annual||'—'}</Text></Pressable>
+    </View>
+    {memberPaymentAmount>0?<>
+     <Text style={s.memberPaymentLabel}>MÉTODO DE PAGAMENTO</Text>
+     <View style={s.memberPaymentOptions}>
+      <Pressable onPress={()=>setMemberPaymentMethod('MBWAY')} style={[s.memberPaymentMethod,memberPaymentMethod==='MBWAY'&&s.memberPaymentOptionOn]}><Text style={[s.memberPaymentMethodText,memberPaymentMethod==='MBWAY'&&s.memberPaymentOptionTextOn]}>MB WAY</Text></Pressable>
+      <Pressable onPress={()=>setMemberPaymentMethod('CARD')} style={[s.memberPaymentMethod,memberPaymentMethod==='CARD'&&s.memberPaymentOptionOn]}><Text style={[s.memberPaymentMethodText,memberPaymentMethod==='CARD'&&s.memberPaymentOptionTextOn]}>CARTÃO</Text></Pressable>
+     </View>
+     <View style={s.memberPaymentTotal}><Text style={s.memberPaymentTotalLabel}>VALOR A PAGAR</Text><Text style={s.memberPaymentTotalValue}>{moneyEUR(memberPaymentAmount)}</Text></View>
+     <Text style={s.memberPaymentNote}>O pagamento é processado por gateway seguro. No preview, a cobrança só fica ativa quando as credenciais SIBS forem configuradas.</Text>
+    </>:<View style={s.memberFreeBox}><Text style={s.memberFreeText}>Esta categoria não tem quota a pagar.</Text></View>}
+   </View>:<Text style={s.memberGuardianNote}>Indica primeiro a data de nascimento para calcular a quota.</Text>}
+
    <Pressable onPress={()=>setMemberPrivacy(!memberPrivacy)} style={s.memberConsent}>
     <View style={[s.memberCheck,memberPrivacy&&s.memberCheckOn]}>{memberPrivacy?<Text style={s.memberCheckMark}>✓</Text>:null}</View>
     <Text style={s.memberConsentText}>Li e aceito a Política de Privacidade e autorizo o tratamento dos dados para este pedido de adesão.</Text>
    </Pressable>
-   {memberSubmitting?<ActivityIndicator style={{marginTop:10}}/>:<Pressable onPress={submitMemberApplication} style={s.memberSubmit}><Text style={s.memberSubmitText}>ENVIAR ADESÃO</Text></Pressable>}
+   {memberSubmitting?<ActivityIndicator style={{marginTop:10}}/>:<Pressable onPress={submitMemberApplication} style={s.memberSubmit}><Text style={s.memberSubmitText}>{memberPaymentAmount>0?'CONTINUAR PARA PAGAMENTO':'ENVIAR ADESÃO'}</Text></Pressable>}
    {memberMessage?<Text style={s.memberMessage}>{memberMessage}</Text>:null}
-   <Text style={s.memberFootnote}>O pedido fica registado na app e sujeito à validação final pelo SCU Torreense.</Text>
+   <Text style={s.memberFootnote}>O pedido, a fotografia e o estado do pagamento ficam registados na app e sujeitos à validação final pelo SCU Torreense.</Text>
   </View>
  </Page>;
  if(screen==='benefits')return <Page><Back title="VANTAGENS"/>
@@ -672,6 +740,8 @@ const s=StyleSheet.create({
  memberHero:{flexDirection:'row',alignItems:'center',padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.90)',borderWidth:1,borderColor:'rgba(241,185,79,.28)',marginBottom:8},memberHeroIcon:{width:36,height:36,borderRadius:10,backgroundColor:'rgba(241,185,79,.10)',alignItems:'center',justifyContent:'center'},memberHeroText:{flex:1,paddingLeft:9},memberHeroTitle:{color:'#fff',fontSize:9.5,fontWeight:'700',letterSpacing:.55},memberHeroSub:{color:'#9fb5c7',fontSize:6.3,lineHeight:9,marginTop:2},
  memberFees:{borderRadius:10,overflow:'hidden',borderWidth:1,borderColor:'rgba(120,164,197,.24)',marginBottom:8},memberFeeRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.07)',backgroundColor:'rgba(8,43,72,.76)'},memberFeeMain:{flex:1},memberFeeName:{color:'#fff',fontSize:6.7,fontWeight:'600'},memberFeeAge:{color:'#8fa9bc',fontSize:5.4,marginTop:1},memberFeeValue:{width:58,color:'#f1b94f',fontSize:6.1,textAlign:'right'},memberFeeAnnual:{width:58,color:'#b8c8d8',fontSize:5.8,textAlign:'right'},
  memberFormCard:{padding:10,borderRadius:12,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(120,164,197,.25)'},memberSectionTitle:{color:'#f1b94f',fontSize:6.4,letterSpacing:.6,marginTop:5,marginBottom:6},memberInput:{height:32,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.32)',backgroundColor:'rgba(1,23,43,.58)',color:'#fff',fontSize:6.9,paddingHorizontal:9,marginBottom:6},memberInputRow:{flexDirection:'row',justifyContent:'space-between'},memberInputHalf:{width:'49%'},memberCategoryBox:{minHeight:40,borderRadius:9,borderWidth:1,borderColor:'rgba(241,185,79,.38)',backgroundColor:'rgba(241,185,79,.08)',paddingHorizontal:9,paddingVertical:6,flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:7},memberCategoryLabel:{color:'#9fb5c7',fontSize:5.3,letterSpacing:.4},memberCategoryName:{color:'#fff',fontSize:7.4,fontWeight:'700',marginTop:2},memberCategoryPrice:{alignItems:'flex-end'},memberCategoryMonthly:{color:'#f1b94f',fontSize:7.4,fontWeight:'700'},memberCategoryAnnual:{color:'#9fb5c7',fontSize:5.7,marginTop:1},memberGuardianNote:{color:'#9fb5c7',fontSize:5.8,marginTop:-3,marginBottom:6},
+ memberPhotoRow:{flexDirection:'row',alignItems:'center',marginBottom:8},memberPhotoFrame:{width:72,height:72,borderRadius:12,overflow:'hidden',borderWidth:1,borderColor:'rgba(241,185,79,.45)',backgroundColor:'rgba(1,23,43,.62)'},memberPhotoImage:{width:'100%',height:'100%'},memberPhotoEmpty:{flex:1,alignItems:'center',justifyContent:'center'},memberPhotoEmptyText:{color:'#7892a7',fontSize:5.4,marginTop:4},memberPhotoActions:{flex:1,paddingLeft:9},memberPhotoBtn:{height:28,borderRadius:7,borderWidth:1,borderColor:'rgba(241,185,79,.48)',alignItems:'center',justifyContent:'center',marginBottom:5},memberPhotoBtnText:{color:'#f1b94f',fontSize:5.9,fontWeight:'700',letterSpacing:.3},memberPhotoHint:{color:'#7892a7',fontSize:5.2,lineHeight:7.5},
+ memberPaymentBox:{borderRadius:10,borderWidth:1,borderColor:'rgba(120,164,197,.24)',backgroundColor:'rgba(1,23,43,.38)',padding:8,marginBottom:6},memberPaymentLabel:{color:'#9fb5c7',fontSize:5.4,letterSpacing:.45,marginBottom:5},memberPaymentOptions:{flexDirection:'row',justifyContent:'space-between',marginBottom:8},memberPaymentOption:{width:'49%',height:29,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.34)',alignItems:'center',justifyContent:'center'},memberPaymentMethod:{width:'49%',height:31,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.34)',alignItems:'center',justifyContent:'center'},memberPaymentOptionOn:{backgroundColor:'#f1b94f',borderColor:'#f1b94f'},memberPaymentOptionText:{color:'#b7c9d9',fontSize:5.9},memberPaymentMethodText:{color:'#b7c9d9',fontSize:6.4,fontWeight:'700'},memberPaymentOptionTextOn:{color:'#082b48',fontWeight:'800'},memberPaymentTotal:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingTop:7,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.08)'},memberPaymentTotalLabel:{color:'#fff',fontSize:6},memberPaymentTotalValue:{color:'#f1b94f',fontSize:10,fontWeight:'800'},memberPaymentNote:{color:'#7892a7',fontSize:5.2,lineHeight:7.5,marginTop:5},memberFreeBox:{padding:8,borderRadius:8,backgroundColor:'rgba(241,185,79,.08)'},memberFreeText:{color:'#f1b94f',fontSize:6.2,textAlign:'center'},
  memberConsent:{flexDirection:'row',alignItems:'flex-start',marginTop:8},memberCheck:{width:17,height:17,borderRadius:4,borderWidth:1,borderColor:'rgba(241,185,79,.60)',alignItems:'center',justifyContent:'center',marginRight:7,marginTop:1},memberCheckOn:{backgroundColor:'#f1b94f'},memberCheckMark:{color:'#082b48',fontSize:10,fontWeight:'800'},memberConsentText:{flex:1,color:'#afc0ce',fontSize:5.8,lineHeight:9},memberSubmit:{height:34,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},memberSubmitText:{color:'#082b48',fontSize:6.8,fontWeight:'800',letterSpacing:.45},memberMessage:{color:'#fff',fontSize:6.3,lineHeight:9.5,textAlign:'center',marginTop:8},memberFootnote:{color:'#7892a7',fontSize:5.4,lineHeight:8,textAlign:'center',marginTop:7},
  benefitMiniHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:7,paddingHorizontal:1},benefitMiniTitle:{color:'#fff',fontSize:6.8,letterSpacing:.45},benefitMiniCount:{color:'#f1b94f',fontSize:6.1},
  benefitSearch:{height:30,borderRadius:8,borderWidth:1,borderColor:'rgba(120,164,197,.34)',backgroundColor:'rgba(1,23,43,.62)',color:'#fff',fontSize:6.8,paddingHorizontal:9,marginBottom:7},benefitFilters:{marginBottom:8},benefitResultHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:-1,marginBottom:5},benefitResultCount:{color:'#9fb5c7',fontSize:5.9,letterSpacing:.35},benefitSource:{color:'#f1b94f',fontSize:5.9,letterSpacing:.25},
