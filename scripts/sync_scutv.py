@@ -48,6 +48,13 @@ def iso_upload_date(v):
     try:return datetime.strptime(s,"%Y%m%d").replace(tzinfo=timezone.utc).isoformat()
     except Exception:return None
 
+def date_from_title(title):
+    m=re.search(r"\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b",title or "")
+    if not m:return None
+    try:
+        return datetime(int(m.group(3)),int(m.group(2)),int(m.group(1)),tzinfo=timezone.utc).isoformat()
+    except Exception:return None
+
 def dt(v):
     if not v:return None
     try:return datetime.fromisoformat(v.replace("Z","+00:00"))
@@ -67,7 +74,7 @@ def row_from(info):
         "youtube_url":"https://www.youtube.com/watch?v="+vid,
         "thumbnail_url":thumb or f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         "live_status":status,
-        "published_at":iso_ts(info.get("timestamp") or info.get("release_timestamp")) or iso_upload_date(info.get("upload_date")),
+        "published_at":iso_ts(info.get("timestamp") or info.get("release_timestamp")) or iso_upload_date(info.get("upload_date")) or date_from_title(info.get("title")),
         "scheduled_start":iso_ts(info.get("release_timestamp")),
         "actual_start":iso_ts(info.get("start_time")),
         "actual_end":iso_ts(info.get("end_time")),
@@ -109,7 +116,26 @@ def match_video(video,matches):
             score=max(score,0.80);reason.append("direto ativo")
         if score>=0.72 and (best is None or score>best[1]):
             best=(m["id"],min(score,1.0),", ".join(reason))
-    return best or (None,None,None)
+
+    if best:
+        return best
+
+    # Generic SportCam/live titles can omit both club names. Associate only when
+    # there is exactly one senior Torreense fixture in the relevant date/window.
+    if when:
+        if is_live:
+            candidates=[]
+            for m in matches:
+                start=dt(m.get("starts_at"))
+                if start and abs((when-start).total_seconds())<=6*3600:
+                    candidates.append(m)
+            if len(candidates)==1:
+                return (candidates[0]["id"],0.78,"único jogo na janela do direto")
+        else:
+            same_day=[m for m in matches if dt(m.get("starts_at")) and dt(m.get("starts_at")).date()==when.date()]
+            if len(same_day)==1:
+                return (same_day[0]["id"],0.76,"único jogo na data do vídeo")
+    return (None,None,None)
 
 def extract(url,flat=False,end=None):
     opts={"quiet":True,"skip_download":True,"ignoreerrors":True}
