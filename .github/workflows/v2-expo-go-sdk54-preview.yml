@@ -1,0 +1,52 @@
+name: V2 Expo Go SDK54 Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/v2-expo-go-sdk54-preview.yml'
+
+jobs:
+  publish:
+    name: Publish SDK54 Expo Go preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check Expo token
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Missing EXPO_TOKEN repository secret."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: expo-go-sdk54-preview
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.5'
+
+      - name: Prepare Expo SDK 54 compatibility
+        working-directory: v2-app
+        run: |
+          npm install expo@~54.0.0 react@19.1.0 react-native@0.81.5 react-native-web@0.21.0 --save
+          npx expo install expo-image-picker react-native-webview expo-updates
+          npx expo install --fix
+
+      - name: Validate SDK 54 project
+        working-directory: v2-app
+        run: npx expo-doctor
+
+      - name: Setup Expo / EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish SDK 54 Expo Go preview
+        working-directory: v2-app
+        env:
+          CI: '1'
+        run: eas update --branch expo-go-sdk54-preview --message "SCU Torreense Expo Go SDK54 preview" --environment preview --non-interactive
