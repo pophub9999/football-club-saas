@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: standings modality and competition filters
+# Deploy trigger: calendar all filter first
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
