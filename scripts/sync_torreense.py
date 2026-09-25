@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os,re,json,html as h,urllib.request,urllib.parse,urllib.error,subprocess,sys
+import os,re,json,html as h,urllib.request,urllib.parse,urllib.error,subprocess,sys,unicodedata
 from datetime import datetime,timezone
 try:
     from bs4 import BeautifulSoup
@@ -426,10 +426,15 @@ def page_image_url(img):
         return src
     return None
 
+def normalize_person_name(value):
+    s=unicodedata.normalize("NFKD",(value or "").casefold())
+    s="".join(ch for ch in s if not unicodedata.combining(ch))
+    s=re.sub(r"[^a-z0-9]+"," ",s)
+    return " ".join(s.split())
+
 def safe_asset_name(value):
-    s=value.casefold()
-    s=re.sub(r"[^a-z0-9]+","-",s)
-    return s.strip("-") or "asset"
+    s=normalize_person_name(value).replace(" ","-")
+    return s or "asset"
 
 def cache_page_image(remote_url,object_prefix,name):
     if not remote_url:
@@ -491,12 +496,28 @@ def sync_player_photos():
         except Exception as e:
             print("PLAYER_PHOTO_PAGE_FAILED",url,repr(e))
             continue
-        players=json.loads(api("players?select=id,name&team_id=eq."+str(team_id)+"&active=eq.true&limit=200"))
-        player_by_name={x["name"].casefold():x for x in players}
+        players=json.loads(api("players?select=id,name,short_name&team_id=eq."+str(team_id)+"&active=eq.true&limit=200"))
+        player_by_name={}
+        for p in players:
+            for label in (p.get("name"),p.get("short_name")):
+                key=normalize_person_name(label)
+                if key:
+                    player_by_name[key]=p
         seen=set()
         for img in soup.find_all("img"):
             alt=(img.get("alt") or "").strip()
-            player=player_by_name.get(alt.casefold())
+            alt_key=normalize_person_name(alt)
+            player=player_by_name.get(alt_key)
+            if not player and alt_key:
+                # Some pages use the full legal name while the DB uses the sporting
+                # name (or vice versa). Match unique containment only.
+                candidates=[]
+                for key,p in player_by_name.items():
+                    if len(key)>=4 and (key in alt_key or alt_key in key):
+                        if p not in candidates:
+                            candidates.append(p)
+                if len(candidates)==1:
+                    player=candidates[0]
             if not player or player["id"] in seen:
                 continue
             src=page_image_url(img)
