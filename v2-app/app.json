@@ -20,6 +20,16 @@
       "eas": {
         "projectId": "b5c19b30-0c77-4d4c-8755-2fbfbf54c8bd"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que o SCU Torreense aceda às suas fotografias para adicionar a foto de sócio.",
+          "cameraPermission": "Permitir que o SCU Torreense use a câmara para tirar a foto de sócio.",
+          "microphonePermission": false
+        }
+      ]
+    ]
   }
 }
