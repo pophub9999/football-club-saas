@@ -18,14 +18,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: v2-app/package-lock.json
       - name: Install dependencies
         working-directory: v2-app
-        run: npm ci
+        run: npm install
       - name: Expo Doctor
         working-directory: v2-app
         run: npx expo-doctor
-      - name: Export native bundles
+      - name: Export Android bundle
         working-directory: v2-app
-        run: npx expo export --platform android --platform ios --output-dir dist-native-check
+        run: npx expo export --platform android --output-dir dist-android-check
+      - name: Export iOS bundle
+        working-directory: v2-app
+        run: npx expo export --platform ios --output-dir dist-ios-check
