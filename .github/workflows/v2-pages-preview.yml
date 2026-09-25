@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: calendar history visibility
+# Deploy trigger: bidirectional calendar timeline
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
