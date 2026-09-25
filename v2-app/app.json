@@ -32,6 +32,12 @@
       ]
     ],
     "scheme": "scutorreense",
-    "description": "Aplicação oficial SCU Torreense"
+    "description": "Aplicação oficial SCU Torreense",
+    "updates": {
+      "url": "https://u.expo.dev/b5c19b30-0c77-4d4c-8755-2fbfbf54c8bd"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
   }
 }
