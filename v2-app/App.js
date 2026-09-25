@@ -434,6 +434,10 @@ export default function App(){
  }
  function openScutv(video,provider='SCUTV'){
   if(!video)return;
+  if(provider==='SPORT TV'){
+   openYouTubeVideo(video);
+   return;
+  }
   setPreviousScreen(screen);setSelectedScutv({...video,provider});setScreen('scutv');
  }
  function saveCart(next){
@@ -470,6 +474,22 @@ export default function App(){
  async function openOfficialStore(url='https://www.torreense.com/loja/'){
   if(Platform.OS==='web'&&typeof window!=='undefined')window.open(url,'_blank');
   else await Linking.openURL(url);
+ }
+ async function openYouTubeVideo(video){
+  if(!video)return;
+  const watchUrl=video.youtube_url||('https://www.youtube.com/watch?v='+video.video_id);
+  if(Platform.OS==='web'&&typeof window!=='undefined'){
+   window.open(watchUrl,'_blank','noopener,noreferrer');
+   return;
+  }
+  const appUrl=video.video_id?'youtube://watch?v='+video.video_id:null;
+  try{
+   if(appUrl&&await Linking.canOpenURL(appUrl)){
+    await Linking.openURL(appUrl);
+    return;
+   }
+  }catch(e){}
+  await Linking.openURL(watchUrl);
  }
  async function openCheckout(){
   setScreen('checkout');setCheckoutMessage('');setCheckoutLoading(true);
@@ -648,14 +668,14 @@ export default function App(){
    {gameTab==='ONZE'&&<View style={s.infoCard}>{gameInfo.lineup.length?gameInfo.lineup.map((x,i)=><Text key={i} style={s.body}>{x.strPlayer||x.strPlayerName||x.strHomeTeam||''}</Text>):<Text style={s.muted}>O onze aparece aqui quando for disponibilizado pela fonte.</Text>}</View>}
   </>}</Page>
  }
- if(screen==='scutv')return <Page scroll={false}><Back title={selectedScutv?.provider==='SPORT TV'?'RESUMO · SPORT TV':selectedScutv?.live_status==='is_live'?'SCUTV · DIRETO':'SCUTV'} to={previousScreen||'calendar'}/>
+ if(screen==='scutv')return <Page scroll={false}><Back title={selectedScutv?.live_status==='is_live'?'SCUTV · DIRETO':'SCUTV'} to={previousScreen||'calendar'}/>
   {selectedScutv?<View style={s.scutvScreen}>
    <View style={s.scutvPlayer}>
     {Platform.OS==='web'
      ?React.createElement('iframe',{src:'https://www.youtube.com/embed/'+selectedScutv.video_id+'?autoplay=1&playsinline=1&rel=0',title:selectedScutv.title,allow:'autoplay; encrypted-media; picture-in-picture; fullscreen',allowFullScreen:true,style:{width:'100%',height:'100%',border:0,backgroundColor:'#000'}})
      :<WebView source={{uri:'https://www.youtube.com/embed/'+selectedScutv.video_id+'?autoplay=1&playsinline=1&rel=0',headers:{Referer:'https://torreense.app'}}} style={s.scutvWebView} mediaPlaybackRequiresUserAction={false} allowsFullscreenVideo allowsInlineMediaPlayback javaScriptEnabled domStorageEnabled/>}
    </View>
-   <View style={s.scutvInfo}><View style={s.scutvTitleRow}><View style={s.youtubeIcon}><Text style={s.youtubePlay}>▶</Text></View><Text style={s.scutvTitle}>{selectedScutv.title}</Text></View>{selectedScutv?.provider==='SPORT TV'?<Text style={s.scutvReplay}>RESUMO OFICIAL SPORT TV</Text>:selectedScutv.live_status==='is_live'?<Text style={s.scutvLive}>● DIRETO AGORA</Text>:<Text style={s.scutvReplay}>GRAVAÇÃO SCUTV</Text>}</View>
+   <View style={s.scutvInfo}><View style={s.scutvTitleRow}><View style={s.youtubeIcon}><Text style={s.youtubePlay}>▶</Text></View><Text style={s.scutvTitle}>{selectedScutv.title}</Text></View>{selectedScutv.live_status==='is_live'?<Text style={s.scutvLive}>● DIRETO AGORA</Text>:<Text style={s.scutvReplay}>GRAVAÇÃO SCUTV</Text>}</View>
   </View>:<View style={s.infoCard}><Text style={s.muted}>Vídeo SCUTV indisponível.</Text></View>}
  </Page>;
  if(screen==='news')return <Page><Back title="NOTÍCIAS"/>{officialNews.map((item,i)=><Pressable key={i} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}{item.date?' · '+item.date:''}</Text><Text style={s.newsTitle}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}</Page>;
