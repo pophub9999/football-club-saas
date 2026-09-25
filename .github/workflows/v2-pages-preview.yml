@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: enriched player profiles
+# Deploy trigger: detailed player profiles
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
