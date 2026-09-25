@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '*/5 * * * *'
 
-# Match guard: require date-compatible senior fixture
+# Match guard: date-safe plus unique-fixture fallback
 jobs:
   sync:
     runs-on: ubuntu-latest
