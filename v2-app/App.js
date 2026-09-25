@@ -37,6 +37,7 @@ function PlayerPhoto({player}){
  return <View style={[s.playerPhoto,s.playerPhotoFallback]}><TeamLogo name="SCU Torreense" style={s.playerPhotoLogo}/></View>;
 }
 function Page({children}){
+ const {width,height}=useWindowDimensions();
  const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
  const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
  const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
@@ -212,7 +213,6 @@ function benefitDiscountLabel(benefit={}){
  return label?label.toUpperCase():'VANTAGEM';
 }
 export default function App(){
- const {width,height}=useWindowDimensions();
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
