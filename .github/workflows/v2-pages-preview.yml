@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: player stats biography honours
+# Deploy trigger: SCUTV live and replay integration
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
