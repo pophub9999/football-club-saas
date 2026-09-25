@@ -42,6 +42,12 @@ def iso_ts(v):
     try:return datetime.fromtimestamp(float(v),timezone.utc).isoformat()
     except Exception:return None
 
+def iso_upload_date(v):
+    s=str(v or "")
+    if not re.fullmatch(r"\d{8}",s):return None
+    try:return datetime.strptime(s,"%Y%m%d").replace(tzinfo=timezone.utc).isoformat()
+    except Exception:return None
+
 def dt(v):
     if not v:return None
     try:return datetime.fromisoformat(v.replace("Z","+00:00"))
@@ -61,7 +67,7 @@ def row_from(info):
         "youtube_url":"https://www.youtube.com/watch?v="+vid,
         "thumbnail_url":thumb or f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         "live_status":status,
-        "published_at":iso_ts(info.get("timestamp") or info.get("release_timestamp")),
+        "published_at":iso_ts(info.get("timestamp") or info.get("release_timestamp")) or iso_upload_date(info.get("upload_date")),
         "scheduled_start":iso_ts(info.get("release_timestamp")),
         "actual_start":iso_ts(info.get("start_time")),
         "actual_end":iso_ts(info.get("end_time")),
@@ -72,8 +78,16 @@ def row_from(info):
 
 def match_video(video,matches):
     title=norm(video["title"])
-    when=dt(video.get("scheduled_start") or video.get("actual_start") or video.get("published_at"))
+    # Do not attach academy/youth streams to senior fixtures merely because
+    # the opponent has the same club name.
+    if re.search(r"\b(sub ?(?:17|19|23)|junior(?:es)?|juvenil(?:is)?)\b",title):
+        return (None,None,None)
     is_live=video.get("live_status") in ("is_live","is_upcoming")
+    when=dt(video.get("scheduled_start") or video.get("actual_start") or video.get("published_at"))
+    if not when and is_live:
+        when=datetime.now(timezone.utc)
+    if not when and not is_live:
+        return (None,None,None)
     best=None
     for m in matches:
         start=dt(m.get("starts_at"))
