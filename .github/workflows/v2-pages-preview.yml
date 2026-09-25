@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: native member signup form
+# Deploy trigger: member photo and payment flow
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
