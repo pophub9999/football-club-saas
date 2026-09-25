@@ -36,6 +36,19 @@ function PlayerPhoto({player}){
  if(player?.photo_url)return <Image source={{uri:player.photo_url}} style={s.playerPhoto} resizeMode="cover"/>;
  return <View style={[s.playerPhoto,s.playerPhotoFallback]}><TeamLogo name="SCU Torreense" style={s.playerPhotoLogo}/></View>;
 }
+function Page({children}){
+ const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
+ const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
+ const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
+ const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
+ return <View style={s.root}>
+  <StatusBar hidden/>
+  <Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>
+  <RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/>
+  <View style={headerStyle}><Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text></View>
+  <View style={contentStyle}><ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView></View>
+ </View>;
+}
 function ShortcutIcon({type}) {
  const gold='#f1b94f';
  if(Platform.OS==='web'){
@@ -190,6 +203,14 @@ function squadSubRank(team={}){
  const m=age.match(/(\d+)/);
  return m?100-Number(m[1]):50;
 }
+function benefitDiscountLabel(benefit={}){
+ const pct=Number(benefit.discount_pct);
+ if(Number.isFinite(pct)&&pct>0)return '−'+pct+'%';
+ const label=String(benefit.discount_label||'').trim();
+ const match=label.match(/(\d+(?:[.,]\d+)?)\s*%/);
+ if(match)return '−'+match[1].replace(',','.')+'%';
+ return label?label.toUpperCase():'VANTAGEM';
+}
 export default function App(){
  const {width,height}=useWindowDimensions();
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
@@ -205,11 +226,6 @@ export default function App(){
  const [checkoutForm,setCheckoutForm]=useState({name:'',email:'',phone:'',nif:'',shippingMethod:'home',street:'',number:'',postalCode:'',city:''});
  const [cart,setCart]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?JSON.parse(window.localStorage.getItem('scut_cart')||'[]'):[]}catch{return []}});
  const [syncVersion,setSyncVersion]=useState(null);
-
- const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
- const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
- const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
- const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
 
  useEffect(()=>{let live=true;(async()=>{try{
   setLoading(true);
@@ -384,8 +400,6 @@ export default function App(){
  const selectedShipping=shippingOptions.find(x=>x.code===checkoutForm.shippingMethod)||{price:0};
  const checkoutTotal=cartTotal+Number(selectedShipping.price||0);
 
- function Header(){return <><RemoteLogo uri={LOGO_URL} style={logoStyle} alt="SCU Torreense"/><View style={headerStyle}><Text style={s.clubLine}><Text style={s.clubLight}>SCU </Text>TORREENSE</Text></View></>}
- function Page({children}){return <View style={s.root}><StatusBar hidden/><Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/><Header/><View style={contentStyle}><ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView></View></View>}
  function Back({title,to='home'}){return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={s.back}>‹</Text></Pressable><Text style={s.pageTitle}>{title}</Text></View>}
 
  if(screen==='game'){
@@ -417,7 +431,7 @@ export default function App(){
     <Text style={s.benefitName} numberOfLines={1}>{b.business_name}</Text>
     <Text style={s.benefitRowMeta} numberOfLines={1}>{b.discount_conditions||b.category||b.locality||'Vantagem para sócios'}</Text>
    </View>
-   <View style={s.benefitDiscountCompact}><Text style={s.benefitDiscountCompactText}>{b.discount_label||(b.discount_pct!=null?'−'+Number(b.discount_pct)+'%':'OFERTA')}</Text></View>
+   <View style={s.benefitDiscountCompact}><Text style={s.benefitDiscountCompactText}>{benefitDiscountLabel(b)}</Text></View>
    <Text style={s.benefitRowArrow}>›</Text>
   </Pressable>):<View style={s.infoCard}><Text style={s.muted}>Não foram encontrados parceiros com estes filtros.</Text></View>}
  </Page>;
@@ -426,7 +440,7 @@ export default function App(){
    <View style={s.benefitDetailTop}>
     <View style={s.benefitDetailAvatar}><Text style={s.benefitDetailAvatarText}>{(selectedBenefit.business_name||'V').trim().charAt(0).toUpperCase()}</Text></View>
     <View style={s.benefitDetailNameWrap}><Text style={s.benefitDetailName}>{selectedBenefit.business_name}</Text><Text style={s.benefitDetailCategory}>{selectedBenefit.category||'Parceiro SCU Torreense'}</Text></View>
-    <View style={s.benefitDiscount}><Text style={s.benefitDiscountText}>{selectedBenefit.discount_label||(selectedBenefit.discount_pct!=null?'−'+Number(selectedBenefit.discount_pct)+'%':'VANTAGEM')}</Text></View>
+    <View style={s.benefitDiscount}><Text style={s.benefitDiscountText}>{benefitDiscountLabel(selectedBenefit)}</Text></View>
    </View>
    {selectedBenefit.discount_conditions?<><Text style={s.benefitDetailLabel}>CONDIÇÕES</Text><Text style={s.benefitDetailText}>{selectedBenefit.discount_conditions}</Text></>:null}
    {(selectedBenefit.address||selectedBenefit.locality)?<><Text style={s.benefitDetailLabel}>LOCALIZAÇÃO</Text><Text style={s.benefitDetailText}>⌖ {selectedBenefit.address||selectedBenefit.locality}</Text></>:null}
