@@ -513,7 +513,8 @@ export default function App(){
  const futureMatches=filtered.filter(x=>!calendarIsPast(x)).sort((a,b)=>new Date(a.startsAt||'2999-12-31')-new Date(b.startsAt||'2999-12-31'));
  const lastCalendarMatch=pastMatches[0]||null;
  const nextCalendarMatch=futureMatches[0]||null;
- const upcomingCalendarMatches=futureMatches.slice(1);
+ const upcomingCalendarMatches=futureMatches.slice(1,5);
+ const laterCalendarMatches=futureMatches.slice(5);
  const olderCalendarMatches=pastMatches.slice(1);
  const torreenseStanding=standings.find(x=>/torreense/i.test(x.team?.name||''))||null;
  const recentTorreenseMatches=pastMatches.filter(x=>/torreense/i.test((x.homeFullName||'')+' '+(x.awayFullName||''))).slice(0,5);
@@ -790,6 +791,11 @@ export default function App(){
     {olderCalendarMatches.length?<><Text style={s.calendarSectionTitle}>JOGOS ANTERIORES</Text>{olderCalendarMatches.map(x=><Pressable key={x.id} style={s.calendarHistoryCard} onPress={()=>openCalendarGame(x)}>
      <View style={s.calendarHistoryMeta}><Text style={s.calendarHistoryDate}>{x.date}</Text><Text style={s.calendarHistoryCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text></View>
      <View style={s.calendarHistoryScoreRow}><Text style={s.calendarHistoryTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.calendarHistoryLogo}/><Text style={s.calendarHistoryScore}>{x.homeScore!=null?x.homeScore:'–'} - {x.awayScore!=null?x.awayScore:'–'}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.calendarHistoryLogo}/><Text style={[s.calendarHistoryTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
+    </Pressable>)}</>:null}
+
+    {laterCalendarMatches.length?<><Text style={s.calendarSectionTitle}>RESTO DA ÉPOCA</Text>{laterCalendarMatches.map(x=><Pressable key={x.id} style={s.calendarUpcomingCard} onPress={()=>openCalendarGame(x)}>
+     <View style={s.calendarUpcomingDate}><Text style={s.calendarUpcomingDay}>{x.startsAt?new Date(x.startsAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',timeZone:'Europe/Lisbon'}).toUpperCase():x.date}</Text><Text style={s.calendarUpcomingTime}>{x.time}</Text></View>
+     <View style={s.calendarUpcomingBody}><Text style={s.calendarUpcomingCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text><View style={s.calendarUpcomingTeams}><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.calendarUpcomingLogo}/><Text style={s.calendarUpcomingTitle}>{x.homeName}  ×  {x.awayName}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.calendarUpcomingLogo}/></View><Text style={s.calendarUpcomingVenue}>{x.venue}</Text></View>
     </Pressable>)}</>:null}
    </>}
   </>:null}
