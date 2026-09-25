@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: shared quick icons and single-line labels
+# Deploy trigger: native edge swipe back
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
