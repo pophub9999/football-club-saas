@@ -273,9 +273,9 @@ export default function App(){
   const [v,n,m,p,st,sc,sp,sh,bf]=await Promise.all([
    sb('app_sync?select=version,updated_at&id=eq.1'),
    sb('news?select=id,title,category,published_at,url,hero_image_url,excerpt,content_text,content_html&active=eq.true&order=published_at.desc.nullslast&limit=100'),
-   sb('matches?select=id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,short_name,logo_url),away:teams!matches_away_team_id_fkey(name,short_name,logo_url)&order=starts_at.asc&limit=200'),
+   sb('matches?select=id,competition_id,event_type,round,starts_at,status,venue,city,home_score,away_score,raw_data,competitions(name),sports(name),home:teams!matches_home_team_id_fkey(name,short_name,logo_url),away:teams!matches_away_team_id_fkey(name,short_name,logo_url)&order=starts_at.asc&limit=300'),
    sb('players?select=id,name,short_name,shirt_number,position,birth_date,nationality,height_cm,photo_url,team:teams!players_team_id_fkey(id,name,short_name,age_group,gender,sports(name))&active=eq.true&order=shirt_number.asc&limit=500'),
-   sb('standings?select=id,competition_id,position,played,wins,draws,losses,goals_for,goals_against,goal_difference,points,form,competition:competitions(name),team:teams!standings_team_id_fkey(id,name,short_name,logo_url,gender,sports(name))&order=position.asc&limit=50'),
+   sb('standings?select=id,competition_id,position,played,wins,draws,losses,goals_for,goals_against,goal_difference,points,form,competition:competitions(name),team:teams!standings_team_id_fkey(id,name,short_name,logo_url,gender,sports(name))&order=competition_id.asc,position.asc&limit=200'),
    sb('store_categories?select=id,name,sort_order&active=eq.true&order=sort_order.asc'),
    sb('store_products?select=id,source_id,category_id,name,url,description_text,price,currency,stock_status,in_stock,image_url,images,options,raw_data&active=eq.true&order=name.asc&limit=250'),
    sb('store_shipping_options?select=code,name,description,price,sort_order&active=eq.true&order=sort_order.asc'),
@@ -286,7 +286,7 @@ export default function App(){
   setNews((n||[]).map(x=>({id:x.id,title:x.title,category:x.category||'TORREENSE',date:x.published_at?new Date(x.published_at).toLocaleDateString('pt-PT'):'',url:x.url,body:x.content_text||'',html:x.content_html||'',hero:x.hero_image_url,excerpt:x.excerpt})));
   setPlayers(p||[]);setStandings(st||[]);
   setStoreCategories(sc||[]);setStoreProducts(sp||[]);setShippingOptions(sh||[]);setBenefits(bf||[]);
-  const positions={};(st||[]).forEach(x=>{if(x.team?.name)positions[x.team.name]=x;});
+  const positions={};(st||[]).forEach(x=>{if(x.team?.name)positions[String(x.competition_id)+'|'+x.team.name]=x;});
 
   const mapped=(m||[]).map(x=>{
    const timeConfirmed=x.raw_data?.time_confirmed!==false;
@@ -306,8 +306,8 @@ export default function App(){
     intAwayScore:x.away_score,
     strVenue:x.venue||'Local a confirmar',
     strStatus:x.status,
-    _homeStanding:positions[x.home?.name]||null,
-    _awayStanding:positions[x.away?.name]||null,
+    _homeStanding:positions[String(x.competition_id)+'|'+(x.home?.name||'')]||null,
+    _awayStanding:positions[String(x.competition_id)+'|'+(x.away?.name||'')]||null,
     raw:x
    };
    return {
