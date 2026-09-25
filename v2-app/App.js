@@ -33,9 +33,10 @@ function TeamLogo({name,uri,style}){
  const initials=(name||'?').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
  return <View style={[style,s.teamLogoFallback]}><Text style={s.teamLogoFallbackText}>{initials}</Text></View>;
 }
-function PlayerPhoto({player}){
- if(player?.photo_url)return <Image source={{uri:player.photo_url}} style={s.playerPhoto} resizeMode="cover"/>;
- return <View style={[s.playerPhoto,s.playerPhotoFallback]}><TeamLogo name="SCU Torreense" style={s.playerPhotoLogo}/></View>;
+function PlayerPhoto({player,compact=false}){
+ const style=compact?s.playerPhotoCompact:s.playerPhoto;
+ if(player?.photo_url)return <Image source={{uri:player.photo_url}} style={style} resizeMode="cover"/>;
+ return <View style={[style,s.playerPhotoFallback]}><TeamLogo name="SCU Torreense" style={compact?s.playerPhotoLogoCompact:s.playerPhotoLogo}/></View>;
 }
 function Page({children,scroll=true}){
  const {width,height}=useWindowDimensions();
@@ -188,6 +189,21 @@ function playerPositionRank(position=''){
  if(p.includes('pivô')||p.includes('pivo'))return 4;
  return 9;
 }
+function playerAge(birthDate){
+ if(!birthDate)return null;
+ const d=new Date(birthDate+'T00:00:00');
+ if(Number.isNaN(d.getTime()))return null;
+ const now=new Date();
+ let age=now.getFullYear()-d.getFullYear();
+ if(now.getMonth()<d.getMonth()||(now.getMonth()===d.getMonth()&&now.getDate()<d.getDate()))age--;
+ return age>=0?age:null;
+}
+function playerBirthLabel(birthDate){
+ if(!birthDate)return '';
+ const d=new Date(birthDate+'T00:00:00');
+ if(Number.isNaN(d.getTime()))return '';
+ return d.toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric'}).replace('.','');
+}
 function squadTeamRank(team={}){
  const sport=String(team.sports?.name||'').toLowerCase();
  const gender=String(team.gender||'M').toUpperCase();
@@ -257,7 +273,7 @@ export default function App(){
  const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('FUTEBOL'),[calendarLoading,setCalendarLoading]=useState(false),[calendarTab,setCalendarTab]=useState('CALENDÁRIO');
  const [classificationSport,setClassificationSport]=useState('FUTEBOL'),[classificationCompetition,setClassificationCompetition]=useState('LP Meu Super');
  const calendarScrollRef=useRef(null),calendarPositionKeyRef=useRef('');
- const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState(''),[standings,setStandings]=useState([]);
+ const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState(''),[standings,setStandings]=useState([]),[selectedPlayer,setSelectedPlayer]=useState(null),[playerDetailTab,setPlayerDetailTab]=useState('ESTATÍSTICAS');
  const [benefits,setBenefits]=useState([]),[benefitCategory,setBenefitCategory]=useState('TODAS'),[benefitSearch,setBenefitSearch]=useState(''),[selectedBenefit,setSelectedBenefit]=useState(null);
  const [memberForm,setMemberForm]=useState({...EMPTY_MEMBER_FORM}),[memberPrivacy,setMemberPrivacy]=useState(false),[memberSubmitting,setMemberSubmitting]=useState(false),[memberMessage,setMemberMessage]=useState('');
  const [memberPhoto,setMemberPhoto]=useState(null),[memberPaymentPlan,setMemberPaymentPlan]=useState('annual'),[memberPaymentMethod,setMemberPaymentMethod]=useState('MBWAY');
@@ -379,6 +395,9 @@ export default function App(){
   setGame(item.ev);setGameTab('RESUMO');
   setGameInfo({event:item.ev,stats:[],lineup:[],timeline:[],results:[]});
   setScreen('game');
+ }
+ function openPlayer(player){
+  setSelectedPlayer(player);setPlayerDetailTab('ESTATÍSTICAS');setScreen('playerDetail');
  }
  function saveCart(next){
   setCart(next);
@@ -563,6 +582,12 @@ export default function App(){
  const squadPlayers=players
   .filter(x=>String(x.team?.id||'')===activeSquadId)
   .sort((a,b)=>playerPositionRank(a.position)-playerPositionRank(b.position)||(a.shirt_number??999)-(b.shirt_number??999)||(a.name||'').localeCompare(b.name||'','pt'));
+ const squadGroups=squadPlayers.reduce((acc,p)=>{
+  const key=p.position||'Jogadores';
+  const found=acc.find(x=>x.title===key);
+  if(found)found.players.push(p);else acc.push({title:key,players:[p]});
+  return acc;
+ },[]);
  const filteredStore=storeProducts.filter(x=>storeCategory==='TODOS'||String(x.category_id)===String(storeCategory));
  const cartCount=cart.reduce((n,x)=>n+x.qty,0);
  const cartTotal=cart.reduce((n,x)=>n+Number(x.price||0)*x.qty,0);
@@ -768,19 +793,36 @@ export default function App(){
    {!checkoutInfo?.enabled&&!checkoutLoading?<Text style={s.checkoutNote}>O checkout já fica dentro da app. A ativação do pagamento real depende das credenciais do fornecedor MB WAY.</Text>:null}
   </View>
  </Page>;
+ if(screen==='playerDetail')return <Page>
+  <Back title="JOGADOR" to="calendar"/>
+  {selectedPlayer?<View style={s.playerDetailPage}>
+   <View style={s.playerDetailHero}>
+    {selectedPlayer.photo_url?<Image source={{uri:selectedPlayer.photo_url}} style={s.playerDetailPhoto} resizeMode="contain"/>:<View style={[s.playerDetailPhoto,s.playerPhotoFallback]}><TeamLogo name="SCU Torreense" style={s.playerPhotoLogo}/></View>}
+   </View>
+   <View style={s.playerDetailHeader}>
+    <Text style={s.playerDetailName}><Text style={s.playerDetailNumber}>{selectedPlayer.shirt_number??'—'} </Text>{selectedPlayer.short_name||selectedPlayer.name}</Text>
+    {selectedPlayer.birth_date?<Text style={s.playerDetailBirth}>{playerBirthLabel(selectedPlayer.birth_date)}{playerAge(selectedPlayer.birth_date)!=null?'  ('+playerAge(selectedPlayer.birth_date)+' anos)':''}</Text>:null}
+   </View>
+   <View style={s.playerDetailFacts}>
+    <View style={s.playerDetailFact}><Text style={s.playerDetailFactLabel}>NACIONALIDADE</Text><Text style={s.playerDetailFactValue}>{selectedPlayer.nationality||'—'}</Text></View>
+    <View style={s.playerDetailFact}><Text style={s.playerDetailFactLabel}>POSIÇÃO</Text><Text style={s.playerDetailFactValue}>{selectedPlayer.position||'—'}</Text></View>
+    <View style={s.playerDetailFact}><Text style={s.playerDetailFactLabel}>ALTURA</Text><Text style={s.playerDetailFactValue}>{selectedPlayer.height_cm?selectedPlayer.height_cm+' cm':'—'}</Text></View>
+   </View>
+   <View style={s.playerDetailTabs}>{['ESTATÍSTICAS','BIOGRAFIA','PALMARÉS'].map(t=><Pressable key={t} onPress={()=>setPlayerDetailTab(t)} style={[s.playerDetailTab,playerDetailTab===t&&s.playerDetailTabOn]}><Text style={[s.playerDetailTabText,playerDetailTab===t&&s.playerDetailTabTextOn]}>{t}</Text></Pressable>)}</View>
+   {playerDetailTab==='ESTATÍSTICAS'?<View>
+    <Text style={s.playerDetailSectionTitle}>ÉPOCA 2026/27</Text>
+    <View style={s.playerDetailStatGrid}><View style={s.playerDetailStat}><Text style={s.playerDetailStatLabel}>JOGOS</Text><Text style={s.playerDetailStatValue}>—</Text></View><View style={s.playerDetailStat}><Text style={s.playerDetailStatLabel}>GOLOS</Text><Text style={s.playerDetailStatValue}>—</Text></View></View>
+    <Text style={s.playerDetailNote}>As estatísticas individuais ainda não estão sincronizadas na fonte de dados da app.</Text>
+   </View>:null}
+   {playerDetailTab==='BIOGRAFIA'?<View style={s.playerDetailTextCard}><Text style={s.playerDetailText}>{selectedPlayer.short_name||selectedPlayer.name} integra o plantel {selectedPlayer.team?.short_name||selectedPlayer.team?.name||'do SCU Torreense'} e atua como {String(selectedPlayer.position||'jogador').toLowerCase()}.{selectedPlayer.shirt_number!=null?' Usa o número '+selectedPlayer.shirt_number+'.':''}</Text></View>:null}
+   {playerDetailTab==='PALMARÉS'?<View style={s.playerDetailTextCard}><Text style={s.playerDetailNote}>Palmarés individual ainda não sincronizado.</Text></View>:null}
+  </View>:<View style={s.infoCard}><Text style={s.muted}>Jogador indisponível.</Text></View>}
+ </Page>;
  if(screen==='squads')return <Page><Back title="PLANTÉIS"/>
   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>
    {squadTeams.map(t=><Pressable key={t.id} onPress={()=>setSquadTeam(String(t.id))} style={[s.filter,activeSquadId===String(t.id)&&s.filterOn]}><Text style={[s.filterText,activeSquadId===String(t.id)&&s.filterTextOn]}>{t.short_name||t.name}</Text></Pressable>)}
   </ScrollView>
-  {squadPlayers.length?<View style={s.playerGrid}>{squadPlayers.map(p=><View key={p.id} style={s.playerCard}>
-   <PlayerPhoto player={p}/>
-   <View style={s.playerNumberBadge}><Text style={s.playerNumber}>{p.shirt_number??'—'}</Text></View>
-   <Text style={s.playerName}>{p.short_name||p.name}</Text>
-   <Text style={s.playerPosition}>{p.position||'Jogador'}</Text>
-   {p.nationality?<Text style={s.playerMeta}>{p.nationality}</Text>:null}
-   {p.birth_date?<Text style={s.playerMeta}>{new Date(p.birth_date+'T00:00:00').toLocaleDateString('pt-PT')}</Text>:null}
-   {p.height_cm?<Text style={s.playerMeta}>{p.height_cm} cm</Text>:null}
-  </View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não temos jogadores publicados para este plantel.</Text></View>}
+  {squadPlayers.length?<View>{squadGroups.map(g=><View key={g.title} style={s.squadGroupCard}><Text style={s.squadGroupTitle}>{g.title}</Text>{g.players.map(p=><Pressable key={p.id} style={s.squadPlayerRow} onPress={()=>openPlayer(p)}><View style={s.squadThumbWrap}><PlayerPhoto player={p} compact/></View><Text style={s.squadRowNumber}>{p.shirt_number??'—'}</Text><View style={s.squadRowBody}><Text style={s.squadRowName}>{p.short_name||p.name}</Text></View><Text style={s.squadRowArrow}>›</Text></Pressable>)}</View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não temos jogadores publicados para este plantel.</Text></View>}
  </Page>;
  if(screen==='calendar')return <Page scroll={false}>
   <Back title="CALENDÁRIO"/>
@@ -854,18 +896,12 @@ export default function App(){
     {filteredStandings.map(x=><View key={x.id||x.team?.id} style={[s.standingsRow,/torreense/i.test(x.team?.name||'')&&s.standingsRowClub]}>
      <Text style={[s.standingsCell,s.standingsPos]}>{x.position}</Text><View style={s.standingsTeamWrap}><TeamLogo name={x.team?.name} uri={x.team?.logo_url} style={s.standingsLogo}/><Text style={s.standingsTeamName} numberOfLines={1}>{x.team?.short_name||x.team?.name}</Text></View><Text style={s.standingsCell}>{x.played}</Text><Text style={s.standingsCell}>{x.goal_difference!=null?(x.goal_difference>0?'+':'')+x.goal_difference:(Number(x.goals_for||0)-Number(x.goals_against||0))}</Text><Text style={[s.standingsCell,s.standingsPts]}>{x.points}</Text>
     </View>)}
-   </View>:classificationMatches.length?<View style={s.classificationRouteCard}>
-    <Text style={s.classificationRouteTitle}>PERCURSO NA PROVA</Text>
-    {classificationMatches.map(x=><Pressable key={x.id} style={s.classificationRouteMatch} onPress={()=>openCalendarGame(x)}>
-     <View style={s.classificationRouteMeta}><Text style={s.classificationRouteDate}>{x.date}</Text><Text style={s.classificationRouteRound}>{x.round||''}</Text></View>
-     <View style={s.classificationRouteTeams}><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.classificationRouteLogo}/><Text style={s.classificationRouteTeam}>{x.homeName}</Text><Text style={s.classificationRouteScore}>{x.homeScore!=null?x.homeScore:'–'} - {x.awayScore!=null?x.awayScore:'–'}</Text><Text style={[s.classificationRouteTeam,{textAlign:'right'}]}>{x.awayName}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.classificationRouteLogo}/></View>
-    </Pressable>)}
-   </View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não existem dados desta prova na app.</Text></View>}
+   </View>:<View style={s.infoCard}><Text style={s.muted}>Esta prova não tem uma tabela classificativa disponível.</Text></View>}
   </ScrollView>:null}
 
   {calendarTab==='PLANTEL'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false}>
    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{squadTeams.map(t=><Pressable key={t.id} onPress={()=>setSquadTeam(String(t.id))} style={[s.filter,activeSquadId===String(t.id)&&s.filterOn]}><Text style={[s.filterText,activeSquadId===String(t.id)&&s.filterTextOn]}>{t.short_name||t.name}</Text></Pressable>)}</ScrollView>
-   {squadPlayers.length?<View style={s.playerGrid}>{squadPlayers.map(p=><View key={p.id} style={s.playerCard}><PlayerPhoto player={p}/><View style={s.playerNumberBadge}><Text style={s.playerNumber}>{p.shirt_number??'—'}</Text></View><Text style={s.playerName}>{p.short_name||p.name}</Text><Text style={s.playerPosition}>{p.position||'Jogador'}</Text>{p.nationality?<Text style={s.playerMeta}>{p.nationality}</Text>:null}</View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não temos jogadores publicados para este plantel.</Text></View>}
+   {squadPlayers.length?<View>{squadGroups.map(g=><View key={g.title} style={s.squadGroupCard}><Text style={s.squadGroupTitle}>{g.title}</Text>{g.players.map(p=><Pressable key={p.id} style={s.squadPlayerRow} onPress={()=>openPlayer(p)}><View style={s.squadThumbWrap}><PlayerPhoto player={p} compact/></View><Text style={s.squadRowNumber}>{p.shirt_number??'—'}</Text><View style={s.squadRowBody}><Text style={s.squadRowName}>{p.short_name||p.name}</Text></View><Text style={s.squadRowArrow}>›</Text></Pressable>)}</View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não temos jogadores publicados para este plantel.</Text></View>}
   </ScrollView>:null}
 
   {calendarTab==='ESTATÍSTICAS'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false}>
@@ -921,5 +957,7 @@ const s=StyleSheet.create({
  classificationRouteCard:{borderRadius:10,overflow:'hidden',borderWidth:1,borderColor:'rgba(120,164,197,.24)',backgroundColor:'rgba(8,43,72,.68)'},classificationRouteTitle:{color:'#f1b94f',fontSize:6.2,fontWeight:'800',letterSpacing:.5,padding:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.07)'},classificationRouteMatch:{padding:7,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.06)'},classificationRouteMeta:{flexDirection:'row',justifyContent:'space-between',marginBottom:5},classificationRouteDate:{color:'#9fb5c7',fontSize:5.5},classificationRouteRound:{color:'#7892a7',fontSize:5.3},classificationRouteTeams:{flexDirection:'row',alignItems:'center'},classificationRouteLogo:{width:20,height:22},classificationRouteTeam:{flex:1,color:'#fff',fontSize:6.2,fontWeight:'600',marginHorizontal:4},classificationRouteScore:{width:42,color:'#fff',fontSize:7.7,fontWeight:'800',textAlign:'center'},
  standingsCard:{borderRadius:10,overflow:'hidden',borderWidth:1,borderColor:'rgba(120,164,197,.24)'},standingsHead:{height:28,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(1,23,43,.72)',paddingHorizontal:6},standingsRow:{minHeight:34,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(8,43,72,.78)',borderTopWidth:1,borderTopColor:'rgba(255,255,255,.06)',paddingHorizontal:6},standingsRowClub:{backgroundColor:'rgba(241,185,79,.11)'},standingsCell:{width:28,color:'#a9bdcd',fontSize:6.2,textAlign:'center'},standingsPos:{width:23},standingsTeam:{flex:1,textAlign:'left'},standingsPts:{color:'#fff',fontWeight:'800'},standingsTeamWrap:{flex:1,flexDirection:'row',alignItems:'center'},standingsLogo:{width:22,height:24,marginRight:6},standingsTeamName:{flex:1,color:'#fff',fontSize:6.6,fontWeight:'600'},
  statsHero:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:11,backgroundColor:'rgba(8,43,72,.88)',borderWidth:1,borderColor:'rgba(241,185,79,.30)',marginBottom:8},statsHeroPosition:{color:'#f1b94f',fontSize:18,fontWeight:'900',marginRight:11},statsHeroTitle:{color:'#fff',fontSize:8.2,fontWeight:'800'},statsHeroSub:{color:'#8fa9bc',fontSize:5.7,marginTop:2},statsHeroPoints:{marginLeft:'auto',color:'#fff',fontSize:9,fontWeight:'800'},statsGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},statsBox:{width:'32%',paddingVertical:9,alignItems:'center',borderRadius:9,backgroundColor:'rgba(8,43,72,.82)',borderWidth:1,borderColor:'rgba(120,164,197,.22)',marginBottom:6},statsValue:{color:'#fff',fontSize:13,fontWeight:'900'},statsLabel:{color:'#8fa9bc',fontSize:5.2,marginTop:2},statsWide:{flexDirection:'row',justifyContent:'space-around',padding:10,borderRadius:9,backgroundColor:'rgba(1,23,43,.55)',marginTop:2},statsWideLabel:{color:'#8fa9bc',fontSize:5.4,textAlign:'center'},statsWideValue:{color:'#f1b94f',fontSize:10,fontWeight:'800',textAlign:'center',marginTop:2},formRow:{flexDirection:'row'},formBadge:{width:28,height:28,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(120,164,197,.30)',marginRight:6},formWin:{backgroundColor:'rgba(53,160,95,.75)'},formDraw:{backgroundColor:'rgba(204,151,38,.75)'},formLoss:{backgroundColor:'rgba(180,52,67,.75)'},formBadgeText:{color:'#fff',fontSize:7,fontWeight:'800'},
-  squadTopButton:{height:34,marginBottom:10,borderRadius:10,borderWidth:1,borderColor:'rgba(241,185,79,.55)',backgroundColor:'rgba(8,43,72,.82)',flexDirection:'row',alignItems:'center',paddingHorizontal:11},squadTopButtonText:{color:'#fff',fontSize:7.5,letterSpacing:.6,marginLeft:9,flex:1},squadTopArrow:{color:'#f1b94f',fontSize:18},playerGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},playerCard:{width:'48.5%',marginBottom:8,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',padding:7,position:'relative'},playerPhoto:{width:'100%',aspectRatio:.86,borderRadius:8,backgroundColor:'rgba(255,255,255,.05)'},playerPhotoFallback:{alignItems:'center',justifyContent:'center'},playerPhotoLogo:{width:52,height:64},playerNumberBadge:{position:'absolute',top:12,right:12,minWidth:22,height:22,borderRadius:11,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},playerNumber:{color:'#082b48',fontSize:7,fontWeight:'700'},playerName:{color:'#fff',fontSize:7.4,lineHeight:10,marginTop:6,fontWeight:'600'},playerPosition:{color:'#f1b94f',fontSize:6.2,marginTop:2},playerMeta:{color:'#9fb5c7',fontSize:5.8,marginTop:2},filters:{marginBottom:12},filtersContent:{paddingRight:24},filter:{height:27,paddingHorizontal:10,marginRight:6,borderRadius:14,borderWidth:1,borderColor:'rgba(120,164,197,.35)',justifyContent:'center',backgroundColor:'rgba(8,43,72,.72)'},filterOn:{borderColor:'#f1b94f',backgroundColor:'rgba(241,185,79,.12)'},filterText:{color:'#b7c9d9',fontSize:6.5},filterTextOn:{color:'#f1b94f'},gameTabs:{flexDirection:'row',marginTop:10,marginBottom:8,borderRadius:10,backgroundColor:'rgba(4,28,51,.60)',padding:3},gameTab:{flex:1,height:29,alignItems:'center',justifyContent:'center',borderRadius:8},gameTabOn:{backgroundColor:'rgba(241,185,79,.14)',borderWidth:1,borderColor:'#f1b94f'},gameTabText:{color:'#aebfce',fontSize:7,letterSpacing:.3},gameTabTextOn:{color:'#f1b94f'},timeline:{marginTop:10,paddingTop:8,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.08)'},sourceButton:{marginTop:16,height:32,borderRadius:8,borderWidth:1,borderColor:'#f1b94f',alignItems:'center',justifyContent:'center'},sourceButtonText:{color:'#f1b94f',fontSize:7,letterSpacing:.4},eventCard:{flexDirection:'row',marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',overflow:'hidden'},dateBox:{width:72,padding:9,justifyContent:'center',backgroundColor:'rgba(4,28,51,.55)'},dateBoxText:{color:'#fff',fontSize:8},eventType:{color:'#f1b94f',fontSize:5.8,marginTop:4},eventBody:{flex:1,padding:9},eventSport:{color:'#9eb6c9',fontSize:6},eventTitle:{color:'#fff',fontSize:8.5,marginVertical:3}
+  squadGroupCard:{borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.22)',marginBottom:9,overflow:'hidden'},squadGroupTitle:{color:'#fff',fontSize:8.8,fontWeight:'800',paddingHorizontal:10,paddingVertical:9,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.07)'},squadPlayerRow:{minHeight:47,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.06)'},squadThumbWrap:{width:38,height:42,overflow:'hidden',borderRadius:7,backgroundColor:'rgba(255,255,255,.05)'},squadRowNumber:{width:34,color:'#f1b94f',fontSize:9,fontWeight:'800',textAlign:'center'},squadRowBody:{flex:1},squadRowName:{color:'#fff',fontSize:7.4,fontWeight:'600'},squadRowArrow:{color:'#7892a7',fontSize:16,marginLeft:4},
+  playerDetailPage:{paddingBottom:16},playerDetailHero:{height:280,borderRadius:13,overflow:'hidden',backgroundColor:'#f4f4f4',alignItems:'center',justifyContent:'flex-end'},playerDetailPhoto:{width:'100%',height:'100%'},playerDetailHeader:{paddingTop:10},playerDetailName:{color:'#fff',fontSize:12,fontWeight:'900'},playerDetailNumber:{color:'#f1b94f'},playerDetailBirth:{color:'#b9cad8',fontSize:7,marginTop:3},playerDetailFacts:{flexDirection:'row',justifyContent:'space-between',marginTop:12,marginBottom:12},playerDetailFact:{width:'31.5%',minHeight:67,borderRadius:9,backgroundColor:'rgba(8,43,72,.82)',borderWidth:1,borderColor:'rgba(120,164,197,.22)',padding:8},playerDetailFactLabel:{color:'#7892a7',fontSize:5.1,fontWeight:'700',letterSpacing:.35},playerDetailFactValue:{color:'#fff',fontSize:7.2,fontWeight:'700',marginTop:10},playerDetailTabs:{flexDirection:'row',borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.12)',marginBottom:10},playerDetailTab:{height:31,justifyContent:'center',marginRight:18,borderBottomWidth:2,borderBottomColor:'transparent'},playerDetailTabOn:{borderBottomColor:'#f1b94f'},playerDetailTabText:{color:'#879dad',fontSize:6.4,fontWeight:'700',letterSpacing:.35},playerDetailTabTextOn:{color:'#fff'},playerDetailSectionTitle:{color:'#fff',fontSize:8.3,fontWeight:'800',marginBottom:8},playerDetailStatGrid:{flexDirection:'row',justifyContent:'space-between'},playerDetailStat:{width:'48.5%',minHeight:78,borderRadius:10,borderWidth:1,borderColor:'rgba(120,164,197,.22)',backgroundColor:'rgba(8,43,72,.78)',padding:10},playerDetailStatLabel:{color:'#b8c8d8',fontSize:6.2,fontWeight:'700'},playerDetailStatValue:{color:'#fff',fontSize:19,fontWeight:'900',marginTop:7},playerDetailNote:{color:'#8fa9bc',fontSize:5.8,lineHeight:8.5,marginTop:8},playerDetailTextCard:{borderRadius:10,borderWidth:1,borderColor:'rgba(120,164,197,.22)',backgroundColor:'rgba(8,43,72,.78)',padding:11},playerDetailText:{color:'#d7e2ea',fontSize:6.7,lineHeight:10},
+  squadTopButton:{height:34,marginBottom:10,borderRadius:10,borderWidth:1,borderColor:'rgba(241,185,79,.55)',backgroundColor:'rgba(8,43,72,.82)',flexDirection:'row',alignItems:'center',paddingHorizontal:11},squadTopButtonText:{color:'#fff',fontSize:7.5,letterSpacing:.6,marginLeft:9,flex:1},squadTopArrow:{color:'#f1b94f',fontSize:18},playerGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},playerCard:{width:'48.5%',marginBottom:8,borderRadius:10,backgroundColor:'rgba(8,43,72,.86)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',padding:7,position:'relative'},playerPhoto:{width:'100%',aspectRatio:.86,borderRadius:8,backgroundColor:'rgba(255,255,255,.05)'},playerPhotoCompact:{width:'100%',height:'100%',borderRadius:7,backgroundColor:'rgba(255,255,255,.05)'},playerPhotoFallback:{alignItems:'center',justifyContent:'center'},playerPhotoLogo:{width:52,height:64},playerPhotoLogoCompact:{width:24,height:29},playerNumberBadge:{position:'absolute',top:12,right:12,minWidth:22,height:22,borderRadius:11,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center'},playerNumber:{color:'#082b48',fontSize:7,fontWeight:'700'},playerName:{color:'#fff',fontSize:7.4,lineHeight:10,marginTop:6,fontWeight:'600'},playerPosition:{color:'#f1b94f',fontSize:6.2,marginTop:2},playerMeta:{color:'#9fb5c7',fontSize:5.8,marginTop:2},filters:{marginBottom:12},filtersContent:{paddingRight:24},filter:{height:27,paddingHorizontal:10,marginRight:6,borderRadius:14,borderWidth:1,borderColor:'rgba(120,164,197,.35)',justifyContent:'center',backgroundColor:'rgba(8,43,72,.72)'},filterOn:{borderColor:'#f1b94f',backgroundColor:'rgba(241,185,79,.12)'},filterText:{color:'#b7c9d9',fontSize:6.5},filterTextOn:{color:'#f1b94f'},gameTabs:{flexDirection:'row',marginTop:10,marginBottom:8,borderRadius:10,backgroundColor:'rgba(4,28,51,.60)',padding:3},gameTab:{flex:1,height:29,alignItems:'center',justifyContent:'center',borderRadius:8},gameTabOn:{backgroundColor:'rgba(241,185,79,.14)',borderWidth:1,borderColor:'#f1b94f'},gameTabText:{color:'#aebfce',fontSize:7,letterSpacing:.3},gameTabTextOn:{color:'#f1b94f'},timeline:{marginTop:10,paddingTop:8,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.08)'},sourceButton:{marginTop:16,height:32,borderRadius:8,borderWidth:1,borderColor:'#f1b94f',alignItems:'center',justifyContent:'center'},sourceButtonText:{color:'#f1b94f',fontSize:7,letterSpacing:.4},eventCard:{flexDirection:'row',marginBottom:7,borderRadius:10,backgroundColor:'rgba(8,43,72,.84)',borderWidth:1,borderColor:'rgba(120,164,197,.25)',overflow:'hidden'},dateBox:{width:72,padding:9,justifyContent:'center',backgroundColor:'rgba(4,28,51,.55)'},dateBoxText:{color:'#fff',fontSize:8},eventType:{color:'#f1b94f',fontSize:5.8,marginTop:4},eventBody:{flex:1,padding:9},eventSport:{color:'#9eb6c9',fontSize:6},eventTitle:{color:'#fff',fontSize:8.5,marginVertical:3}
 });
