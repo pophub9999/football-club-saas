@@ -910,9 +910,8 @@ export default function App(){
    <View style={s.benefitAvatar}><Text style={s.benefitAvatarText}>{(b.business_name||'V').trim().charAt(0).toUpperCase()}</Text></View>
    <View style={s.benefitRowBody}>
     <Text style={s.benefitName} numberOfLines={1}>{b.business_name}</Text>
-    <Text style={s.benefitRowMeta} numberOfLines={1}>{b.discount_conditions||b.category||b.locality||'Vantagem para sócios'}</Text>
+    <Text style={s.benefitRowMeta} numberOfLines={1}>{[b.category,b.locality].filter(Boolean).join(' · ')||'Parceiro SCU Torreense'}</Text>
    </View>
-   <View style={s.benefitDiscountCompact}><Text style={s.benefitDiscountCompactText}>{benefitDiscountLabel(b)}</Text></View>
    <Text style={s.benefitRowArrow}>›</Text>
   </Pressable>):<View style={s.infoCard}><Text style={s.muted}>Não foram encontrados parceiros com estes filtros.</Text></View>}
  </Page>;
