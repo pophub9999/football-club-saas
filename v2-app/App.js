@@ -184,6 +184,7 @@ function playerPositionRank(position=''){
  if(p.includes('defesa'))return 2;
  if(p.includes('fixo'))return 2;
  if(p.includes('médio')||p.includes('medio'))return 3;
+ if(p.includes('universal'))return 3;
  if(p.includes('ala'))return 3;
  if(p.includes('avançado')||p.includes('avancado'))return 4;
  if(p.includes('pivô')||p.includes('pivo'))return 4;
