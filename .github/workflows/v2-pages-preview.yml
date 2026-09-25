@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: calendar tabs and match hierarchy
+# Deploy trigger: calendar history visibility
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
