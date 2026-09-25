@@ -277,6 +277,7 @@ def article(url):
     text_parts=[]
     seen=set()
     text_started=False
+    hero=None
 
     # Walk EVERY element after H1. Torreense sometimes stores article images
     # in link/data attributes instead of a normal <img src>, so inspect all nodes.
@@ -342,6 +343,8 @@ def article(url):
             if cached:
                 seen.add(key)
                 blocks.append('<img src="'+h.escape(cached,quote=True)+'">')
+                if hero is None:
+                    hero=cached
                 media_added=True
 
         if node.name in ("img","picture","source") or media_added:
@@ -375,9 +378,8 @@ def article(url):
 
     content_html="".join(blocks) if blocks else "<p>"+h.escape(text)+"</p>"
 
-    # Keep article media in its original position; no synthetic hero image.
-    hero=None
-
+    # Reuse the first cached article image as the card/hero image. The media
+    # remains in content_html as well; the app suppresses the duplicate at render time.
     return {
         "source":"torreense",
         "url":url,
