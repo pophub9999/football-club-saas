@@ -1,5 +1,5 @@
 name: Sync Torreense Data
-# Sync trigger: refreshed 2026-27 senior squads
+# Sync trigger: persist news hero images
 
 on:
   workflow_dispatch:
