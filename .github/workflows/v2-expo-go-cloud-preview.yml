@@ -1,0 +1,43 @@
+name: V2 Expo Go Cloud Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/v2-expo-go-cloud-preview.yml'
+
+jobs:
+  publish:
+    name: Publish Expo Go preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check Expo token
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Missing EXPO_TOKEN repository secret."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: v2-app
+        run: npm install
+
+      - name: Setup Expo / EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish Expo Go preview
+        working-directory: v2-app
+        run: eas update --branch expo-go-preview --message "SCU Torreense cloud preview" --environment preview --non-interactive
