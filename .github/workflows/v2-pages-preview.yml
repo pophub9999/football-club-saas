@@ -1,5 +1,5 @@
 name: V2 GitHub Pages Preview
-# Deploy trigger: brighter native mobile theme
+# Deploy trigger: native article image rendering fix
 # Builds the latest V2 branch into GitHub Pages.
 
 on:
