@@ -15,6 +15,31 @@ const fs=n=>{
  if(n<15)return Math.round(n*1.30*10)/10;
  return n;
 };
+const FOLLOWABLE_SPORTS=['FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
+const sportLabel=v=>({
+ 'FUTEBOL':'Futebol Masculino',
+ 'FUTEBOL FEMININO':'Futebol Feminino',
+ 'FUTSAL MASCULINO':'Futsal Masculino',
+ 'FUTSAL FEMININO':'Futsal Feminino',
+ 'FORMAÇÃO':'Formação'
+}[v]||v);
+function teamSportKey(team){
+ const sport=String(team?.sports?.name||'').toUpperCase();
+ const gender=String(team?.gender||'').toUpperCase();
+ const female=/FEM|FEMALE|WOMEN|MULHER/.test(gender);
+ if(/FUTSAL/.test(sport))return female?'FUTSAL FEMININO':'FUTSAL MASCULINO';
+ if(/FUTEBOL|FOOTBALL|SOCCER/.test(sport))return female?'FUTEBOL FEMININO':'FUTEBOL';
+ return null;
+}
+function newsSportKey(item){
+ const category=String(item?.category||'').toUpperCase();
+ const text=(category+' '+String(item?.title||'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ if(/FUTSAL/.test(text))return /FEMIN|WOMEN|FEM/.test(text)?'FUTSAL FEMININO':'FUTSAL MASCULINO';
+ if(/FUTEBOL FEMININO|LIGA BPI|WOMEN/.test(text))return 'FUTEBOL FEMININO';
+ if(/FORMACAO|SUB[- ]?\d|JUNIOR|JUVENIL/.test(text))return 'FORMAÇÃO';
+ if(/^FUTEBOL$/.test(category.normalize('NFD').replace(/[\u0300-\u036f]/g,'')))return 'FUTEBOL';
+ return null;
+}
 const SUPABASE_URL='https://vcvnmcewoocoizjljmbc.supabase.co';
 const SUPABASE_KEY='sb_publishable_TyM24TpRzq3_ijZsFRTVGg_bWM2WOky';
 const SB_HEADERS={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Cache-Control':'no-cache','Pragma':'no-cache'};
@@ -346,6 +371,7 @@ export default function App(){
  const [memberPhoto,setMemberPhoto]=useState(null),[memberPaymentPlan,setMemberPaymentPlan]=useState('annual'),[memberPaymentMethod,setMemberPaymentMethod]=useState('MBWAY');
  const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
  const [loginForm,setLoginForm]=useState({email:'',password:''}),[loginMessage,setLoginMessage]=useState('');
+ const [followedSports,setFollowedSports]=useState(()=>{try{if(Platform.OS==='web'&&typeof window!=='undefined'){const saved=JSON.parse(window.localStorage.getItem('scut_followed_sports')||'null');if(Array.isArray(saved)&&saved.length)return saved.filter(x=>FOLLOWABLE_SPORTS.includes(x))}}catch{}return [...FOLLOWABLE_SPORTS]});
  const [notificationPrefs,setNotificationPrefs]=useState({kickoff:true,goals:true,lineup:true,results:true,news:true,shop:false});
  const [selectedProduct,setSelectedProduct]=useState(null),[productChoices,setProductChoices]=useState({});
  const [shippingOptions,setShippingOptions]=useState([]),[checkoutInfo,setCheckoutInfo]=useState(null),[checkoutLoading,setCheckoutLoading]=useState(false),[checkoutMessage,setCheckoutMessage]=useState('');
@@ -354,6 +380,14 @@ export default function App(){
  const [cartNotice,setCartNotice]=useState(''),cartNoticeTimer=useRef(null);
  const [syncVersion,setSyncVersion]=useState(null);
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
+
+ useEffect(()=>{
+  if(Platform.OS==='web'&&typeof window!=='undefined'){try{window.localStorage.setItem('scut_followed_sports',JSON.stringify(followedSports))}catch{}}
+  if(sport!=='TODAS'&&!followedSports.includes(sport))setSport('TODAS');
+  if(!followedSports.includes(classificationSport)){
+   setClassificationSport(followedSports.find(x=>x!=='FORMAÇÃO')||followedSports[0]||'FUTEBOL');
+  }
+ },[followedSports]);
 
  useEffect(()=>{let live=true;(async()=>{try{
   setLoading(true);
@@ -490,10 +524,12 @@ export default function App(){
    setGameLoading(false);
   }
  }
- async function openGame(from='home'){
-  setPreviousScreen(from);setScreen('game');setGameTab('RESUMO');
-  setGameInfo({event:game,stats:[],lineup:[],timeline:[],results:[]});
-  await loadGameDetails(game);
+ async function openGame(from='home',event=game){
+  const target=event||game;
+  if(!target)return;
+  setPreviousScreen(from);setGame(target);setScreen('game');setGameTab('RESUMO');
+  setGameInfo({event:target,stats:[],lineup:[],timeline:[],results:[]});
+  await loadGameDetails(target);
  }
  async function openArticle(item){
   setPreviousScreen(screen);setSelectedNews(item);setScreen('article');
@@ -672,17 +708,21 @@ export default function App(){
   }catch(e){setMemberMessage(e.message||'Não foi possível enviar o pedido de adesão.')}
   finally{setMemberSubmitting(false)}
  }
- const officialNews=news;
+ const preferredCalendar=calendar.filter(x=>followedSports.includes(x.sport));
+ const preferredStandings=standings.filter(x=>{const k=teamSportKey(x.team);return !k||followedSports.includes(k)});
+ const officialNews=news.filter(item=>{const k=newsSportKey(item);return !k||followedSports.includes(k)});
  const newsLead=officialNews[0]||null;
  const newsGrid=officialNews.slice(1,3);
  const newsRest=officialNews.slice(3);
- const futureClubMatches=calendar.filter(x=>x.status!=='finished'&&x.startsAt&&new Date(x.startsAt).getTime()>=Date.now()).sort((a,b)=>new Date(a.startsAt)-new Date(b.startsAt));
+ const futureClubMatches=preferredCalendar.filter(x=>x.status!=='finished'&&x.startsAt&&new Date(x.startsAt).getTime()>=Date.now()).sort((a,b)=>new Date(a.startsAt)-new Date(b.startsAt));
+ const recentPreferredMatch=preferredCalendar.filter(x=>x.status==='finished'||(x.homeScore!=null&&x.awayScore!=null)).sort((a,b)=>new Date(b.startsAt||0)-new Date(a.startsAt||0))[0]||null;
  const ticketMatches=futureClubMatches.slice(0,5);
- const matchDayEvent=game||ticketMatches[0]?.ev||null;
+ const homeGame=futureClubMatches[0]?.ev||recentPreferredMatch?.ev||game;
+ const matchDayEvent=futureClubMatches[0]?.ev||null;
  const lisbonDay=iso=>iso?new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Europe/Lisbon'}).format(new Date(iso)):null;
  const isMatchToday=matchDayEvent&&lisbonDay(matchDayEvent.strTimestamp||matchDayEvent.starts_at)===lisbonDay(new Date().toISOString());
- const sports=['TODAS','FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
- const filtered=calendar.filter(x=>sport==='TODAS'||x.sport===sport);
+ const sports=['TODAS',...FOLLOWABLE_SPORTS.filter(x=>followedSports.includes(x))];
+ const filtered=preferredCalendar.filter(x=>sport==='TODAS'||x.sport===sport);
  const calendarNow=Date.now();
  const calendarIsPast=x=>{
   const ts=x.startsAt?new Date(x.startsAt).getTime():0;
@@ -695,7 +735,7 @@ export default function App(){
  const upcomingCalendarMatches=futureMatches.slice(1);
  const olderCalendarMatches=pastMatches.slice(1).reverse();
  const calendarPositionKey=sport+'|'+(lastCalendarMatch?.id||'none')+'|'+(nextCalendarMatch?.id||'none');
- const classificationSports=[...new Set(calendar.map(x=>x.sport).filter(x=>x&&x!=='TODAS'&&x!=='FORMAÇÃO'))]
+ const classificationSports=[...new Set(preferredCalendar.map(x=>x.sport).filter(x=>x&&x!=='TODAS'&&x!=='FORMAÇÃO'))]
   .sort((a,b)=>sports.indexOf(a)-sports.indexOf(b));
  const classificationCompetitionRank=name=>{
   const v=String(name||'').toLowerCase();
@@ -706,20 +746,20 @@ export default function App(){
   return 9;
  };
  const activeClassificationNames=new Set([
-  ...calendar.filter(x=>!calendarIsPast(x)).map(x=>x.competition).filter(Boolean),
-  ...standings.map(x=>x.competition?.name).filter(Boolean)
+  ...preferredCalendar.filter(x=>!calendarIsPast(x)).map(x=>x.competition).filter(Boolean),
+  ...preferredStandings.map(x=>x.competition?.name).filter(Boolean)
  ]);
- const classificationCompetitions=[...new Set(calendar
+ const classificationCompetitions=[...new Set(preferredCalendar
   .filter(x=>x.sport===classificationSport&&activeClassificationNames.has(x.competition))
   .map(x=>x.competition).filter(Boolean))]
   .sort((a,b)=>classificationCompetitionRank(a)-classificationCompetitionRank(b)||a.localeCompare(b,'pt'));
  const activeClassificationCompetition=classificationCompetitions.includes(classificationCompetition)
   ? classificationCompetition
   : (classificationCompetitions[0]||'');
- const filteredStandings=standings.filter(x=>x.competition?.name===activeClassificationCompetition);
- const classificationMatches=calendar.filter(x=>x.sport===classificationSport&&x.competition===activeClassificationCompetition)
+ const filteredStandings=preferredStandings.filter(x=>x.competition?.name===activeClassificationCompetition);
+ const classificationMatches=preferredCalendar.filter(x=>x.sport===classificationSport&&x.competition===activeClassificationCompetition)
   .sort((a,b)=>new Date(a.startsAt||0)-new Date(b.startsAt||0));
- const torreenseStanding=standings.find(x=>/torreense/i.test(x.team?.name||''))||null;
+ const torreenseStanding=filteredStandings.find(x=>/torreense/i.test(x.team?.name||''))||null;
  const recentTorreenseMatches=pastMatches.filter(x=>/torreense/i.test((x.homeFullName||'')+' '+(x.awayFullName||''))).slice(0,5);
  const recentForm=recentTorreenseMatches.map(x=>{
   const home=/torreense/i.test(x.homeFullName||x.homeName||'');
@@ -734,7 +774,7 @@ export default function App(){
   const hay=[x.business_name,x.category,x.discount_conditions,x.address,x.locality].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   return hay.includes(benefitNeedle);
  });
- const squadTeams=[...new Map(players.filter(x=>x.team).map(x=>[x.team.id,x.team])).values()]
+ const squadTeams=[...new Map(players.filter(x=>x.team&&followedSports.includes(teamSportKey(x.team))).map(x=>[x.team.id,x.team])).values()]
   .sort((a,b)=>squadTeamRank(a)-squadTeamRank(b)||squadSubRank(a)-squadSubRank(b)||(a.name||'').localeCompare(b.name||'','pt'));
  const activeSquadId=squadTeam||String(squadTeams[0]?.id||'');
  const squadPlayers=players
@@ -944,7 +984,7 @@ export default function App(){
    <HubOption icon="card" title="CARTÃO DIGITAL" subtitle="Cartão de sócio e QR de identificação" onPress={()=>setScreen('memberCard')}/>
    <HubOption icon="members" title="ÁREA PESSOAL" subtitle="Dados, quotas, vantagens e compras" onPress={()=>setScreen('account')}/>
    <HubOption icon="ticket" title="BILHETES" subtitle="Próximos jogos e bilheteira oficial" onPress={()=>setScreen('tickets')}/>
-   <HubOption icon="match" title="MATCH CENTRE" subtitle="Resultado, onze, eventos e estatísticas" onPress={()=>openGame('scutHub')}/>
+   <HubOption icon="match" title="MATCH CENTRE" subtitle="Resultado, onze, eventos e estatísticas" onPress={()=>openGame('scutHub',homeGame)}/>
    <HubOption icon="bell" title="NOTIFICAÇÕES" subtitle="Escolhe os alertas que queres receber" onPress={()=>setScreen('notifications')}/>
    <HubOption icon="calendar" title="DIA DE JOGO" subtitle="Tudo o que precisas para o próximo jogo" onPress={()=>setScreen('matchDay')}/>
   </View>
@@ -960,6 +1000,18 @@ export default function App(){
 
  if(screen==='account')return <Page><Back title="ÁREA PESSOAL" to="scutHub"/>
   <View style={s.accountHero}><View style={s.accountAvatar}><ShortcutIcon type="members"/></View><View style={s.accountHeroBody}><Text style={s.accountTitle}>A tua conta Torreense</Text><Text style={s.accountSub}>Liga o login à tua ficha de sócio para consultar os teus dados.</Text></View></View>
+  <View style={s.profileSportsCard}>
+   <Text style={s.profileSportsTitle}>MODALIDADES QUE SEGUES</Text>
+   <Text style={s.profileSportsText}>A Home, calendário, classificações, plantéis e notícias adaptam-se a esta seleção.</Text>
+   {FOLLOWABLE_SPORTS.map(key=>{
+    const on=followedSports.includes(key);
+    return <Pressable key={key} style={s.profileSportRow} onPress={()=>{if(on&&followedSports.length===1)return;setFollowedSports(on?followedSports.filter(x=>x!==key):[...followedSports,key])}}>
+     <View style={[s.profileSportCheck,on&&s.profileSportCheckOn]}>{on?<Text style={s.profileSportCheckText}>✓</Text>:null}</View>
+     <Text style={s.profileSportName}>{sportLabel(key)}</Text>
+    </Pressable>;
+   })}
+   <Text style={s.profileSportsHint}>Mantém pelo menos uma modalidade selecionada.</Text>
+  </View>
   <Pressable style={s.accountRow} onPress={()=>setScreen('memberCard')}><Text style={s.accountRowTitle}>Cartão digital</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={s.accountRow} onPress={()=>setScreen('benefits')}><Text style={s.accountRowTitle}>Vantagens de sócio</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={s.accountRow} onPress={()=>setScreen('cart')}><Text style={s.accountRowTitle}>Compras e carrinho</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
@@ -997,7 +1049,7 @@ export default function App(){
    <Text style={s.matchDayVenue}>⌖ {matchDayEvent.strVenue||'Local a confirmar'}</Text>
    <View style={s.matchDayActions}>
     <Pressable style={s.matchDayAction} onPress={()=>openOfficialStore('https://torreense.com/bilheteira')}><ShortcutIcon type="ticket"/><Text style={s.matchDayActionText}>BILHETE</Text></Pressable>
-    <Pressable style={s.matchDayAction} onPress={()=>openGame('matchDay')}><ShortcutIcon type="match"/><Text style={s.matchDayActionText}>MATCH CENTRE</Text></Pressable>
+    <Pressable style={s.matchDayAction} onPress={()=>openGame('matchDay',matchDayEvent)}><ShortcutIcon type="match"/><Text style={s.matchDayActionText}>MATCH CENTRE</Text></Pressable>
     <Pressable style={s.matchDayAction} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.matchDayActionText}>CALENDÁRIO</Text></Pressable>
    </View>
   </View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não existe um próximo jogo disponível.</Text></View>}
@@ -1242,14 +1294,14 @@ export default function App(){
   </ScrollView>:null}
  </Page>;
 
- const home={name:game?.strHomeTeam,logo:game?.strHomeTeamBadge||game?.strHomeTeamLogo},away={name:game?.strAwayTeam,logo:game?.strAwayTeamBadge||game?.strAwayTeamLogo};
+ const home={name:homeGame?.strHomeTeam,logo:homeGame?.strHomeTeamBadge||homeGame?.strHomeTeamLogo},away={name:homeGame?.strAwayTeam,logo:homeGame?.strAwayTeamBadge||homeGame?.strAwayTeamLogo};
  return <Page>
   <View style={s.homeTopActions}>
    <Pressable style={s.homeTopAction} onPress={()=>{setLoginMessage('');setScreen('login')}}><ShortcutIcon type="members"/><Text style={s.homeTopActionText}>LOGIN</Text></Pressable>
    <Pressable style={s.homeTopAction} onPress={()=>setScreen('scutHub')}><ShortcutIcon type="menu"/><Text style={s.homeTopActionText}>ÁREA SCUT</Text></Pressable>
    <Pressable style={s.homeTopAction} onPress={()=>setScreen('cart')}><ShortcutIcon type="shop"/><Text style={s.homeTopActionText}>CARRINHO</Text><View style={s.homeCartBadge}><Text style={s.homeCartBadgeText}>{cartCount}</Text></View></Pressable>
   </View>
-  <Pressable style={s.card} onPress={openGame}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error?<Text style={s.muted}>Não foi possível atualizar o jogo.</Text>:<><View style={s.header}><View><Text style={s.competition}>{game?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{game?.intRound?'Jornada '+game.intRound:'Próximo jogo'}</Text></View><View style={s.homeDateRow}><Text style={s.date}>{fmtGameDate(game)}</Text>{game?.scutvVideo?.live_status==='is_live'?<YouTubeBadge onPress={()=>openScutv(game.scutvVideo)}/>:null}</View></View><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text>{game?._homeStanding&&<Text style={s.teamStanding}>{game._homeStanding.position}.º · {game._homeStanding.points} pts</Text>}</View><Text style={s.vs}>VS</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text>{game?._awayStanding&&<Text style={s.teamStanding}>{game._awayStanding.position}.º · {game._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {game?.strVenue||'Local a confirmar'}</Text><Text style={s.detailsArrow}>›</Text></>}</Pressable>
+  <Pressable style={s.card} onPress={()=>openGame('home',homeGame)}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error||!homeGame?<Text style={s.muted}>Não existem jogos para as modalidades selecionadas.</Text>:<><View style={s.header}><View><Text style={s.competition}>{homeGame?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{homeGame?.intRound?'Jornada '+homeGame.intRound:'Próximo jogo'}</Text></View><View style={s.homeDateRow}><Text style={s.date}>{fmtGameDate(homeGame)}</Text>{homeGame?.scutvVideo?.live_status==='is_live'?<YouTubeBadge onPress={()=>openScutv(homeGame.scutvVideo)}/>:null}</View></View><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text>{homeGame?._homeStanding&&<Text style={s.teamStanding}>{homeGame._homeStanding.position}.º · {homeGame._homeStanding.points} pts</Text>}</View><Text style={s.vs}>VS</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text>{homeGame?._awayStanding&&<Text style={s.teamStanding}>{homeGame._awayStanding.position}.º · {homeGame._awayStanding.points} pts</Text>}</View></View><Text style={s.stadium}>⌖ {homeGame?.strVenue||'Local a confirmar'}</Text><Text style={s.detailsArrow}>›</Text></>}</Pressable>
   <View style={s.quickSection}><View style={s.quickRow}>
    <Pressable style={s.quickCard} onPress={openCalendar}><ShortcutIcon type="calendar"/><QuickLabel>CALENDÁRIO</QuickLabel></Pressable>
    <Pressable style={s.quickCard} onPress={()=>setScreen('news')}><ShortcutIcon type="news"/><QuickLabel>NOTÍCIAS</QuickLabel></Pressable>
@@ -1271,7 +1323,8 @@ const s=StyleSheet.create({
  clubLine:{color:'#fff',fontSize:fs(15),letterSpacing:.2},clubLight:{color:'#f1f6f9'},homeTopActions:{flexDirection:'row',justifyContent:'space-between',marginBottom:8},homeTopAction:{width:'32.3%',height:34,borderRadius:10,backgroundColor:'rgba(255,255,255,.94)',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',justifyContent:'center',paddingHorizontal:4},homeTopActionText:{color:'#17324a',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.25,marginLeft:3},homeCartBadge:{minWidth:17,height:17,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginLeft:4},homeCartBadgeText:{color:'#082b48',fontSize:fs(5.7),fontWeight:'900'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',alignItems:'center',justifyContent:'center',paddingHorizontal:1,overflow:'hidden'},quickIconFallback:{color:'#f1b94f',fontSize:fs(22),lineHeight:fs(26)},quickText:{width:'100%',color:'#17324a',fontSize:Platform.OS==='web'?5.9:7.2,lineHeight:Platform.OS==='web'?7.5:9,letterSpacing:Platform.OS==='web'?.18:0,marginTop:4,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'#d7e0e7',backgroundColor:'#ffffff',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#17324a',fontSize:fs(7),letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:fs(18)},
  hubIntro:{padding:12,borderRadius:12,backgroundColor:'rgba(255,255,255,.94)',borderWidth:1,borderColor:'#d7e0e7',marginBottom:9},hubIntroTitle:{color:'#17324a',fontSize:fs(9.3),fontWeight:'900',letterSpacing:.6},hubIntroText:{color:'#667b8c',fontSize:fs(6.4),lineHeight:fs(9.2),marginTop:3},hubGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},hubOption:{width:'48.5%',minHeight:112,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',padding:10,marginBottom:8},hubIcon:{width:37,height:37,borderRadius:10,backgroundColor:'rgba(241,185,79,.12)',alignItems:'center',justifyContent:'center',marginBottom:8},hubOptionTitle:{color:'#17324a',fontSize:fs(7),fontWeight:'900',letterSpacing:.35},hubOptionSub:{color:'#667b8c',fontSize:fs(5.7),lineHeight:fs(8.2),marginTop:3},hubPrimaryButton:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},hubPrimaryButtonText:{color:'#082b48',fontSize:fs(6.8),fontWeight:'900',letterSpacing:.45},
  digitalCard:{padding:14,borderRadius:16,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},digitalCardTop:{flexDirection:'row',alignItems:'center',paddingBottom:11,borderBottomWidth:1,borderBottomColor:'#e4e9ed'},digitalCardLogo:{width:48,height:54},digitalCardTopText:{flex:1,paddingLeft:10},digitalCardClub:{color:'#17324a',fontSize:fs(9.5),fontWeight:'900'},digitalCardLabel:{color:'#a91f42',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.45,marginTop:2},digitalCardLocked:{alignItems:'center',paddingVertical:22},digitalCardLock:{color:'#f1b94f',fontSize:fs(24)},digitalCardLockedTitle:{color:'#17324a',fontSize:fs(8),fontWeight:'900',marginTop:5},digitalCardLockedText:{color:'#667b8c',fontSize:fs(6.1),lineHeight:fs(9.2),textAlign:'center',marginTop:5,paddingHorizontal:12},
- accountHero:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',marginBottom:8},accountAvatar:{width:42,height:42,borderRadius:12,backgroundColor:'rgba(241,185,79,.12)',alignItems:'center',justifyContent:'center'},accountHeroBody:{flex:1,paddingLeft:9},accountTitle:{color:'#17324a',fontSize:fs(8.2),fontWeight:'800'},accountSub:{color:'#667b8c',fontSize:fs(5.8),lineHeight:fs(8.5),marginTop:2},accountRow:{height:39,borderRadius:9,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',paddingHorizontal:11,flexDirection:'row',alignItems:'center',marginBottom:6},accountRowTitle:{flex:1,color:'#17324a',fontSize:fs(6.8),fontWeight:'700'},accountRowArrow:{color:'#f1b94f',fontSize:fs(17)},
+ profileSportsCard:{padding:11,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',marginBottom:8},profileSportsTitle:{color:'#a91f42',fontSize:fs(6.3),fontWeight:'900',letterSpacing:.55},profileSportsText:{color:'#667b8c',fontSize:fs(5.7),lineHeight:fs(8.4),marginTop:3,marginBottom:7},profileSportRow:{minHeight:34,flexDirection:'row',alignItems:'center',borderTopWidth:1,borderTopColor:'#edf1f4'},profileSportCheck:{width:20,height:20,borderRadius:6,borderWidth:1,borderColor:'#bdcbd5',alignItems:'center',justifyContent:'center',marginRight:8},profileSportCheckOn:{backgroundColor:'#f1b94f',borderColor:'#f1b94f'},profileSportCheckText:{color:'#082b48',fontSize:fs(7),fontWeight:'900'},profileSportName:{color:'#17324a',fontSize:fs(6.6),fontWeight:'700'},profileSportsHint:{color:'#8797a4',fontSize:fs(5.2),marginTop:6},
+  accountHero:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',marginBottom:8},accountAvatar:{width:42,height:42,borderRadius:12,backgroundColor:'rgba(241,185,79,.12)',alignItems:'center',justifyContent:'center'},accountHeroBody:{flex:1,paddingLeft:9},accountTitle:{color:'#17324a',fontSize:fs(8.2),fontWeight:'800'},accountSub:{color:'#667b8c',fontSize:fs(5.8),lineHeight:fs(8.5),marginTop:2},accountRow:{height:39,borderRadius:9,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',paddingHorizontal:11,flexDirection:'row',alignItems:'center',marginBottom:6},accountRowTitle:{flex:1,color:'#17324a',fontSize:fs(6.8),fontWeight:'700'},accountRowArrow:{color:'#f1b94f',fontSize:fs(17)},
  ticketHero:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',marginBottom:9},ticketHeroBody:{flex:1,paddingLeft:9},ticketHeroTitle:{color:'#17324a',fontSize:fs(8.4),fontWeight:'900'},ticketHeroText:{color:'#667b8c',fontSize:fs(5.8),lineHeight:fs(8.6),marginTop:2},ticketMatch:{minHeight:62,borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',marginBottom:6,overflow:'hidden'},ticketDateBox:{width:78,alignSelf:'stretch',backgroundColor:'rgba(169,31,66,.07)',alignItems:'center',justifyContent:'center',paddingHorizontal:4},ticketDate:{color:'#a91f42',fontSize:fs(5.8),fontWeight:'800',textAlign:'center'},ticketTime:{color:'#17324a',fontSize:fs(6.4),fontWeight:'900',marginTop:2},ticketMatchBody:{flex:1,paddingHorizontal:9,paddingVertical:7},ticketCompetition:{color:'#f1b94f',fontSize:fs(5.2),fontWeight:'800'},ticketTeams:{color:'#17324a',fontSize:fs(7.1),fontWeight:'800',lineHeight:fs(9.5),marginTop:2},ticketVenue:{color:'#667b8c',fontSize:fs(5.3),marginTop:2},
  notifyCard:{borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden'},notifyHeading:{color:'#a91f42',fontSize:fs(6.1),fontWeight:'900',letterSpacing:.55,padding:11,paddingBottom:7},notifyRow:{minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:11,paddingVertical:8,borderTopWidth:1,borderTopColor:'#e8edf0'},notifyBody:{flex:1,paddingRight:10},notifyTitle:{color:'#17324a',fontSize:fs(6.9),fontWeight:'800'},notifySub:{color:'#667b8c',fontSize:fs(5.5),lineHeight:fs(8),marginTop:2},notifySwitch:{width:36,height:21,borderRadius:11,backgroundColor:'#d7dfe5',padding:2,justifyContent:'center'},notifySwitchOn:{backgroundColor:'#f1b94f'},notifyKnob:{width:17,height:17,borderRadius:9,backgroundColor:'#fff'},notifyKnobOn:{alignSelf:'flex-end'},notifyFootnote:{color:'#e4edf3',fontSize:fs(5.5),lineHeight:fs(8.5),textAlign:'center',marginTop:8,paddingHorizontal:8},
  matchDayCard:{padding:13,borderRadius:15,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},matchDayKicker:{color:'#a91f42',fontSize:fs(7),fontWeight:'900',letterSpacing:.7,textAlign:'center'},matchDayDate:{color:'#667b8c',fontSize:fs(6.2),textAlign:'center',marginTop:3},matchDayTeams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:14},matchDayTeam:{width:'38%',alignItems:'center'},matchDayLogo:{width:58,height:64},matchDayTeamName:{color:'#17324a',fontSize:fs(7),fontWeight:'800',textAlign:'center',marginTop:4},matchDayVs:{color:'#17324a',fontSize:fs(13),fontWeight:'900'},matchDayVenue:{color:'#667b8c',fontSize:fs(6.1),textAlign:'center',marginTop:10},matchDayActions:{flexDirection:'row',justifyContent:'space-between',marginTop:14},matchDayAction:{width:'32%',height:58,borderRadius:10,borderWidth:1,borderColor:'#e0e6eb',backgroundColor:'#f8fafb',alignItems:'center',justifyContent:'center'},matchDayActionText:{color:'#17324a',fontSize:fs(5.2),fontWeight:'800',marginTop:4,textAlign:'center'},
