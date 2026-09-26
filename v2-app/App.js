@@ -490,8 +490,8 @@ export default function App(){
    setGameLoading(false);
   }
  }
- async function openGame(){
-  setPreviousScreen('home');setScreen('game');setGameTab('RESUMO');
+ async function openGame(from='home'){
+  setPreviousScreen(from);setScreen('game');setGameTab('RESUMO');
   setGameInfo({event:game,stats:[],lineup:[],timeline:[],results:[]});
   await loadGameDetails(game);
  }
@@ -944,7 +944,7 @@ export default function App(){
    <HubOption icon="card" title="CARTÃO DIGITAL" subtitle="Cartão de sócio e QR de identificação" onPress={()=>setScreen('memberCard')}/>
    <HubOption icon="members" title="ÁREA PESSOAL" subtitle="Dados, quotas, vantagens e compras" onPress={()=>setScreen('account')}/>
    <HubOption icon="ticket" title="BILHETES" subtitle="Próximos jogos e bilheteira oficial" onPress={()=>setScreen('tickets')}/>
-   <HubOption icon="match" title="MATCH CENTRE" subtitle="Resultado, onze, eventos e estatísticas" onPress={()=>{setPreviousScreen('scutHub');openGame()}}/>
+   <HubOption icon="match" title="MATCH CENTRE" subtitle="Resultado, onze, eventos e estatísticas" onPress={()=>openGame('scutHub')}/>
    <HubOption icon="bell" title="NOTIFICAÇÕES" subtitle="Escolhe os alertas que queres receber" onPress={()=>setScreen('notifications')}/>
    <HubOption icon="calendar" title="DIA DE JOGO" subtitle="Tudo o que precisas para o próximo jogo" onPress={()=>setScreen('matchDay')}/>
   </View>
@@ -997,7 +997,7 @@ export default function App(){
    <Text style={s.matchDayVenue}>⌖ {matchDayEvent.strVenue||'Local a confirmar'}</Text>
    <View style={s.matchDayActions}>
     <Pressable style={s.matchDayAction} onPress={()=>openOfficialStore('https://torreense.com/bilheteira')}><ShortcutIcon type="ticket"/><Text style={s.matchDayActionText}>BILHETE</Text></Pressable>
-    <Pressable style={s.matchDayAction} onPress={()=>{setPreviousScreen('matchDay');openGame()}}><ShortcutIcon type="match"/><Text style={s.matchDayActionText}>MATCH CENTRE</Text></Pressable>
+    <Pressable style={s.matchDayAction} onPress={()=>openGame('matchDay')}><ShortcutIcon type="match"/><Text style={s.matchDayActionText}>MATCH CENTRE</Text></Pressable>
     <Pressable style={s.matchDayAction} onPress={openCalendar}><ShortcutIcon type="calendar"/><Text style={s.matchDayActionText}>CALENDÁRIO</Text></Pressable>
    </View>
   </View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não existe um próximo jogo disponível.</Text></View>}
