@@ -145,6 +145,7 @@ function ShortcutIcon({type}) {
   {type==='bell'?<><Path d="M6 17h12l-2-3V9a4 4 0 0 0-8 0v5l-2 3z" {...common}/><Path d="M10 20h4" {...common}/></>:null}
   {type==='match'?<><Circle cx="12" cy="12" r="8" {...common}/><Path d="m12 8 2 1.5-.7 2.5h-2.6L10 9.5 12 8zM7 13l2 1.5M17 13l-2 1.5M9 6l1 2M15 6l-1 2" {...common}/></>:null}
   {type==='card'?<><Rect x="3" y="5" width="18" height="14" rx="2" {...common}/><Path d="M3 9h18M7 14h4" {...common}/></>:null}
+  {type==='settings'?<><Circle cx="12" cy="12" r="3" {...common}/><Path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" {...common}/></>:null}
  </Svg>;
 }
 function QuickLabel({children}){
@@ -993,6 +994,7 @@ export default function App(){
    <HubOption icon="match" title="MATCH CENTRE" subtitle="Resultado, onze, eventos e estatísticas" onPress={()=>openGame('scutHub',homeGame)}/>
    <HubOption icon="bell" title="NOTIFICAÇÕES" subtitle="Escolhe os alertas que queres receber" onPress={()=>setScreen('notifications')}/>
    <HubOption icon="calendar" title="DIA DE JOGO" subtitle="Tudo o que precisas para o próximo jogo" onPress={()=>setScreen('matchDay')}/>
+   <HubOption icon="settings" title="CONFIGURAÇÕES" subtitle="Tema, modalidades e preferências da app" onPress={()=>setScreen('settings')}/>
   </View>
  </Page>;
 
