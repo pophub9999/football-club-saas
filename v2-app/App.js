@@ -196,6 +196,13 @@ function fmtGameDate(ev){
  }
  return fmtDate(iso);
 }
+function fmtCountdown(ms){
+ const total=Math.max(0,Math.floor(ms/1000));
+ const h=Math.floor(total/3600);
+ const m=Math.floor((total%3600)/60);
+ const s=total%60;
+ return String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
+}
 function cleanHtml(v=''){return v.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();}
 function toDate(ev){return ev?.strTimestamp||(ev?.dateEvent?ev.dateEvent+'T'+(ev.strTime||'00:00:00'):null);}
 function cleanNewsTitle(v=''){return v.replace(/\s*\|\s*(?:Site Oficial do )?Torreense\s*$/i,'').trim();}
@@ -390,8 +397,48 @@ function memberFeeAmount(category='',plan='annual'){
  if(monthly==null)return 0;
  return plan==='annual'?monthly*12:monthly;
 }
+function StadiumIntro({onClose}){
+ const [stage,setStage]=useState(0);
+ useEffect(()=>{
+  const a=setTimeout(()=>setStage(1),2800);
+  const b=setTimeout(()=>setStage(2),5700);
+  const done=setTimeout(()=>onClose?.(),9500);
+  return()=>{clearTimeout(a);clearTimeout(b);clearTimeout(done)};
+ },[onClose]);
+ const injected=`
+  (function(){
+   try{
+    document.documentElement.style.scrollBehavior='smooth';
+    var y=0;
+    setTimeout(function(){y=window.innerHeight*0.70;window.scrollTo({top:y,behavior:'smooth'});},1200);
+    setTimeout(function(){y=window.innerHeight*1.65;window.scrollTo({top:y,behavior:'smooth'});},3900);
+    setTimeout(function(){y=window.innerHeight*2.65;window.scrollTo({top:y,behavior:'smooth'});},6600);
+   }catch(e){}
+   true;
+  })();
+ `;
+ return <View style={s.introRoot}>
+  <StatusBar hidden/>
+  <View style={s.introWebWrap} pointerEvents="none">
+   {Platform.OS==='web'
+    ?React.createElement('iframe',{src:'https://estadio.torreense.com/',title:'Novo Estádio Manuel Marques',style:{width:'100%',height:'100%',border:0,backgroundColor:'#0b1322'}})
+    :<WebView source={{uri:'https://estadio.torreense.com/'}} style={s.introWebView} javaScriptEnabled domStorageEnabled injectedJavaScript={injected} scrollEnabled={false} showsVerticalScrollIndicator={false}/>}
+  </View>
+  <View pointerEvents="none" style={s.introShadeTop}/>
+  <View pointerEvents="none" style={s.introShadeBottom}/>
+  <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.introLogo} alt="SCU Torreense"/>
+  <View style={s.introCopy} pointerEvents="none">
+   <Text style={s.introEyebrow}>{stage===0?'O FUTURO COMEÇA AGORA':stage===1?'UMA NOVA CASA':'PELO FUTURO DO TORREENSE'}</Text>
+   <Text style={s.introTitle}>{stage===0?'NOVO ESTÁDIO\nMANUEL MARQUES':stage===1?'BANCADA NASCENTE\nCAMAROTES · PREMIUM':'SCU TORREENSE'}</Text>
+   <View style={s.introProgress}><View style={[s.introProgressFill,{width:stage===0?'34%':stage===1?'67%':'100%'}]}/></View>
+  </View>
+  <Pressable onPress={onClose} style={s.introSkip}><Text style={s.introSkipText}>SALTAR</Text></Pressable>
+ </View>;
+}
+
 export default function App(){
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
+ const [showStadiumIntro,setShowStadiumIntro]=useState(true),[nowTick,setNowTick]=useState(Date.now());
  APP_SWIPE_SCREEN=screen;
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
@@ -420,6 +467,11 @@ export default function App(){
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
 
  useEffect(()=>{if(Platform.OS==='web'&&typeof window!=='undefined'){try{window.localStorage.setItem('scut_theme',appTheme)}catch{}}},[appTheme]);
+ useEffect(()=>{
+  const t=setInterval(()=>setNowTick(Date.now()),1000);
+  return()=>clearInterval(t);
+ },[]);
+
 
  useEffect(()=>{
   if(Platform.OS==='web'&&typeof window!=='undefined'){try{window.localStorage.setItem('scut_followed_sports',JSON.stringify(followedSports))}catch{}}
@@ -767,6 +819,9 @@ export default function App(){
  const recentPreferredMatch=preferredCalendar.filter(x=>x.status==='finished'||(x.homeScore!=null&&x.awayScore!=null)).sort((a,b)=>new Date(b.startsAt||0)-new Date(a.startsAt||0))[0]||null;
  const ticketMatches=futureClubMatches.slice(0,5);
  const homeGame=futureClubMatches[0]?.ev||recentPreferredMatch?.ev||game;
+ const homeGameTime=homeGame?new Date(homeGame.strTimestamp||homeGame.starts_at||0).getTime():0;
+ const homeCountdownMs=homeGameTime-nowTick;
+ const homeCountdownActive=homeGame?.strStatus!=='finished'&&homeGame?._timeConfirmed!==false&&homeCountdownMs>0&&homeCountdownMs<=24*60*60*1000;
  const matchDayEvent=futureClubMatches[0]?.ev||null;
  const lisbonDay=iso=>iso?new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Europe/Lisbon'}).format(new Date(iso)):null;
  const isMatchToday=matchDayEvent&&lisbonDay(matchDayEvent.strTimestamp||matchDayEvent.starts_at)===lisbonDay(new Date().toISOString());
@@ -905,6 +960,8 @@ export default function App(){
  APP_SWIPE_BACK=swipeBack;
 
  function Back({title,to='home'}){const light=appTheme==='light';return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={[s.back,light&&s.backLightTheme]}>‹</Text></Pressable><Text style={[s.pageTitle,light&&s.pageTitleLightTheme]}>{title}</Text></View>}
+
+ if(showStadiumIntro)return <StadiumIntro onClose={()=>setShowStadiumIntro(false)}/>;
 
  if(screen==='webPortal')return <Page scroll={false}><Back title={webPortal.title||'TORREENSE'} to={previousScreen||'home'}/>
   <View style={s.portalFrame}>
@@ -1426,6 +1483,27 @@ export default function App(){
  
  const home={name:homeGame?.strHomeTeam,logo:homeGame?.strHomeTeamBadge||homeGame?.strHomeTeamLogo},away={name:homeGame?.strAwayTeam,logo:homeGame?.strAwayTeamBadge||homeGame?.strAwayTeamLogo};
  return <Page>
+  <View style={s.homeMatchHero}>
+   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.homeMatchWatermark} alt="SCU Torreense"/>
+   {loading?<View style={s.homeMatchLoading}><ActivityIndicator color="#fff"/></View>:error||!homeGame?<View style={s.homeMatchLoading}><Text style={s.homeMatchEmpty}>Não existem jogos para as modalidades selecionadas.</Text></View>:<>
+    <View style={s.homeMatchTop}><Text style={s.homeMatchCompetition}>{homeGame?.strLeague||'COMPETIÇÃO'}</Text><Pressable onPress={openCalendar}><Text style={s.homeMatchCalendarLink}>CALENDÁRIO ›</Text></Pressable></View>
+    <View style={s.homeMatchTeams}>
+     <View style={s.homeMatchTeam}><TeamLogo name={home.name} uri={home.logo} style={s.homeMatchLogo}/><Text style={s.homeMatchTeamName}>{home.name}</Text></View>
+     <View style={s.homeMatchCenter}>
+      <Text style={s.homeMatchDate}>{fmtGameDate(homeGame)}</Text>
+      {homeCountdownActive?<><Text style={s.homeMatchCountdownLabel}>FALTA</Text><Text style={s.homeMatchCountdown}>{fmtCountdown(homeCountdownMs)}</Text></>:<Text style={s.homeMatchVs}>VS</Text>}
+     </View>
+     <View style={s.homeMatchTeam}><TeamLogo name={away.name} uri={away.logo} style={s.homeMatchLogo}/><Text style={s.homeMatchTeamName}>{away.name}</Text></View>
+    </View>
+    <Text style={s.homeMatchMeta}>{homeGame?.intRound?'Jornada '+homeGame.intRound+' · ':''}{homeGame?.strVenue||'Local a confirmar'}</Text>
+    <View style={s.homeMatchActions}>
+     <Pressable onPress={()=>openClubPortal('BILHETES',CLUB_URLS.tickets,'home')} style={s.homeMatchTicket}><Text style={s.homeMatchTicketText}>BILHETES</Text></Pressable>
+     <Pressable onPress={()=>openGame('home',homeGame)} style={s.homeMatchGame}><Text style={s.homeMatchGameText}>GAME CENTER</Text></Pressable>
+    </View>
+   </>}
+  </View>
+
+  <View style={s.homeSectionHead}><Text style={[s.homeSectionTitle,appTheme==='light'&&s.newsHeadingLightTheme]}>ÚLTIMAS NOTÍCIAS</Text><Pressable onPress={()=>setScreen('news')}><Text style={s.homeSectionLink}>VER TODAS ›</Text></Pressable></View>
   {newsLead?<Pressable style={s.homeLeadNews} onPress={()=>openArticle(newsLead)}>
    <NewsVisual uri={newsLead.hero} style={s.homeLeadNewsImage}/>
    <View style={s.homeLeadNewsShade}/>
@@ -1434,9 +1512,6 @@ export default function App(){
   {newsGrid.length?<View style={s.homeNewsGrid}>{newsGrid.map(item=><Pressable key={item.id||item.title} style={s.homeNewsSmall} onPress={()=>openArticle(item)}>
    <NewsVisual uri={item.hero} style={s.homeNewsSmallImage}/><View style={s.homeNewsSmallBody}><Text style={s.newsEditorialMeta}>{item.category}</Text><Text style={s.homeNewsSmallTitle} numberOfLines={3}>{cleanNewsTitle(item.title)}</Text></View>
   </Pressable>)}</View>:null}
-
-  <View style={s.homeSectionHead}><Text style={[s.homeSectionTitle,appTheme==='light'&&s.newsHeadingLightTheme]}>PRÓXIMO JOGO</Text><Pressable onPress={openCalendar}><Text style={s.homeSectionLink}>VER JOGOS ›</Text></Pressable></View>
-  <Pressable style={s.card} onPress={()=>openGame('home',homeGame)}>{loading?<View style={s.loading}><ActivityIndicator/></View>:error||!homeGame?<Text style={s.muted}>Não existem jogos para as modalidades selecionadas.</Text>:<><View style={s.header}><View><Text style={s.competition}>{homeGame?.strLeague||'COMPETIÇÃO'}</Text><Text style={s.round}>{homeGame?.intRound?'Jornada '+homeGame.intRound:'Próximo jogo'}</Text></View><View style={s.homeDateRow}><Text style={s.date}>{fmtGameDate(homeGame)}</Text>{homeGame?.scutvVideo?.live_status==='is_live'?<YouTubeBadge onPress={()=>openScutv(homeGame.scutvVideo)}/>:null}</View></View><View style={s.teams}><View style={s.team}><TeamLogo name={home.name} uri={home.logo} style={s.teamLogo}/><Text style={s.teamName}>{home.name}</Text></View><Text style={s.vs}>VS</Text><View style={s.team}><TeamLogo name={away.name} uri={away.logo} style={s.teamLogo}/><Text style={s.teamName}>{away.name}</Text></View></View><Text style={s.stadium}>⌖ {homeGame?.strVenue||'Local a confirmar'}</Text></>}</Pressable>
 
   {futureClubMatches.length>1?<><View style={s.homeSectionHead}><Text style={[s.homeSectionTitle,appTheme==='light'&&s.newsHeadingLightTheme]}>A SEGUIR</Text></View>{futureClubMatches.slice(1,4).map(x=><Pressable key={x.id} style={s.homeFixtureRow} onPress={()=>openCalendarGame(x)}>
    <View style={s.homeFixtureDate}><Text style={s.homeFixtureDay}>{x.startsAt?new Date(x.startsAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',timeZone:'Europe/Lisbon'}).toUpperCase():x.date}</Text><Text style={s.homeFixtureTime}>{x.time}</Text></View>
@@ -1465,13 +1540,15 @@ export default function App(){
 }
 
 const _baseStyles=StyleSheet.create({
- root:{flex:1,backgroundColor:Platform.OS==='web'?'#00142c':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
+ introRoot:{flex:1,backgroundColor:'#08111e',overflow:'hidden'},introWebWrap:{...StyleSheet.absoluteFillObject},introWebView:{flex:1,backgroundColor:'#08111e'},introShadeTop:{position:'absolute',left:0,right:0,top:0,height:'34%',backgroundColor:'rgba(5,10,18,.42)'},introShadeBottom:{position:'absolute',left:0,right:0,bottom:0,height:'48%',backgroundColor:'rgba(5,10,18,.68)'},introLogo:{position:'absolute',top:'7%',left:'7%',width:66,height:76},introCopy:{position:'absolute',left:'7%',right:'7%',bottom:'10%'},introEyebrow:{color:'#f1b94f',fontSize:13,fontWeight:'900',letterSpacing:1.8,marginBottom:8},introTitle:{color:'#fff',fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:.3},introProgress:{height:3,borderRadius:2,backgroundColor:'rgba(255,255,255,.25)',marginTop:20,overflow:'hidden'},introProgressFill:{height:'100%',backgroundColor:'#f1b94f'},introSkip:{position:'absolute',right:'6%',top:'7%',height:34,paddingHorizontal:13,borderRadius:17,backgroundColor:'rgba(7,14,23,.62)',borderWidth:1,borderColor:'rgba(255,255,255,.32)',alignItems:'center',justifyContent:'center'},introSkipText:{color:'#fff',fontSize:11,fontWeight:'900',letterSpacing:.8},
+  root:{flex:1,backgroundColor:Platform.OS==='web'?'#00142c':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
  card:{width:'100%',backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#17324a',fontSize:fs(8),letterSpacing:.55},round:{color:'#17324a',fontSize:fs(8.5),marginTop:3},date:{color:'#17324a',fontSize:fs(8)},
  teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamLogoFallback:{borderRadius:999,backgroundColor:'rgba(255,255,255,.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'rgba(255,255,255,.18)'},teamLogoFallbackText:{color:'#dce7ef',fontSize:fs(8),fontWeight:'700'},teamName:{color:'#17324a',fontSize:fs(8),marginTop:3,textAlign:'center',minHeight:16},teamStanding:{color:'#17324a',fontSize:fs(6),marginTop:1},vs:{color:'#17324a',fontSize:fs(12)},score:{color:'#17324a',fontSize:fs(19)},stadium:{color:'#17324a',fontSize:fs(8),textAlign:'center',marginTop:4},gameStatus:{color:'#f1b94f',fontSize:fs(6),textAlign:'center'},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#17324a',fontSize:fs(24)},
  youtubeBadge:{width:15,height:11,alignItems:'center',justifyContent:'center',marginLeft:5},youtubeIcon:{width:15,height:10,borderRadius:3,backgroundColor:'#ff0033',alignItems:'center',justifyContent:'center',position:'relative'},youtubePlay:{color:'#fff',fontSize:fs(4.7),lineHeight:fs(6),fontWeight:'900',marginLeft:1},youtubeSummaryMark:{position:'absolute',right:-3,bottom:-3,width:7,height:7,borderRadius:4,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#fff'},youtubeSummaryMarkText:{color:'#17212a',fontSize:fs(3.8),fontWeight:'900',lineHeight:fs(5)},homeDateRow:{flexDirection:'row',alignItems:'center'},gameStatusRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginTop:3},
  scutvScreen:{flex:1},scutvPlayer:{width:'100%',aspectRatio:16/9,borderRadius:12,overflow:'hidden',backgroundColor:'#000'},scutvWebView:{flex:1,backgroundColor:'#000'},scutvInfo:{paddingTop:10},scutvTitleRow:{flexDirection:'row',alignItems:'center'},scutvTitle:{flex:1,color:'#fff',fontSize:fs(8.2),fontWeight:'700',lineHeight:fs(11)},scutvLive:{color:'#ff4967',fontSize:fs(6.4),fontWeight:'800',marginTop:7},scutvReplay:{color:Platform.OS==='web'?'#8fa9bc':'#b6c9d7',fontSize:fs(6.1),fontWeight:'700',marginTop:7},
- homeLeadNews:{height:305,borderRadius:16,overflow:'hidden',backgroundColor:'#172f46',position:'relative',marginBottom:9},homeLeadNewsImage:{width:'100%',height:'100%',backgroundColor:'#eef3f6'},homeLeadNewsShade:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(7,20,34,.35)'},homeLeadNewsBody:{position:'absolute',left:13,right:13,bottom:13},homeLeadNewsMeta:{color:'#fff',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.5,textTransform:'uppercase',marginBottom:5},homeLeadNewsTitle:{color:'#fff',fontSize:fs(13.3),lineHeight:fs(17),fontWeight:'900'},homeNewsGrid:{flexDirection:'row',justifyContent:'space-between',marginBottom:5},homeNewsSmall:{width:'48.7%',borderRadius:12,overflow:'hidden',backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7'},homeNewsSmallImage:{width:'100%',height:105,backgroundColor:'#eef3f6'},homeNewsSmallBody:{padding:8},homeNewsSmallTitle:{color:'#17324a',fontSize:fs(7.1),lineHeight:fs(9.8),fontWeight:'800'},homeSectionHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:15,marginBottom:7},homeSectionTitle:{color:'#fff',fontSize:fs(8.1),fontWeight:'900',letterSpacing:.5},homeSectionLink:{color:'#f1b94f',fontSize:fs(5.8),fontWeight:'800'},homeFixtureRow:{minHeight:64,borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',marginBottom:6,overflow:'hidden'},homeFixtureDate:{width:65,alignSelf:'stretch',backgroundColor:'#f3f6f8',alignItems:'center',justifyContent:'center'},homeFixtureDay:{color:'#8f173b',fontSize:fs(6.1),fontWeight:'900'},homeFixtureTime:{color:'#17324a',fontSize:fs(6.2),fontWeight:'800',marginTop:2},homeFixtureBody:{flex:1,paddingHorizontal:8},homeFixtureSport:{color:'#667b8c',fontSize:fs(5.1),marginBottom:4},homeFixtureTeams:{flexDirection:'row',alignItems:'center'},homeFixtureLogo:{width:22,height:25},homeFixtureNames:{flex:1,color:'#17324a',fontSize:fs(6.4),fontWeight:'800',textAlign:'center',paddingHorizontal:5},homeFixtureArrow:{color:'#8f173b',fontSize:fs(18),paddingRight:8},homeStandingsCard:{borderRadius:12,overflow:'hidden',backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7'},homeStandingsTitleRow:{paddingHorizontal:9,paddingVertical:7,backgroundColor:'#f3f6f8'},homeStandingsCompetition:{color:'#8f173b',fontSize:fs(5.8),fontWeight:'900'},homeStandingRow:{minHeight:34,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderTopWidth:1,borderTopColor:'#edf1f4'},homeStandingClub:{backgroundColor:'rgba(169,31,66,.07)'},homeStandingPos:{width:22,color:'#17324a',fontSize:fs(6.4),fontWeight:'900'},homeStandingLogo:{width:21,height:24,marginRight:6},homeStandingTeam:{flex:1,color:'#17324a',fontSize:fs(6.2),fontWeight:'700'},homeStandingPlayed:{width:34,color:'#667b8c',fontSize:fs(5.7),textAlign:'right'},homeStandingPts:{width:48,color:'#17324a',fontSize:fs(6.3),fontWeight:'900',textAlign:'right'},homeStoreGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},homeStoreCard:{width:'48.5%',borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:7,marginBottom:7},homeStoreImage:{width:'100%',height:115,borderRadius:8,backgroundColor:'#fff'},homeStoreName:{color:'#17324a',fontSize:fs(6.3),fontWeight:'700',lineHeight:fs(8.5),marginTop:5,minHeight:18},homeStorePrice:{color:'#8f173b',fontSize:fs(7),fontWeight:'900',marginTop:3},homePortalBanner:{height:72,borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',paddingHorizontal:12},homePortalBannerBody:{flex:1,paddingHorizontal:10},homePortalBannerTitle:{color:'#17324a',fontSize:fs(7.1),fontWeight:'900'},homePortalBannerText:{color:'#667b8c',fontSize:fs(5.5),lineHeight:fs(8),marginTop:2},homePortalBannerArrow:{color:'#8f173b',fontSize:fs(20)},homeBenefitsCard:{borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden'},homeBenefitRow:{minHeight:48,flexDirection:'row',alignItems:'center',paddingHorizontal:9,borderTopWidth:1,borderTopColor:'#edf1f4'},homeBenefitAvatar:{width:29,height:29,borderRadius:8,backgroundColor:'rgba(169,31,66,.08)',alignItems:'center',justifyContent:'center'},homeBenefitAvatarText:{color:'#8f173b',fontSize:fs(8),fontWeight:'900'},homeBenefitBody:{flex:1,paddingHorizontal:8},homeBenefitName:{color:'#17324a',fontSize:fs(6.5),fontWeight:'800'},homeBenefitMeta:{color:'#667b8c',fontSize:fs(5.2),marginTop:1},homeBenefitArrow:{color:'#8f173b',fontSize:fs(17)},
+ homeMatchHero:{minHeight:310,borderRadius:18,backgroundColor:'#11182d',overflow:'hidden',position:'relative',padding:14,marginBottom:3,borderWidth:1,borderColor:'rgba(255,255,255,.10)'},homeMatchWatermark:{position:'absolute',right:-58,top:24,width:250,height:285,opacity:.075},homeMatchLoading:{minHeight:280,alignItems:'center',justifyContent:'center'},homeMatchEmpty:{color:'#fff',fontSize:fs(7),textAlign:'center'},homeMatchTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},homeMatchCompetition:{alignSelf:'flex-start',backgroundColor:'#5f718c',color:'#fff',fontSize:fs(6.3),fontWeight:'900',letterSpacing:.45,paddingHorizontal:12,paddingVertical:6,borderRadius:16},homeMatchCalendarLink:{color:'#b7c0cf',fontSize:fs(5.2),fontWeight:'800'},homeMatchTeams:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:21},homeMatchTeam:{width:'30%',alignItems:'center'},homeMatchLogo:{width:67,height:76},homeMatchTeamName:{color:'#fff',fontSize:fs(8.2),lineHeight:fs(10.4),fontWeight:'900',textAlign:'center',marginTop:7},homeMatchCenter:{width:'40%',alignItems:'center',paddingHorizontal:2},homeMatchDate:{color:'#aeb7c7',fontSize:fs(6.1),fontWeight:'800',textAlign:'center'},homeMatchCountdownLabel:{color:'#b7c0cf',fontSize:fs(4.8),fontWeight:'800',marginTop:8,letterSpacing:1},homeMatchCountdown:{color:'#fff',fontSize:fs(10.3),fontWeight:'900',marginTop:2,textAlign:'center'},homeMatchVs:{color:'#fff',fontSize:fs(14),fontWeight:'900',marginTop:10},homeMatchMeta:{color:'#aeb7c7',fontSize:fs(6),textAlign:'center',marginTop:18},homeMatchActions:{flexDirection:'row',justifyContent:'space-between',marginTop:14},homeMatchTicket:{width:'49%',height:37,borderRadius:10,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center'},homeMatchTicketText:{color:'#fff',fontSize:fs(6.2),fontWeight:'900'},homeMatchGame:{width:'49%',height:37,borderRadius:10,borderWidth:1.5,borderColor:'#fff',alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.03)'},homeMatchGameText:{color:'#fff',fontSize:fs(6.2),fontWeight:'900'},
+  homeLeadNews:{height:305,borderRadius:16,overflow:'hidden',backgroundColor:'#172f46',position:'relative',marginBottom:9},homeLeadNewsImage:{width:'100%',height:'100%',backgroundColor:'#eef3f6'},homeLeadNewsShade:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(7,20,34,.35)'},homeLeadNewsBody:{position:'absolute',left:13,right:13,bottom:13},homeLeadNewsMeta:{color:'#fff',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.5,textTransform:'uppercase',marginBottom:5},homeLeadNewsTitle:{color:'#fff',fontSize:fs(13.3),lineHeight:fs(17),fontWeight:'900'},homeNewsGrid:{flexDirection:'row',justifyContent:'space-between',marginBottom:5},homeNewsSmall:{width:'48.7%',borderRadius:12,overflow:'hidden',backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7'},homeNewsSmallImage:{width:'100%',height:105,backgroundColor:'#eef3f6'},homeNewsSmallBody:{padding:8},homeNewsSmallTitle:{color:'#17324a',fontSize:fs(7.1),lineHeight:fs(9.8),fontWeight:'800'},homeSectionHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:15,marginBottom:7},homeSectionTitle:{color:'#fff',fontSize:fs(8.1),fontWeight:'900',letterSpacing:.5},homeSectionLink:{color:'#f1b94f',fontSize:fs(5.8),fontWeight:'800'},homeFixtureRow:{minHeight:64,borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',marginBottom:6,overflow:'hidden'},homeFixtureDate:{width:65,alignSelf:'stretch',backgroundColor:'#f3f6f8',alignItems:'center',justifyContent:'center'},homeFixtureDay:{color:'#8f173b',fontSize:fs(6.1),fontWeight:'900'},homeFixtureTime:{color:'#17324a',fontSize:fs(6.2),fontWeight:'800',marginTop:2},homeFixtureBody:{flex:1,paddingHorizontal:8},homeFixtureSport:{color:'#667b8c',fontSize:fs(5.1),marginBottom:4},homeFixtureTeams:{flexDirection:'row',alignItems:'center'},homeFixtureLogo:{width:22,height:25},homeFixtureNames:{flex:1,color:'#17324a',fontSize:fs(6.4),fontWeight:'800',textAlign:'center',paddingHorizontal:5},homeFixtureArrow:{color:'#8f173b',fontSize:fs(18),paddingRight:8},homeStandingsCard:{borderRadius:12,overflow:'hidden',backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7'},homeStandingsTitleRow:{paddingHorizontal:9,paddingVertical:7,backgroundColor:'#f3f6f8'},homeStandingsCompetition:{color:'#8f173b',fontSize:fs(5.8),fontWeight:'900'},homeStandingRow:{minHeight:34,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderTopWidth:1,borderTopColor:'#edf1f4'},homeStandingClub:{backgroundColor:'rgba(169,31,66,.07)'},homeStandingPos:{width:22,color:'#17324a',fontSize:fs(6.4),fontWeight:'900'},homeStandingLogo:{width:21,height:24,marginRight:6},homeStandingTeam:{flex:1,color:'#17324a',fontSize:fs(6.2),fontWeight:'700'},homeStandingPlayed:{width:34,color:'#667b8c',fontSize:fs(5.7),textAlign:'right'},homeStandingPts:{width:48,color:'#17324a',fontSize:fs(6.3),fontWeight:'900',textAlign:'right'},homeStoreGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},homeStoreCard:{width:'48.5%',borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:7,marginBottom:7},homeStoreImage:{width:'100%',height:115,borderRadius:8,backgroundColor:'#fff'},homeStoreName:{color:'#17324a',fontSize:fs(6.3),fontWeight:'700',lineHeight:fs(8.5),marginTop:5,minHeight:18},homeStorePrice:{color:'#8f173b',fontSize:fs(7),fontWeight:'900',marginTop:3},homePortalBanner:{height:72,borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',paddingHorizontal:12},homePortalBannerBody:{flex:1,paddingHorizontal:10},homePortalBannerTitle:{color:'#17324a',fontSize:fs(7.1),fontWeight:'900'},homePortalBannerText:{color:'#667b8c',fontSize:fs(5.5),lineHeight:fs(8),marginTop:2},homePortalBannerArrow:{color:'#8f173b',fontSize:fs(20)},homeBenefitsCard:{borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden'},homeBenefitRow:{minHeight:48,flexDirection:'row',alignItems:'center',paddingHorizontal:9,borderTopWidth:1,borderTopColor:'#edf1f4'},homeBenefitAvatar:{width:29,height:29,borderRadius:8,backgroundColor:'rgba(169,31,66,.08)',alignItems:'center',justifyContent:'center'},homeBenefitAvatarText:{color:'#8f173b',fontSize:fs(8),fontWeight:'900'},homeBenefitBody:{flex:1,paddingHorizontal:8},homeBenefitName:{color:'#17324a',fontSize:fs(6.5),fontWeight:'800'},homeBenefitMeta:{color:'#667b8c',fontSize:fs(5.2),marginTop:1},homeBenefitArrow:{color:'#8f173b',fontSize:fs(17)},
   clubLine:{color:'#fff',fontSize:fs(15),letterSpacing:.2},clubLight:{color:'#f1f6f9'},clubLineLightTheme:{color:'#8f173b',fontWeight:'900'},clubLightTheme:{color:'#8f173b'},homeTopActions:{flexDirection:'row',justifyContent:'space-between',marginBottom:8},homeTopAction:{width:'32.3%',height:34,borderRadius:10,backgroundColor:'rgba(255,255,255,.94)',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',justifyContent:'center',paddingHorizontal:4},homeTopActionText:{color:'#17324a',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.25,marginLeft:3},homeCartBadge:{minWidth:17,height:17,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginLeft:4},homeCartBadgeText:{color:'#082b48',fontSize:fs(5.7),fontWeight:'900'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',alignItems:'center',justifyContent:'center',paddingHorizontal:1,overflow:'hidden'},quickIconFallback:{color:'#f1b94f',fontSize:fs(22),lineHeight:fs(26)},quickText:{width:'100%',color:'#17324a',fontSize:Platform.OS==='web'?5.9:7.2,lineHeight:Platform.OS==='web'?7.5:9,letterSpacing:Platform.OS==='web'?.18:0,marginTop:4,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'#d7e0e7',backgroundColor:'#ffffff',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#17324a',fontSize:fs(7),letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:fs(18)},
  hubIntro:{padding:12,borderRadius:12,backgroundColor:'rgba(255,255,255,.94)',borderWidth:1,borderColor:'#d7e0e7',marginBottom:9},hubIntroTitle:{color:'#17324a',fontSize:fs(9.3),fontWeight:'900',letterSpacing:.6},hubIntroText:{color:'#667b8c',fontSize:fs(6.4),lineHeight:fs(9.2),marginTop:3},hubGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},hubOption:{width:'48.5%',minHeight:112,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',padding:10,marginBottom:8},hubIcon:{width:37,height:37,borderRadius:10,backgroundColor:'rgba(241,185,79,.12)',alignItems:'center',justifyContent:'center',marginBottom:8},hubOptionTitle:{color:'#17324a',fontSize:fs(7),fontWeight:'900',letterSpacing:.35},hubOptionSub:{color:'#667b8c',fontSize:fs(5.7),lineHeight:fs(8.2),marginTop:3},hubPrimaryButton:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},hubPrimaryButtonText:{color:'#082b48',fontSize:fs(6.8),fontWeight:'900',letterSpacing:.45},
  digitalCard:{padding:14,borderRadius:16,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},digitalCardTop:{flexDirection:'row',alignItems:'center',paddingBottom:11,borderBottomWidth:1,borderBottomColor:'#e4e9ed'},digitalCardLogo:{width:48,height:54},digitalCardTopText:{flex:1,paddingLeft:10},digitalCardClub:{color:'#17324a',fontSize:fs(9.5),fontWeight:'900'},digitalCardLabel:{color:'#a91f42',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.45,marginTop:2},digitalCardLocked:{alignItems:'center',paddingVertical:22},digitalCardLock:{color:'#f1b94f',fontSize:fs(24)},digitalCardLockedTitle:{color:'#17324a',fontSize:fs(8),fontWeight:'900',marginTop:5},digitalCardLockedText:{color:'#667b8c',fontSize:fs(6.1),lineHeight:fs(9.2),textAlign:'center',marginTop:5,paddingHorizontal:12},
@@ -1591,6 +1668,11 @@ function lightThemeStyle(name,base){
  if(name==='calendarViewToggle'){out.backgroundColor='#e9eaed'}
  if(name==='calendarViewButtonOn'){out.backgroundColor='#8f173b'}
  if(name==='calendarViewButtonTextOn')out.color='#ffffff';
+ if(name==='homeMatchHero'){out.backgroundColor='#11182d';out.borderColor='rgba(17,24,45,.18)'}
+ if(['homeMatchTeamName','homeMatchCountdown','homeMatchVs','homeMatchTicketText','homeMatchGameText'].includes(name))out.color='#ffffff';
+ if(['homeMatchDate','homeMatchMeta','homeMatchCalendarLink','homeMatchCountdownLabel'].includes(name))out.color='#b7c0cf';
+ if(name==='homeMatchCompetition'){out.backgroundColor='#5f718c';out.color='#ffffff'}
+
  if(LIGHT_PRIMARY_BG.has(name)){out.backgroundColor='#8f173b';out.borderColor='#8f173b'}
  if(LIGHT_PRIMARY_TEXT.has(name))out.color='#ffffff';
  if(LIGHT_SELECTED_BG.has(name)){out.backgroundColor='#8f173b';out.borderColor='#8f173b'}
