@@ -405,7 +405,7 @@ function StadiumIntro({mode='main',onClose}){
  const short=mode==='short';
  const lightScale=useRef(new Animated.Value(0)).current;
  const logoOpacity=useRef(new Animated.Value(0)).current;
- const logoScale=useRef(new Animated.Value(short?.78:.64)).current;
+ const logoScale=useRef(new Animated.Value(short ? .78 : .64)).current;
  const logoY=useRef(new Animated.Value(short?12:22)).current;
  const clubOpacity=useRef(new Animated.Value(0)).current;
  const stadiumOpacity=useRef(new Animated.Value(0)).current;
