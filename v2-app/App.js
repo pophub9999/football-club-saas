@@ -423,7 +423,7 @@ function StadiumIntro({mode='main',onClose}){
  const {width}=useWindowDimensions();
  const lineX=useRef(new Animated.Value(0)).current;
  const logoOpacity=useRef(new Animated.Value(0)).current;
- const logoScale=useRef(new Animated.Value(short?.72:.52)).current;
+ const logoScale=useRef(new Animated.Value(short ? .72 : .52)).current;
  const blueprintOpacity=useRef(new Animated.Value(0)).current;
  const blueprintScale=useRef(new Animated.Value(.92)).current;
  const ringOpacity=useRef(new Animated.Value(0)).current;
@@ -447,9 +447,9 @@ function StadiumIntro({mode='main',onClose}){
   later(short?180:520,()=>Animated.parallel([
    Animated.timing(logoOpacity,{toValue:1,duration:short?260:520,useNativeDriver:true}),
    Animated.spring(logoScale,{toValue:1,friction:7,tension:62,useNativeDriver:true}),
-   Animated.timing(ringOpacity,{toValue:short?.2:.38,duration:short?320:620,useNativeDriver:true}),
+   Animated.timing(ringOpacity,{toValue:short ? .2 : .38,duration:short?320:620,useNativeDriver:true}),
    Animated.spring(ringScale,{toValue:1.18,friction:8,tension:48,useNativeDriver:true}),
-   Animated.timing(glowOpacity,{toValue:short?.18:.32,duration:short?320:700,useNativeDriver:true})
+   Animated.timing(glowOpacity,{toValue:short ? .18 : .32,duration:short?320:700,useNativeDriver:true})
   ]).start());
 
   later(short?500:1180,()=>Animated.parallel([
