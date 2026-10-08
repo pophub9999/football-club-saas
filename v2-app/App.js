@@ -135,7 +135,7 @@ function Page({children,scroll=true,overlay=null}){
  })).current;
  const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
  const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
- const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
+ const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.025,height:canvasHeight*.085,justifyContent:'flex-end',paddingBottom:canvasHeight*.006};
  const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.755};
  const cartStyle={position:'absolute',right:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.044};
  return <View style={[s.root,light&&s.lightRoot]} {...(Platform.OS==='web'?{}:swipeBackResponder.panHandlers)}>
