@@ -4,10 +4,12 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput, PanResponder, Animated, Easing } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const LOGO_NATIVE_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/teams/scu-torreense.png';
+const INTRO_VERSION='cinematic-v2';
 const fs=n=>{
  if(Platform.OS==='web')return n;
  if(n<6)return Math.round(n*1.75*10)/10;
@@ -398,57 +400,125 @@ function memberFeeAmount(category='',plan='annual'){
  if(monthly==null)return 0;
  return plan==='annual'?monthly*12:monthly;
 }
-function StadiumIntro({onClose}){
+function StadiumBlueprint(){
+ return <Svg width="100%" height="100%" viewBox="0 0 360 520">
+  <Path d="M35 390 L82 300 L278 300 L325 390" stroke="rgba(134,180,224,.48)" strokeWidth="2" fill="none"/>
+  <Path d="M58 390 L95 325 L265 325 L302 390" stroke="rgba(134,180,224,.34)" strokeWidth="1.4" fill="none"/>
+  <Path d="M78 390 L108 346 L252 346 L282 390" stroke="rgba(134,180,224,.28)" strokeWidth="1.2" fill="none"/>
+  <Path d="M48 290 L312 290" stroke="rgba(134,180,224,.32)" strokeWidth="1.3"/>
+  <Path d="M70 270 L290 270" stroke="rgba(134,180,224,.23)" strokeWidth="1"/>
+  <Path d="M95 247 L265 247" stroke="rgba(134,180,224,.18)" strokeWidth="1"/>
+  <Path d="M110 215 L110 300 M250 215 L250 300" stroke="rgba(134,180,224,.26)" strokeWidth="1.1"/>
+  <Path d="M97 215 L123 215 M237 215 L263 215" stroke="rgba(134,180,224,.36)" strokeWidth="2"/>
+  <Path d="M105 215 L115 174 M255 215 L245 174" stroke="rgba(134,180,224,.30)" strokeWidth="1.5"/>
+  <Path d="M92 174 L128 174 M232 174 L268 174" stroke="rgba(134,180,224,.34)" strokeWidth="1.2"/>
+  <Path d="M180 300 L180 390" stroke="rgba(134,180,224,.20)" strokeWidth="1"/>
+  <Path d="M96 365 Q180 335 264 365" stroke="rgba(134,180,224,.22)" strokeWidth="1" fill="none"/>
+  <Path d="M96 365 Q180 410 264 365" stroke="rgba(134,180,224,.18)" strokeWidth="1" fill="none"/>
+ </Svg>;
+}
+
+function StadiumIntro({mode='main',onClose}){
+ const short=mode==='short';
  const {width}=useWindowDimensions();
- const leftPanel=useRef(new Animated.Value(-width)).current;
- const rightPanel=useRef(new Animated.Value(width)).current;
+ const lineX=useRef(new Animated.Value(0)).current;
  const logoOpacity=useRef(new Animated.Value(0)).current;
- const logoScale=useRef(new Animated.Value(.46)).current;
- const ringScale=useRef(new Animated.Value(.55)).current;
+ const logoScale=useRef(new Animated.Value(short?.72:.52)).current;
+ const blueprintOpacity=useRef(new Animated.Value(0)).current;
+ const blueprintScale=useRef(new Animated.Value(.92)).current;
  const ringOpacity=useRef(new Animated.Value(0)).current;
+ const ringScale=useRef(new Animated.Value(.72)).current;
  const clubOpacity=useRef(new Animated.Value(0)).current;
+ const clubY=useRef(new Animated.Value(12)).current;
  const futureOpacity=useRef(new Animated.Value(0)).current;
- const futureY=useRef(new Animated.Value(18)).current;
+ const futureY=useRef(new Animated.Value(20)).current;
+ const stadiumOpacity=useRef(new Animated.Value(0)).current;
+ const stadiumY=useRef(new Animated.Value(18)).current;
+ const glowOpacity=useRef(new Animated.Value(0)).current;
+ const whiteFlash=useRef(new Animated.Value(0)).current;
+ const vignette=useRef(new Animated.Value(0)).current;
+
  useEffect(()=>{
-  Animated.parallel([
-   Animated.timing(leftPanel,{toValue:0,duration:620,easing:Easing.out(Easing.cubic),useNativeDriver:true}),
-   Animated.timing(rightPanel,{toValue:0,duration:620,easing:Easing.out(Easing.cubic),useNativeDriver:true})
-  ]).start();
-  const a=setTimeout(()=>Animated.parallel([
-   Animated.timing(logoOpacity,{toValue:1,duration:480,useNativeDriver:true}),
-   Animated.spring(logoScale,{toValue:1.06,friction:6,tension:55,useNativeDriver:true}),
-   Animated.timing(ringOpacity,{toValue:.34,duration:520,useNativeDriver:true}),
-   Animated.spring(ringScale,{toValue:1.18,friction:7,tension:48,useNativeDriver:true})
-  ]).start(()=>Animated.spring(logoScale,{toValue:1,friction:7,tension:60,useNativeDriver:true}).start()),520);
-  const b=setTimeout(()=>Animated.timing(clubOpacity,{toValue:1,duration:520,useNativeDriver:true}).start(),1250);
-  const d=setTimeout(()=>Animated.parallel([
-   Animated.timing(futureOpacity,{toValue:1,duration:520,useNativeDriver:true}),
-   Animated.timing(futureY,{toValue:0,duration:520,easing:Easing.out(Easing.cubic),useNativeDriver:true})
-  ]).start(),2350);
-  const done=setTimeout(()=>onClose?.(),5600);
-  return()=>{clearTimeout(a);clearTimeout(b);clearTimeout(d);clearTimeout(done)};
- },[onClose,width]);
- return <View style={s.introRoot}>
+  const timers=[];
+  const later=(ms,fn)=>timers.push(setTimeout(fn,ms));
+
+  Animated.timing(lineX,{toValue:1,duration:short?280:680,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start();
+
+  later(short?180:520,()=>Animated.parallel([
+   Animated.timing(logoOpacity,{toValue:1,duration:short?260:520,useNativeDriver:true}),
+   Animated.spring(logoScale,{toValue:1,friction:7,tension:62,useNativeDriver:true}),
+   Animated.timing(ringOpacity,{toValue:short?.2:.38,duration:short?320:620,useNativeDriver:true}),
+   Animated.spring(ringScale,{toValue:1.18,friction:8,tension:48,useNativeDriver:true}),
+   Animated.timing(glowOpacity,{toValue:short?.18:.32,duration:short?320:700,useNativeDriver:true})
+  ]).start());
+
+  later(short?500:1180,()=>Animated.parallel([
+   Animated.timing(clubOpacity,{toValue:1,duration:short?300:520,useNativeDriver:true}),
+   Animated.timing(clubY,{toValue:0,duration:short?300:520,easing:Easing.out(Easing.cubic),useNativeDriver:true})
+  ]).start());
+
+  if(!short){
+   later(1750,()=>Animated.parallel([
+    Animated.timing(blueprintOpacity,{toValue:1,duration:850,useNativeDriver:true}),
+    Animated.timing(blueprintScale,{toValue:1,duration:900,easing:Easing.out(Easing.cubic),useNativeDriver:true}),
+    Animated.timing(vignette,{toValue:1,duration:900,useNativeDriver:true})
+   ]).start());
+
+   later(2950,()=>Animated.parallel([
+    Animated.timing(futureOpacity,{toValue:1,duration:560,useNativeDriver:true}),
+    Animated.timing(futureY,{toValue:0,duration:560,easing:Easing.out(Easing.cubic),useNativeDriver:true})
+   ]).start());
+
+   later(4050,()=>Animated.parallel([
+    Animated.timing(stadiumOpacity,{toValue:1,duration:560,useNativeDriver:true}),
+    Animated.timing(stadiumY,{toValue:0,duration:560,easing:Easing.out(Easing.cubic),useNativeDriver:true})
+   ]).start());
+
+   later(5450,()=>Animated.timing(whiteFlash,{toValue:1,duration:620,easing:Easing.inOut(Easing.cubic),useNativeDriver:true}).start());
+   later(6100,()=>onClose?.());
+  }else{
+   later(1120,()=>Animated.timing(whiteFlash,{toValue:1,duration:420,easing:Easing.inOut(Easing.cubic),useNativeDriver:true}).start());
+   later(1580,()=>onClose?.());
+  }
+
+  return()=>timers.forEach(clearTimeout);
+ },[mode,onClose]);
+
+ return <View style={s.cineIntroRoot}>
   <StatusBar hidden/>
-  <Animated.View pointerEvents="none" style={[s.introPanelLeft,{transform:[{translateX:leftPanel}]}]}/>
-  <Animated.View pointerEvents="none" style={[s.introPanelRight,{transform:[{translateX:rightPanel}]}]}/>
-  <View pointerEvents="none" style={s.introDiagonal}/>
-  <Animated.View pointerEvents="none" style={[s.introRing,{opacity:ringOpacity,transform:[{scale:ringScale}]}]}/>
-  <Animated.View pointerEvents="none" style={[s.introLogoWrap,{opacity:logoOpacity,transform:[{scale:logoScale}]}]}>
-   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.introLogoAnimated} alt="SCU Torreense"/>
+  <View pointerEvents="none" style={s.cineIntroBg}/>
+  <Animated.View pointerEvents="none" style={[s.cineIntroGlow,{opacity:glowOpacity}]}/>
+  {!short?<Animated.View pointerEvents="none" style={[s.cineBlueprint,{opacity:blueprintOpacity,transform:[{scale:blueprintScale}]}]}><StadiumBlueprint/></Animated.View>:null}
+  {!short?<Animated.View pointerEvents="none" style={[s.cineVignette,{opacity:vignette}]}/>:null}
+
+  <Animated.View pointerEvents="none" style={[s.cineLightLine,{transform:[{scaleX:lineX}]}]}/>
+  <Animated.View pointerEvents="none" style={[s.cineRing,{opacity:ringOpacity,transform:[{scale:ringScale}]}]}/>
+
+  <Animated.View pointerEvents="none" style={[s.cineLogoWrap,{opacity:logoOpacity,transform:[{scale:logoScale}]}]}>
+   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.cineLogo} alt="SCU Torreense"/>
   </Animated.View>
-  <Animated.Text pointerEvents="none" style={[s.introClubName,{opacity:clubOpacity}]}>SCU TORREENSE</Animated.Text>
-  <Animated.View pointerEvents="none" style={[s.introFutureBlock,{opacity:futureOpacity,transform:[{translateY:futureY}]}]}>
-   <Text style={s.introFutureEyebrow}>O FUTURO COMEÇA AGORA</Text>
-   <Text style={s.introFutureTitle}>NOVO ESTÁDIO MANUEL MARQUES</Text>
-  </Animated.View>
-  <Pressable onPress={onClose} style={s.introSkip}><Text style={s.introSkipText}>SALTAR</Text></Pressable>
+
+  <Animated.Text pointerEvents="none" style={[s.cineClubName,{opacity:clubOpacity,transform:[{translateY:clubY}]}]}>SCU TORREENSE</Animated.Text>
+
+  {!short?<Animated.View pointerEvents="none" style={[s.cineFutureBlock,{opacity:futureOpacity,transform:[{translateY:futureY}]}]}>
+   <Text style={s.cineFutureEyebrow}>O FUTURO COMEÇA</Text>
+   <Text style={s.cineFutureNow}>AGORA</Text>
+  </Animated.View>:null}
+
+  {!short?<Animated.View pointerEvents="none" style={[s.cineStadiumBlock,{opacity:stadiumOpacity,transform:[{translateY:stadiumY}]}]}>
+   <View style={s.cineStadiumRule}/>
+   <Text style={s.cineStadiumTitle}>NOVO ESTÁDIO MANUEL MARQUES</Text>
+   <Text style={s.cineStadiumSub}>TRADIÇÃO · COMUNIDADE · FUTURO</Text>
+  </Animated.View>:null}
+
+  <Pressable onPress={onClose} style={s.cineSkip}><Text style={s.cineSkipText}>SALTAR</Text></Pressable>
+  <Animated.View pointerEvents="none" style={[s.cineWhiteFlash,{opacity:whiteFlash}]}/>
  </View>;
 }
 
 export default function App(){
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
- const [showStadiumIntro,setShowStadiumIntro]=useState(true),[nowTick,setNowTick]=useState(Date.now());
+ const [introMode,setIntroMode]=useState('loading'),[nowTick,setNowTick]=useState(Date.now());
  APP_SWIPE_SCREEN=screen;
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
@@ -475,6 +545,25 @@ export default function App(){
  const [cartNotice,setCartNotice]=useState(''),cartNoticeTimer=useRef(null);
  const [syncVersion,setSyncVersion]=useState(null);
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
+
+ useEffect(()=>{
+  let live=true;
+  (async()=>{
+   try{
+    const seen=await AsyncStorage.getItem('scut_intro_version');
+    if(live)setIntroMode(seen===INTRO_VERSION?'short':'main');
+   }catch(e){
+    if(live)setIntroMode('main');
+   }
+  })();
+  return()=>{live=false};
+ },[]);
+
+ async function finishIntro(){
+  const wasMain=introMode==='main';
+  setIntroMode('done');
+  if(wasMain){try{await AsyncStorage.setItem('scut_intro_version',INTRO_VERSION)}catch(e){}}
+ }
 
  useEffect(()=>{
   const t=setInterval(()=>setNowTick(Date.now()),1000);
@@ -970,7 +1059,8 @@ export default function App(){
 
  function Back({title,to='home'}){const light=appTheme==='light';return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={[s.back,light&&s.backLightTheme]}>‹</Text></Pressable><Text style={[s.pageTitle,light&&s.pageTitleLightTheme]}>{title}</Text></View>}
 
- if(showStadiumIntro)return <StadiumIntro onClose={()=>setShowStadiumIntro(false)}/>;
+ if(introMode==='loading')return <View style={s.cineIntroRoot}/>;
+ if(introMode==='main'||introMode==='short')return <StadiumIntro mode={introMode} onClose={finishIntro}/>;
 
  if(screen==='webPortal')return <Page scroll={false}><Back title={webPortal.title||'TORREENSE'} to={previousScreen||'home'}/>
   <View style={s.portalFrame}>
@@ -1534,7 +1624,7 @@ export default function App(){
 }
 
 const _baseStyles=StyleSheet.create({
- introRoot:{flex:1,backgroundColor:'#11172a',overflow:'hidden'},introPanelLeft:{position:'absolute',left:0,top:0,bottom:0,width:'54%',backgroundColor:'#8f173b'},introPanelRight:{position:'absolute',right:0,top:0,bottom:0,width:'54%',backgroundColor:'#11172a'},introDiagonal:{position:'absolute',left:'41%',top:'-10%',width:'22%',height:'120%',backgroundColor:'rgba(255,255,255,.035)',transform:[{rotate:'8deg'}]},introRing:{position:'absolute',alignSelf:'center',top:'28%',width:235,height:235,borderRadius:118,borderWidth:2,borderColor:'rgba(255,255,255,.85)'},introLogoWrap:{position:'absolute',alignSelf:'center',top:'31%',width:170,height:195,alignItems:'center',justifyContent:'center'},introLogoAnimated:{width:150,height:175},introClubName:{position:'absolute',top:'61%',left:0,right:0,color:'#fff',fontSize:27,fontWeight:'900',letterSpacing:2.4,textAlign:'center'},introFutureBlock:{position:'absolute',left:'9%',right:'9%',bottom:'11%',alignItems:'center'},introFutureEyebrow:{color:'#f1b94f',fontSize:11,fontWeight:'900',letterSpacing:1.7,textAlign:'center'},introFutureTitle:{color:'#fff',fontSize:15,lineHeight:20,fontWeight:'800',letterSpacing:.65,textAlign:'center',marginTop:7},introSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,backgroundColor:'rgba(7,14,23,.38)',borderWidth:1,borderColor:'rgba(255,255,255,.42)',alignItems:'center',justifyContent:'center'},introSkipText:{color:'#fff',fontSize:11,fontWeight:'900',letterSpacing:.8},
+ cineIntroRoot:{flex:1,backgroundColor:'#09111f',overflow:'hidden',alignItems:'center',justifyContent:'center'},cineIntroBg:{...StyleSheet.absoluteFillObject,backgroundColor:'#09111f'},cineIntroGlow:{position:'absolute',alignSelf:'center',top:'24%',width:310,height:310,borderRadius:155,backgroundColor:'#8f173b'},cineBlueprint:{position:'absolute',left:'4%',right:'4%',top:'12%',bottom:'4%'},cineVignette:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(4,8,16,.20)'},cineLightLine:{position:'absolute',top:'49.5%',width:'88%',height:2,backgroundColor:'#b32850',shadowColor:'#ff416e',shadowOpacity:.95,shadowRadius:14,elevation:8},cineRing:{position:'absolute',top:'28.5%',width:230,height:230,borderRadius:115,borderWidth:1.5,borderColor:'rgba(255,255,255,.72)'},cineLogoWrap:{position:'absolute',top:'29%',width:178,height:198,alignItems:'center',justifyContent:'center'},cineLogo:{width:146,height:170},cineClubName:{position:'absolute',top:'58.5%',left:20,right:20,color:'#fff',fontSize:28,fontWeight:'900',letterSpacing:2.6,textAlign:'center'},cineFutureBlock:{position:'absolute',left:'8%',right:'8%',top:'68%',alignItems:'center'},cineFutureEyebrow:{color:'#dce2ec',fontSize:13,fontWeight:'800',letterSpacing:1.7,textAlign:'center'},cineFutureNow:{color:'#b32850',fontSize:28,fontWeight:'900',letterSpacing:2.6,textAlign:'center',marginTop:2},cineStadiumBlock:{position:'absolute',left:'8%',right:'8%',bottom:'6.5%',alignItems:'center'},cineStadiumRule:{width:45,height:2,backgroundColor:'#b32850',marginBottom:10},cineStadiumTitle:{color:'#fff',fontSize:14,fontWeight:'900',letterSpacing:1.0,textAlign:'center'},cineStadiumSub:{color:'#95a4ba',fontSize:9,fontWeight:'700',letterSpacing:1.45,textAlign:'center',marginTop:6},cineSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,backgroundColor:'rgba(7,14,23,.38)',borderWidth:1,borderColor:'rgba(255,255,255,.38)',alignItems:'center',justifyContent:'center',zIndex:8},cineSkipText:{color:'#fff',fontSize:11,fontWeight:'900',letterSpacing:.8},cineWhiteFlash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6',zIndex:20},
   root:{flex:1,backgroundColor:Platform.OS==='web'?'#00142c':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
  card:{width:'100%',backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#17324a',fontSize:fs(8),letterSpacing:.55},round:{color:'#17324a',fontSize:fs(8.5),marginTop:3},date:{color:'#17324a',fontSize:fs(8)},
