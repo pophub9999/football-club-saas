@@ -26,6 +26,8 @@ const sportLabel=v=>({
 function teamSportKey(team){
  const sport=String(team?.sports?.name||'').toUpperCase();
  const gender=String(team?.gender||'').toUpperCase();
+ const age=String(team?.age_group||'').toUpperCase();
+ if(age&&age!=='SENIORES'&&age!=='SENIOR')return 'FORMAÇÃO';
  const female=/FEM|FEMALE|WOMEN|MULHER/.test(gender);
  if(/FUTSAL/.test(sport))return female?'FUTSAL FEMININO':'FUTSAL MASCULINO';
  if(/FUTEBOL|FOOTBALL|SOCCER/.test(sport))return female?'FUTEBOL FEMININO':'FUTEBOL';
@@ -776,6 +778,7 @@ export default function App(){
  const nextCalendarMatch=futureMatches[0]||null;
  const upcomingCalendarMatches=futureMatches.slice(1);
  const olderCalendarMatches=pastMatches.slice(1).reverse();
+ const matchMonthLabel=x=>x?.startsAt?new Date(x.startsAt).toLocaleDateString('pt-PT',{month:'long',year:'numeric',timeZone:'Europe/Lisbon'}).toUpperCase():'';
  const calendarPositionKey=sport+'|'+(lastCalendarMatch?.id||'none')+'|'+(nextCalendarMatch?.id||'none');
  const classificationSports=[...new Set(preferredCalendar.map(x=>x.sport).filter(x=>x&&x!=='TODAS'&&x!=='FORMAÇÃO'))]
   .sort((a,b)=>sports.indexOf(a)-sports.indexOf(b));
@@ -818,7 +821,8 @@ export default function App(){
  });
  const squadTeams=[...new Map(players.filter(x=>x.team&&followedSports.includes(teamSportKey(x.team))).map(x=>[x.team.id,x.team])).values()]
   .sort((a,b)=>squadTeamRank(a)-squadTeamRank(b)||squadSubRank(a)-squadSubRank(b)||(a.name||'').localeCompare(b.name||'','pt'));
- const activeSquadId=squadTeam||String(squadTeams[0]?.id||'');
+ const sportSquadTeams=squadTeams.filter(t=>teamSportKey(t)===sport);
+ const activeSquadId=sportSquadTeams.some(t=>String(t.id)===String(squadTeam))?String(squadTeam):String(sportSquadTeams[0]?.id||'');
  const squadPlayers=players
   .filter(x=>String(x.team?.id||'')===activeSquadId)
   .sort((a,b)=>playerPositionRank(a.position)-playerPositionRank(b.position)||(a.shirt_number??999)-(b.shirt_number??999)||(a.name||'').localeCompare(b.name||'','pt'));
@@ -1276,87 +1280,72 @@ export default function App(){
   {squadPlayers.length?<View>{squadGroups.map(g=><View key={g.title} style={s.squadGroupCard}><Text style={s.squadGroupTitle}>{g.title}</Text>{g.players.map(p=><Pressable key={p.id} style={s.squadPlayerRow} onPress={()=>openPlayer(p)}><View style={s.squadThumbWrap}><PlayerPhoto player={p} compact/></View><Text style={s.squadRowNumber}>{p.shirt_number??'—'}</Text><View style={s.squadRowBody}><Text style={s.squadRowName}>{p.short_name||p.name}</Text></View><Text style={s.squadRowArrow}>›</Text></Pressable>)}</View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não temos jogadores publicados para este plantel.</Text></View>}
  </Page>;
  if(screen==='calendar')return <Page scroll={false}>
-  <Back title="CALENDÁRIO"/>
+  <Back title="JOGOS"/>
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.calendarSportBar} contentContainerStyle={s.filtersContent}>
+   {sports.map(x=><Pressable key={x} onPress={()=>{
+    calendarPositionKeyRef.current='';
+    setSport(x);setClassificationSport(x);setClassificationCompetition('');
+    const firstTeam=squadTeams.find(t=>teamSportKey(t)===x);setSquadTeam(firstTeam?String(firstTeam.id):'');
+   }} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{sportLabel(x).toUpperCase()}</Text></Pressable>)}
+  </ScrollView>
   <View style={s.calendarTabs}>
-   {['CALENDÁRIO','CLASSIFICAÇÃO','PLANTEL','ESTATÍSTICAS'].map(tab=><Pressable key={tab} onPress={()=>setCalendarTab(tab)} style={[s.calendarTopTab,calendarTab===tab&&s.calendarTopTabOn]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.86} style={[s.calendarTopTabText,calendarTab===tab&&s.calendarTopTabTextOn]}>{tab}</Text></Pressable>)}
+   {[['CALENDÁRIO','JOGOS'],['RESULTADOS','RESULTADOS'],['CLASSIFICAÇÃO','CLASSIFICAÇÃO'],['PLANTEL','PLANTEL']].map(([id,label])=><Pressable key={id} onPress={()=>setCalendarTab(id)} style={[s.calendarTopTab,calendarTab===id&&s.calendarTopTabOn]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[s.calendarTopTabText,calendarTab===id&&s.calendarTopTabTextOn]}>{label}</Text></Pressable>)}
   </View>
 
-  {calendarTab==='CALENDÁRIO'?<>
-   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.calendarSportBar} contentContainerStyle={s.filtersContent}>
-    {sports.map(x=><Pressable key={x} onPress={()=>{calendarPositionKeyRef.current='';setSport(x)}} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}
-   </ScrollView>
-   <ScrollView ref={calendarScrollRef} style={s.calendarTimeline} showsVerticalScrollIndicator={false} contentContainerStyle={s.calendarTimelineContent}>
-    {calendarLoading?<ActivityIndicator/>:<>
-     {olderCalendarMatches.length?olderCalendarMatches.map(x=><Pressable key={x.id} style={s.calendarHistoryCard} onPress={()=>openCalendarGame(x)}>
-      <View style={s.calendarHistoryMeta}><Text style={s.calendarHistoryDate}>{x.date}</Text><View style={s.calendarHistoryMetaRight}><Text style={s.calendarHistoryCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text>{x.scutvVideo?<YouTubeBadge label="Abrir SCUTV" onPress={()=>openScutv(x.scutvVideo,'SCUTV')}/>:null}{x.sporttvHighlight?<YouTubeBadge summary label="Ver resumo SPORT TV" onPress={()=>openScutv(x.sporttvHighlight,'SPORT TV')}/>:null}</View></View>
-      <View style={s.calendarHistoryScoreRow}><Text style={s.calendarHistoryTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.calendarHistoryLogo}/><Text style={s.calendarHistoryScore}>{x.homeScore!=null?x.homeScore:'–'} - {x.awayScore!=null?x.awayScore:'–'}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.calendarHistoryLogo}/><Text style={[s.calendarHistoryTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
-     </Pressable>):null}
-
-     <View onLayout={e=>{
-      const y=e.nativeEvent.layout.y;
-      if(calendarPositionKeyRef.current!==calendarPositionKey){
-       calendarPositionKeyRef.current=calendarPositionKey;
-       setTimeout(()=>calendarScrollRef.current?.scrollTo?.({y:Math.max(0,y-3),animated:false}),0);
-      }
-     }}>
-      {lastCalendarMatch?<Pressable style={s.calendarLastCard} onPress={()=>openCalendarGame(lastCalendarMatch)}>
-       <View style={s.calendarCompetitionInline}><Text style={s.calendarCardCompetition}>{lastCalendarMatch.competition}{lastCalendarMatch.round?' · '+lastCalendarMatch.round:''}</Text>{lastCalendarMatch.scutvVideo?<YouTubeBadge label="Abrir SCUTV" onPress={()=>openScutv(lastCalendarMatch.scutvVideo,'SCUTV')}/>:null}{lastCalendarMatch.sporttvHighlight?<YouTubeBadge summary label="Ver resumo SPORT TV" onPress={()=>openScutv(lastCalendarMatch.sporttvHighlight,'SPORT TV')}/>:null}</View>
-       <View style={s.calendarLastRow}>
-        <View style={s.calendarLastTeam}><Text style={s.calendarLastTeamName}>{lastCalendarMatch.homeName}</Text><TeamLogo name={lastCalendarMatch.homeFullName} uri={lastCalendarMatch.homeLogo} style={s.calendarLastLogo}/></View>
-        <View style={s.calendarLastScoreBox}><Text style={s.calendarLastScore}>{lastCalendarMatch.homeScore} - {lastCalendarMatch.awayScore}</Text><Text style={s.calendarLastDate}>{lastCalendarMatch.date}</Text></View>
-        <View style={[s.calendarLastTeam,{justifyContent:'flex-start'}]}><TeamLogo name={lastCalendarMatch.awayFullName} uri={lastCalendarMatch.awayLogo} style={s.calendarLastLogo}/><Text style={[s.calendarLastTeamName,{textAlign:'left'}]}>{lastCalendarMatch.awayName}</Text></View>
-       </View>
-      </Pressable>:<View style={s.calendarBoundaryNote}><Text style={[s.muted,s.onDarkText]}>Ainda não existem resultados anteriores para esta modalidade.</Text></View>}
-     </View>
-
-     {nextCalendarMatch?<Pressable style={s.calendarNextCard} onPress={()=>openCalendarGame(nextCalendarMatch)}>
-      <View style={s.calendarNextCompetitionRow}><Text style={s.calendarNextCompetition}>{nextCalendarMatch.competition}{nextCalendarMatch.round?' · '+nextCalendarMatch.round:''}</Text>{nextCalendarMatch.scutvVideo?.live_status==='is_live'?<YouTubeBadge onPress={()=>openScutv(nextCalendarMatch.scutvVideo)}/>:null}</View>
-      <View style={s.calendarNextTeams}>
-       <View style={s.calendarNextTeam}><TeamLogo name={nextCalendarMatch.homeFullName} uri={nextCalendarMatch.homeLogo} style={s.calendarNextLogo}/><Text style={s.calendarNextTeamCode}>{nextCalendarMatch.homeName}</Text></View>
-       <View style={s.calendarNextCenter}><Text style={s.calendarNextDate}>{nextCalendarMatch.startsAt?new Date(nextCalendarMatch.startsAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',timeZone:'Europe/Lisbon'}).toUpperCase():nextCalendarMatch.date}</Text><Text style={s.calendarNextTime}>{nextCalendarMatch.time}</Text><Text style={s.calendarNextVenue}>{nextCalendarMatch.venue}</Text></View>
-       <View style={s.calendarNextTeam}><TeamLogo name={nextCalendarMatch.awayFullName} uri={nextCalendarMatch.awayLogo} style={s.calendarNextLogo}/><Text style={s.calendarNextTeamCode}>{nextCalendarMatch.awayName}</Text></View>
+  {calendarTab==='CALENDÁRIO'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.calendarTimelineContent}>
+   {calendarLoading?<ActivityIndicator/>:<>
+    {nextCalendarMatch?<>
+     <Text style={s.gamesMonthTitle}>{matchMonthLabel(nextCalendarMatch)}</Text>
+     <Pressable style={s.fixtureFeature} onPress={()=>openCalendarGame(nextCalendarMatch)}>
+      <View style={s.fixtureMetaRow}><Text style={s.fixtureCompetition}>{nextCalendarMatch.competition}</Text><Text style={s.fixtureDateText}>{nextCalendarMatch.date}</Text></View>
+      <View style={s.fixtureTeamsRow}>
+       <View style={s.fixtureTeam}><TeamLogo name={nextCalendarMatch.homeFullName} uri={nextCalendarMatch.homeLogo} style={s.fixtureLogo}/><Text style={s.fixtureTeamName}>{nextCalendarMatch.homeName}</Text></View>
+       <View style={s.fixtureCenter}><Text style={s.fixtureTime}>{nextCalendarMatch.time}</Text><Text style={s.fixtureVs}>VS</Text></View>
+       <View style={s.fixtureTeam}><TeamLogo name={nextCalendarMatch.awayFullName} uri={nextCalendarMatch.awayLogo} style={s.fixtureLogo}/><Text style={s.fixtureTeamName}>{nextCalendarMatch.awayName}</Text></View>
       </View>
-      <Text style={s.calendarNextMatchup}>{nextCalendarMatch.homeName}{'\n'}{nextCalendarMatch.awayName}</Text>
-     </Pressable>:<View style={s.infoCard}><Text style={s.muted}>Não existem próximos jogos publicados para esta modalidade.</Text></View>}
+      <Text style={s.fixtureVenue}>⌖ {nextCalendarMatch.venue}</Text>
+      <View style={s.fixtureActions}><Text style={s.fixtureMore}>MAIS INFORMAÇÃO</Text>{/torreense/i.test(nextCalendarMatch.homeFullName||'')?<Pressable onPress={e=>{e?.stopPropagation?.();openClubPortal('BILHETES',CLUB_URLS.tickets,'calendar')}} style={s.fixtureBuy}><Text style={s.fixtureBuyText}>BILHETES</Text></Pressable>:null}</View>
+     </Pressable>
+    </>:<View style={s.infoCard}><Text style={s.muted}>Não existem próximos jogos publicados para esta modalidade.</Text></View>}
 
-     {upcomingCalendarMatches.length?<><Text style={s.calendarSectionTitle}>PRÓXIMOS JOGOS</Text>{upcomingCalendarMatches.map(x=><Pressable key={x.id} style={s.calendarUpcomingCard} onPress={()=>openCalendarGame(x)}>
-      <View style={s.calendarUpcomingDate}><Text style={s.calendarUpcomingDay}>{x.startsAt?new Date(x.startsAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',timeZone:'Europe/Lisbon'}).toUpperCase():x.date}</Text><Text style={s.calendarUpcomingTime}>{x.time}</Text></View>
-      <View style={s.calendarUpcomingBody}><View style={s.calendarUpcomingCompetitionRow}><Text style={s.calendarUpcomingCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text>{x.scutvVideo?.live_status==='is_live'?<YouTubeBadge onPress={()=>openScutv(x.scutvVideo)}/>:null}</View><View style={s.calendarUpcomingTeams}><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.calendarUpcomingLogo}/><Text style={s.calendarUpcomingTitle}>{x.homeName}  ×  {x.awayName}</Text><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.calendarUpcomingLogo}/></View><Text style={s.calendarUpcomingVenue}>{x.venue}</Text></View>
-     </Pressable>)}</>:null}
-    </>}
-   </ScrollView>
-  </>:null}
+    {upcomingCalendarMatches.map((x,i)=>{
+     const prev=i===0?nextCalendarMatch:upcomingCalendarMatches[i-1];
+     const newMonth=!prev||matchMonthLabel(prev)!==matchMonthLabel(x);
+     return <React.Fragment key={x.id}>{newMonth?<Text style={s.gamesMonthTitle}>{matchMonthLabel(x)}</Text>:null}<Pressable style={s.fixtureRowCard} onPress={()=>openCalendarGame(x)}>
+      <View style={s.fixtureRowHead}><Text style={s.fixtureRowDate}>{x.date}</Text><Text style={s.fixtureRowCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text></View>
+      <View style={s.fixtureRowTeams}><Text style={s.fixtureRowTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.fixtureRowLogo}/><View style={s.fixtureRowTimeBox}><Text style={s.fixtureRowTime}>{x.time}</Text></View><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.fixtureRowLogo}/><Text style={[s.fixtureRowTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
+      <Text style={s.fixtureRowVenue}>⌖ {x.venue}</Text>
+     </Pressable></React.Fragment>;
+    })}
+   </>}
+  </ScrollView>:null}
+
+  {calendarTab==='RESULTADOS'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.calendarTimelineContent}>
+   {pastMatches.length?pastMatches.map((x,i)=>{
+    const prev=pastMatches[i-1];
+    const newMonth=i===0||matchMonthLabel(prev)!==matchMonthLabel(x);
+    return <React.Fragment key={x.id}>{newMonth?<Text style={s.gamesMonthTitle}>{matchMonthLabel(x)}</Text>:null}<Pressable style={s.resultRowCard} onPress={()=>openCalendarGame(x)}>
+     <View style={s.fixtureRowHead}><Text style={s.fixtureRowDate}>{x.date}</Text><Text style={s.fixtureRowCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text></View>
+     <View style={s.resultTeamsRow}><Text style={s.fixtureRowTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.fixtureRowLogo}/><View style={s.resultScoreBox}><Text style={s.resultScore}>{x.homeScore??'–'}  {x.awayScore??'–'}</Text></View><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.fixtureRowLogo}/><Text style={[s.fixtureRowTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
+     <View style={s.resultMediaRow}>{x.scutvVideo?<YouTubeBadge label="Abrir SCUTV" onPress={()=>openScutv(x.scutvVideo,'SCUTV')}/>:null}{x.sporttvHighlight?<YouTubeBadge summary label="Ver resumo SPORT TV" onPress={()=>openScutv(x.sporttvHighlight,'SPORT TV')}/>:null}</View>
+    </Pressable></React.Fragment>;
+   }):<View style={s.infoCard}><Text style={s.muted}>Ainda não existem resultados para esta modalidade.</Text></View>}
+  </ScrollView>:null}
 
   {calendarTab==='CLASSIFICAÇÃO'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false}>
-   <Text style={s.classificationFilterLabel}>MODALIDADE</Text>
-   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.classificationFilterBar} contentContainerStyle={s.filtersContent}>
-    {classificationSports.map(x=><Pressable key={x} onPress={()=>{
-     const comps=[...new Set(calendar.filter(m=>m.sport===x).map(m=>m.competition).filter(Boolean))];
-     setClassificationSport(x);setClassificationCompetition(comps[0]||'');
-    }} style={[s.filter,classificationSport===x&&s.filterOn]}><Text style={[s.filterText,classificationSport===x&&s.filterTextOn]}>{x}</Text></Pressable>)}
-   </ScrollView>
-
-   <Text style={s.classificationFilterLabel}>PROVA</Text>
-   <View style={s.classificationCompetitionGrid}>
-    {classificationCompetitions.map(x=><Pressable key={x} onPress={()=>setClassificationCompetition(x)} style={[s.classificationCompetitionChip,activeClassificationCompetition===x&&s.filterOn]}><Text style={[s.classificationCompetitionChipText,activeClassificationCompetition===x&&s.filterTextOn]}>{x.toUpperCase()}</Text></Pressable>)}
-   </View>
-
+   {classificationCompetitions.length>1?<View style={s.classificationCompetitionGrid}>{classificationCompetitions.map(x=><Pressable key={x} onPress={()=>setClassificationCompetition(x)} style={[s.classificationCompetitionChip,activeClassificationCompetition===x&&s.filterOn]}><Text style={[s.classificationCompetitionChipText,activeClassificationCompetition===x&&s.filterTextOn]}>{x.toUpperCase()}</Text></Pressable>)}</View>:null}
    {activeClassificationCompetition?<Text style={s.classificationCompetitionTitle}>{activeClassificationCompetition}</Text>:null}
    {filteredStandings.length?<View style={s.standingsCard}>
     <View style={s.standingsHead}><Text style={[s.standingsCell,s.standingsPos]}>#</Text><Text style={[s.standingsCell,s.standingsTeam]}>EQUIPA</Text><Text style={s.standingsCell}>J</Text><Text style={s.standingsCell}>DG</Text><Text style={[s.standingsCell,s.standingsPts]}>PTS</Text></View>
     {filteredStandings.map(x=><View key={x.id||x.team?.id} style={[s.standingsRow,/torreense/i.test(x.team?.name||'')&&s.standingsRowClub]}>
      <Text style={[s.standingsCell,s.standingsPos]}>{x.position}</Text><View style={s.standingsTeamWrap}><TeamLogo name={x.team?.name} uri={x.team?.logo_url} style={s.standingsLogo}/><Text style={s.standingsTeamName} numberOfLines={1}>{x.team?.short_name||x.team?.name}</Text></View><Text style={s.standingsCell}>{x.played}</Text><Text style={s.standingsCell}>{x.goal_difference!=null?(x.goal_difference>0?'+':'')+x.goal_difference:(Number(x.goals_for||0)-Number(x.goals_against||0))}</Text><Text style={[s.standingsCell,s.standingsPts]}>{x.points}</Text>
     </View>)}
-   </View>:<View style={s.infoCard}><Text style={s.muted}>Esta prova não tem uma tabela classificativa disponível.</Text></View>}
+   </View>:<View style={s.infoCard}><Text style={s.muted}>Esta modalidade ainda não tem uma classificação disponível.</Text></View>}
   </ScrollView>:null}
 
   {calendarTab==='PLANTEL'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false}>
-   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{squadTeams.map(t=><Pressable key={t.id} onPress={()=>setSquadTeam(String(t.id))} style={[s.filter,activeSquadId===String(t.id)&&s.filterOn]}><Text style={[s.filterText,activeSquadId===String(t.id)&&s.filterTextOn]}>{t.short_name||t.name}</Text></Pressable>)}</ScrollView>
-   {squadPlayers.length?<View>{squadGroups.map(g=><View key={g.title} style={s.squadGroupCard}><Text style={s.squadGroupTitle}>{g.title}</Text>{g.players.map(p=><Pressable key={p.id} style={s.squadPlayerRow} onPress={()=>openPlayer(p)}><View style={s.squadThumbWrap}><PlayerPhoto player={p} compact/></View><Text style={s.squadRowNumber}>{p.shirt_number??'—'}</Text><View style={s.squadRowBody}><Text style={s.squadRowName}>{p.short_name||p.name}</Text></View><Text style={s.squadRowArrow}>›</Text></Pressable>)}</View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não temos jogadores publicados para este plantel.</Text></View>}
-  </ScrollView>:null}
-
-  {calendarTab==='ESTATÍSTICAS'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false}>
-   {torreenseStanding?<><View style={s.statsHero}><Text style={s.statsHeroPosition}>{torreenseStanding.position}.º</Text><View><Text style={s.statsHeroTitle}>{torreenseStanding.team?.name||'SCU Torreense'}</Text><Text style={s.statsHeroSub}>{torreenseStanding.competition?.name||'Época atual'}</Text></View><Text style={s.statsHeroPoints}>{torreenseStanding.points} pts</Text></View><View style={s.statsGrid}>{[['JOGOS',torreenseStanding.played],['VITÓRIAS',torreenseStanding.wins],['EMPATES',torreenseStanding.draws],['DERROTAS',torreenseStanding.losses],['GOLOS',torreenseStanding.goals_for],['SOFRIDOS',torreenseStanding.goals_against]].map(x=><View key={x[0]} style={s.statsBox}><Text style={s.statsValue}>{x[1]??0}</Text><Text style={s.statsLabel}>{x[0]}</Text></View>)}</View><View style={s.statsWide}><View><Text style={s.statsWideLabel}>SALDO DE GOLOS</Text><Text style={s.statsWideValue}>{torreenseStanding.goal_difference!=null?(torreenseStanding.goal_difference>0?'+':'')+torreenseStanding.goal_difference:(Number(torreenseStanding.goals_for||0)-Number(torreenseStanding.goals_against||0))}</Text></View><View><Text style={s.statsWideLabel}>MÉDIA DE PONTOS</Text><Text style={s.statsWideValue}>{torreenseStanding.played?((Number(torreenseStanding.points||0)/Number(torreenseStanding.played)).toFixed(2)):'0.00'}</Text></View></View><Text style={s.calendarSectionTitle}>FORMA RECENTE</Text><View style={s.formRow}>{(recentForm.length?recentForm:['—']).map((x,i)=><View key={i} style={[s.formBadge,x==='V'?s.formWin:x==='D'?s.formLoss:x==='E'?s.formDraw:null]}><Text style={s.formBadgeText}>{x}</Text></View>)}</View></>:<View style={s.infoCard}><Text style={s.muted}>As estatísticas da classificação ainda não estão disponíveis para esta modalidade.</Text></View>}
+   {sportSquadTeams.length>1?<ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>{sportSquadTeams.map(t=><Pressable key={t.id} onPress={()=>setSquadTeam(String(t.id))} style={[s.filter,activeSquadId===String(t.id)&&s.filterOn]}><Text style={[s.filterText,activeSquadId===String(t.id)&&s.filterTextOn]}>{t.short_name||t.name}</Text></Pressable>)}</ScrollView>:null}
+   {squadPlayers.length?<View>{squadGroups.map(g=><View key={g.title} style={s.squadGroupCard}><Text style={s.squadGroupTitle}>{g.title}</Text>{g.players.map(p=><Pressable key={p.id} style={s.squadPlayerRow} onPress={()=>openPlayer(p)}><View style={s.squadThumbWrap}><PlayerPhoto player={p} compact teamName={p.team?.name}/></View><Text style={s.squadRowNumber}>{p.shirt_number??'—'}</Text><View style={s.squadRowBody}><Text style={s.squadRowName}>{p.short_name||p.name}</Text></View><Text style={s.squadRowArrow}>›</Text></Pressable>)}</View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>Ainda não temos jogadores publicados para esta modalidade.</Text></View>}
   </ScrollView>:null}
  </Page>;
 
@@ -1417,7 +1406,8 @@ const _baseStyles=StyleSheet.create({
  newsVisualFallback:{backgroundColor:'#eef3f6',alignItems:'center',justifyContent:'center'},newsVisualFallbackLogo:{width:42,height:48},newsLeadCard:{borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden',marginBottom:10},newsLeadImage:{width:'100%',height:185,backgroundColor:'#eef3f6'},newsLeadBody:{paddingHorizontal:12,paddingTop:10,paddingBottom:12},newsEditorialMeta:{color:'#a91f42',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.5,marginBottom:4,textTransform:'uppercase'},newsLeadTitle:{color:'#17324a',fontSize:fs(12.2),fontWeight:'800',lineHeight:fs(16)},newsLeadExcerpt:{color:'#667b8c',fontSize:fs(6.4),lineHeight:fs(9.4),marginTop:6},newsGrid:{flexDirection:'row',justifyContent:'space-between',marginBottom:11},newsGridCard:{width:'48.6%',borderRadius:11,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden'},newsGridImage:{width:'100%',height:96,backgroundColor:'#eef3f6'},newsGridBody:{padding:8},newsGridTitle:{color:'#17324a',fontSize:fs(7.4),fontWeight:'700',lineHeight:fs(10.2)},newsListSection:{marginTop:2},newsListHeading:{color:'#fff',fontSize:fs(7.2),fontWeight:'800',letterSpacing:.65,marginBottom:7},newsEditorialRow:{minHeight:84,marginBottom:7,borderRadius:11,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden',flexDirection:'row'},newsEditorialRowImage:{width:112,minHeight:84,backgroundColor:'#eef3f6'},newsEditorialRowBody:{flex:1,paddingHorizontal:9,paddingVertical:8,justifyContent:'center'},newsEditorialRowTitle:{color:'#17324a',fontSize:fs(7.7),fontWeight:'700',lineHeight:fs(10.7)},
  pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:fs(30),lineHeight:fs(30),paddingRight:12},pageTitle:{color:'#fff',fontSize:fs(14),letterSpacing:.8},backLightTheme:{color:'#8f173b'},pageTitleLightTheme:{color:'#25282d',fontWeight:'900'},newsHeadingLightTheme:{color:'#25282d'},notifyFootnoteLightTheme:{color:'#6f747a'},detailCard:{backgroundColor:'#ffffff',borderRadius:14,padding:14,borderWidth:1,borderColor:'#d7e0e7'},kicker:{color:'#f1b94f',fontSize:fs(7),letterSpacing:.5},detailDate:{color:'#17324a',fontSize:fs(9),marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:fs(7.5),letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'#ffffff',borderRadius:10,padding:11,borderWidth:1,borderColor:'#d7e0e7'},body:{color:'#17324a',fontSize:fs(8),lineHeight:fs(13)},muted:{color:'#667b8c',fontSize:fs(8),lineHeight:fs(12)},statRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingVertical:5,borderBottomWidth:1,borderBottomColor:'#e5ebf0'},gameSectionLabel:{color:'#f1b94f',fontSize:fs(6.1),fontWeight:'800',letterSpacing:.55,marginBottom:6},gameEventRow:{flexDirection:'row',alignItems:'flex-start',paddingVertical:5,borderBottomWidth:1,borderBottomColor:'#e5ebf0'},gameEventMinute:{width:34,color:'#f1b94f',fontSize:fs(6.6),fontWeight:'800'},gameEventBody:{flex:1},gameEventTitle:{color:'#17324a',fontSize:fs(7),fontWeight:'700'},gameEventDetail:{color:'#667b8c',fontSize:fs(5.9),lineHeight:fs(8.5),marginTop:1},gameStatsHead:{flexDirection:'row',alignItems:'center',paddingBottom:7,borderBottomWidth:1,borderBottomColor:'#dce4ea'},gameStatsTeam:{flex:1,color:'#17324a',fontSize:fs(5.8),fontWeight:'800',textAlign:'center'},gameStatsLabel:{width:'42%',color:'#667b8c',fontSize:fs(5.4),fontWeight:'700',textAlign:'center'},gameStatValue:{width:'24%',color:'#17324a',fontSize:fs(7.4),fontWeight:'800',textAlign:'center'},gameStatName:{flex:1,color:'#667b8c',fontSize:fs(5.7),textAlign:'center',textTransform:'capitalize'},lineupTeamBlock:{marginBottom:11},lineupTeamTitle:{color:'#17324a',fontSize:fs(8.2),fontWeight:'900',paddingBottom:5,borderBottomWidth:1,borderBottomColor:'#dce4ea'},lineupGroupTitle:{color:'#f1b94f',fontSize:fs(5.5),fontWeight:'800',letterSpacing:.55,marginTop:7,marginBottom:3},lineupPlayerRow:{minHeight:40,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:'#e9eef2',paddingVertical:4},lineupPhoto:{width:31,height:34,borderRadius:6,overflow:'hidden',backgroundColor:'#f3f6f8'},lineupNumber:{width:31,color:'#f1b94f',fontSize:fs(7.4),fontWeight:'800',textAlign:'center'},lineupPlayerBody:{flex:1},lineupPlayerName:{color:'#17324a',fontSize:fs(6.8),fontWeight:'700'},lineupPosition:{color:'#667b8c',fontSize:fs(5.5),marginTop:1},
  articleCard:{backgroundColor:'#ffffff',borderRadius:14,padding:14,borderWidth:1,borderColor:'#d7e0e7'},articleTitle:{color:'#17324a',fontSize:fs(14),lineHeight:fs(19),marginBottom:12},articleBody:{color:'#17324a',fontSize:fs(8.5),lineHeight:fs(14)},articleParagraph:{color:'#17324a',fontSize:fs(8.5),lineHeight:fs(14),marginBottom:9},articleHeroImage:{width:'100%',height:190,borderRadius:12,marginBottom:16},articleInlineImage:{width:'100%',height:210,borderRadius:10,marginVertical:10},
- calendarTabBody:{flex:1,minHeight:0},calendarSportBar:{height:36,maxHeight:36,flexGrow:0,flexShrink:0,marginBottom:7},calendarTimeline:{flex:1,minHeight:0},calendarTimelineContent:{paddingBottom:18},calendarBoundaryNote:{marginBottom:8},
+ gamesMonthTitle:{color:'#17324a',fontSize:fs(9),fontWeight:'900',textTransform:'uppercase',textAlign:'center',marginTop:6,marginBottom:8,letterSpacing:.3},fixtureFeature:{borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',padding:12,marginBottom:10},fixtureMetaRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},fixtureCompetition:{color:'#8f173b',fontSize:fs(6.1),fontWeight:'800'},fixtureDateText:{color:'#667b8c',fontSize:fs(5.8),fontWeight:'700'},fixtureTeamsRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:12},fixtureTeam:{width:'36%',alignItems:'center'},fixtureLogo:{width:52,height:58},fixtureTeamName:{color:'#17324a',fontSize:fs(7.5),fontWeight:'800',textAlign:'center',marginTop:4},fixtureCenter:{width:'24%',alignItems:'center'},fixtureTime:{color:'#17324a',fontSize:fs(11),fontWeight:'900'},fixtureVs:{color:'#8f173b',fontSize:fs(5.4),fontWeight:'800',marginTop:2},fixtureVenue:{color:'#667b8c',fontSize:fs(6.2),textAlign:'center',marginTop:10},fixtureActions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:10},fixtureMore:{flex:1,height:30,borderRadius:8,backgroundColor:'#eef2f5',color:'#17324a',fontSize:fs(5.8),fontWeight:'800',textAlign:'center',textAlignVertical:'center',paddingTop:7},fixtureBuy:{height:30,borderRadius:8,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center',paddingHorizontal:12,marginLeft:7},fixtureBuyText:{color:'#fff',fontSize:fs(5.7),fontWeight:'900'},fixtureRowCard:{borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:9,marginBottom:7},fixtureRowHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8},fixtureRowDate:{color:'#17324a',fontSize:fs(6.2),fontWeight:'900'},fixtureRowCompetition:{color:'#667b8c',fontSize:fs(5.4)},fixtureRowTeams:{flexDirection:'row',alignItems:'center',justifyContent:'center'},fixtureRowTeam:{width:'25%',color:'#17324a',fontSize:fs(6.4),fontWeight:'800',textAlign:'right'},fixtureRowLogo:{width:29,height:33,marginHorizontal:5},fixtureRowTimeBox:{minWidth:54,height:31,borderRadius:8,backgroundColor:'#eef2f5',alignItems:'center',justifyContent:'center',marginHorizontal:3},fixtureRowTime:{color:'#17324a',fontSize:fs(7.1),fontWeight:'900'},fixtureRowVenue:{color:'#667b8c',fontSize:fs(5.6),textAlign:'center',marginTop:7},resultRowCard:{borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:9,marginBottom:7},resultTeamsRow:{flexDirection:'row',alignItems:'center',justifyContent:'center'},resultScoreBox:{minWidth:60,height:34,borderRadius:8,backgroundColor:'#17324a',alignItems:'center',justifyContent:'center',marginHorizontal:3},resultScore:{color:'#fff',fontSize:fs(8.6),fontWeight:'900'},resultMediaRow:{flexDirection:'row',justifyContent:'center',marginTop:7},
+  calendarTabBody:{flex:1,minHeight:0},calendarSportBar:{height:36,maxHeight:36,flexGrow:0,flexShrink:0,marginBottom:7},calendarTimeline:{flex:1,minHeight:0},calendarTimelineContent:{paddingBottom:18},calendarBoundaryNote:{marginBottom:8},
  calendarTabs:{height:40,maxHeight:40,flexGrow:0,flexShrink:0,flexDirection:'row',alignItems:'center',marginBottom:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.10)'},calendarTabsContent:{height:40,alignItems:'center'},calendarTopTab:{flex:1,height:39,justifyContent:'center',alignItems:'center',paddingHorizontal:1,borderBottomWidth:2,borderBottomColor:'transparent'},calendarTopTabOn:{borderBottomColor:'#f1b94f'},calendarTopTabText:{width:'100%',color:'#dce8ef',fontSize:fs(5.8),fontWeight:'700',letterSpacing:.18,textAlign:'center'},calendarTopTabTextOn:{color:'#fff'},
  calendarLastCard:{padding:9,borderRadius:10,backgroundColor:'rgba(255,255,255,.96)',marginBottom:8},calendarCompetitionInline:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginBottom:5},calendarCardCompetition:{color:'#7e8790',fontSize:fs(6.1),fontWeight:'700',textAlign:'center'},calendarLastRow:{flexDirection:'row',alignItems:'center',justifyContent:'center'},calendarLastTeam:{width:'34%',flexDirection:'row',alignItems:'center',justifyContent:'flex-end'},calendarLastTeamName:{color:'#6f7880',fontSize:fs(7.5),fontWeight:'700',textAlign:'right',flexShrink:1},calendarLastLogo:{width:28,height:32,marginHorizontal:5},calendarLastScoreBox:{width:'25%',alignItems:'center'},calendarLastScore:{color:'#313a42',fontSize:fs(13),fontWeight:'800'},calendarLastDate:{color:'#7e8790',fontSize:fs(6.2),fontWeight:'700',marginTop:1},
  calendarNextCard:{padding:12,borderRadius:12,backgroundColor:'rgba(255,255,255,.98)',marginBottom:10},calendarNextCompetitionRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginBottom:10},calendarNextCompetition:{color:'#17212a',fontSize:fs(8.3),fontWeight:'800',textAlign:'center'},calendarNextTeams:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},calendarNextTeam:{width:'27%',alignItems:'center'},calendarNextLogo:{width:58,height:64},calendarNextTeamCode:{color:'#17212a',fontSize:fs(7.5),fontWeight:'800',marginTop:4},calendarNextCenter:{width:'40%',alignItems:'center'},calendarNextDate:{color:'#111',fontSize:fs(14),fontWeight:'900'},calendarNextTime:{color:'#111',fontSize:fs(8),fontWeight:'700',marginTop:1},calendarNextVenue:{color:'#4b545b',fontSize:fs(5.7),lineHeight:fs(8),textAlign:'center',marginTop:3},calendarNextMatchup:{color:'#111',fontSize:fs(16),lineHeight:fs(19),fontWeight:'900',textAlign:'center',marginTop:12},
@@ -1434,7 +1424,7 @@ const _baseStyles=StyleSheet.create({
 
 const LIGHT_DARK_TEXT=new Set([
  'scutvTitle','memberMessage','benefitMiniTitle','benefitSearch','newsHeading','newsListHeading',
- 'calendarSectionTitle','classificationCompetitionTitle','playerDetailSectionTitle','playerDetailName'
+ 'calendarSectionTitle','classificationCompetitionTitle','playerDetailSectionTitle','playerDetailName','gamesMonthTitle'
 ]);
 const LIGHT_ACCENT_TEXT=new Set([
  'calendarTopTabTextOn','playerDetailTabTextOn'
