@@ -86,9 +86,34 @@ function YouTubeBadge({onPress,summary=false,label='Abrir vídeo no YouTube'}){
   <View style={s.youtubeIcon}><Text style={s.youtubePlay}>▶</Text>{summary?<View style={s.youtubeSummaryMark}><Text style={s.youtubeSummaryMarkText}>R</Text></View>:null}</View>
  </Pressable>;
 }
+const CLUB_URLS={
+ store:'https://www.torreense.com/loja',
+ cart:'https://www.torreense.com/loja/index.php?route=checkout/cart',
+ tickets:'https://www.torreense.com/bilheteira',
+ member:'https://www.torreense.com/socio/login'
+};
 let APP_SWIPE_BACK=null;
 let APP_SWIPE_SCREEN='home';
 let APP_THEME='scut';
+let APP_NAVIGATE=null;
+let APP_OPEN_PORTAL=null;
+let APP_PORTAL_TITLE='';
+function BottomNav(){
+ const screen=APP_SWIPE_SCREEN;
+ const portal=APP_PORTAL_TITLE;
+ const items=[
+  {key:'home',label:'INÍCIO',icon:'home',go:()=>APP_NAVIGATE?.('home'),active:screen==='home'},
+  {key:'calendar',label:'JOGOS',icon:'calendar',go:()=>APP_NAVIGATE?.('calendar'),active:screen==='calendar'||screen==='game'},
+  {key:'news',label:'NOTÍCIAS',icon:'news',go:()=>APP_NAVIGATE?.('news'),active:screen==='news'||screen==='article'},
+  {key:'store',label:'LOJA',icon:'shop',go:()=>APP_NAVIGATE?.('store'),active:screen==='store'||(screen==='webPortal'&&portal==='LOJA')},
+  {key:'scutHub',label:'ÁREA SCUT',icon:'members',go:()=>APP_NAVIGATE?.('scutHub'),active:['scutHub','account','memberCard','notifications','settings','matchDay'].includes(screen)}
+ ];
+ return <View style={s.bottomNav}>{items.map(item=><Pressable key={item.key} style={s.bottomNavItem} onPress={item.go}>
+  <View style={[s.bottomNavIcon,!item.active&&s.bottomNavIconMuted]}><ShortcutIcon type={item.icon}/></View>
+  <Text style={[s.bottomNavText,item.active&&s.bottomNavTextOn]} numberOfLines={1}>{item.label}</Text>
+  {item.active?<View style={s.bottomNavActive}/>:null}
+ </Pressable>)}</View>;
+}
 function Page({children,scroll=true,overlay=null}){
  const {width,height}=useWindowDimensions();
  const light=APP_THEME==='light';
@@ -109,14 +134,17 @@ function Page({children,scroll=true,overlay=null}){
  const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
  const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
  const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.043};
- const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.80};
+ const contentStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:canvasWidth*.89,height:canvasHeight*.725};
+ const cartStyle={position:'absolute',right:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.044};
  return <View style={[s.root,light&&s.lightRoot]} {...(Platform.OS==='web'?{}:swipeBackResponder.panHandlers)}>
   <StatusBar hidden/>
   {!light?<Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>:null}
   {light?<><View pointerEvents="none" style={s.lightThemeWash}/><View pointerEvents="none" style={s.lightTopBand}/></>:Platform.OS!=='web'?<View pointerEvents="none" style={s.mobileLightWash}/>:null}
   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={logoStyle} alt="SCU Torreense"/>
   <View style={headerStyle}><Text style={[s.clubLine,light&&s.clubLineLightTheme]}><Text style={[s.clubLight,light&&s.clubLightTheme]}>SCU </Text>TORREENSE</Text></View>
-  <View style={contentStyle}>{scroll?<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={light?s.lightContent:null}>{children}</ScrollView>:children}{overlay}</View>
+  <Pressable style={[cartStyle,s.topCartIcon]} onPress={()=>APP_OPEN_PORTAL?.('CARRINHO',CLUB_URLS.cart,APP_SWIPE_SCREEN)}><ShortcutIcon type="shop"/></Pressable>
+  <View style={contentStyle}>{scroll?<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[light?s.lightContent:null,s.pageScrollContent]}>{children}</ScrollView>:children}{overlay}</View>
+  <BottomNav/>
  </View>;
 }
 function NewsThumb({uri,title}){
@@ -135,6 +163,7 @@ function NewsVisual({uri,style}){
 function ShortcutIcon({type}) {
  const gold=APP_THEME==='light'?'#a91f42':'#f1b94f',common={stroke:gold,strokeWidth:1.35,strokeLinecap:'round',strokeLinejoin:'round',fill:'none'};
  return <Svg width={27} height={27} viewBox="0 0 24 24">
+  {type==='home'?<><Path d="M3 11.5 12 4l9 7.5" {...common}/><Path d="M5.5 10v10h13V10M9.5 20v-6h5v6" {...common}/></>:null}
   {type==='calendar'?<><Rect x="4" y="6" width="16" height="14" rx="2" {...common}/><Path d="M8 3v6M16 3v6M4 10h16" {...common}/></>:null}
   {type==='news'?<><Rect x="3" y="5" width="18" height="14" rx="2" {...common}/><Path d="M7 9h4v4H7zM14 9h4M14 12h4M7 16h11" {...common}/></>:null}
   {type==='shop'?<Path d="M6 8h12l1 12H5L6 8zM9 9V7a3 3 0 0 1 6 0v2" {...common}/>:null}
@@ -374,6 +403,7 @@ export default function App(){
  const [memberPhoto,setMemberPhoto]=useState(null),[memberPaymentPlan,setMemberPaymentPlan]=useState('annual'),[memberPaymentMethod,setMemberPaymentMethod]=useState('MBWAY');
  const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
  const [loginForm,setLoginForm]=useState({email:'',password:''}),[loginMessage,setLoginMessage]=useState('');
+ const [webPortal,setWebPortal]=useState({title:'',url:''});
  const [appTheme,setAppTheme]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?(window.localStorage.getItem('scut_theme')||'scut'):'scut'}catch{return 'scut'}});
  APP_THEME=appTheme;
  const [followedSports,setFollowedSports]=useState(()=>{try{if(Platform.OS==='web'&&typeof window!=='undefined'){const saved=JSON.parse(window.localStorage.getItem('scut_followed_sports')||'null');if(Array.isArray(saved)&&saved.length)return saved.filter(x=>FOLLOWABLE_SPORTS.includes(x))}}catch{}return [...FOLLOWABLE_SPORTS]});
@@ -390,7 +420,7 @@ export default function App(){
 
  useEffect(()=>{
   if(Platform.OS==='web'&&typeof window!=='undefined'){try{window.localStorage.setItem('scut_followed_sports',JSON.stringify(followedSports))}catch{}}
-  if(sport!=='TODAS'&&!followedSports.includes(sport))setSport('TODAS');
+  if(!followedSports.includes(sport))setSport(followedSports[0]||'FUTEBOL');
   if(!followedSports.includes(classificationSport)){
    setClassificationSport(followedSports.find(x=>x!=='FORMAÇÃO')||followedSports[0]||'FUTEBOL');
   }
@@ -552,6 +582,11 @@ export default function App(){
   setCalendarTab('CALENDÁRIO');
   setScreen('calendar');
   setCalendarLoading(false);
+ }
+ function openClubPortal(title,url,from=screen){
+  setPreviousScreen(from||'home');
+  setWebPortal({title,url});
+  setScreen('webPortal');
  }
  async function openCalendarGame(item){
   if(!item?.ev)return;
@@ -728,8 +763,8 @@ export default function App(){
  const matchDayEvent=futureClubMatches[0]?.ev||null;
  const lisbonDay=iso=>iso?new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Europe/Lisbon'}).format(new Date(iso)):null;
  const isMatchToday=matchDayEvent&&lisbonDay(matchDayEvent.strTimestamp||matchDayEvent.starts_at)===lisbonDay(new Date().toISOString());
- const sports=['TODAS',...FOLLOWABLE_SPORTS.filter(x=>followedSports.includes(x))];
- const filtered=preferredCalendar.filter(x=>sport==='TODAS'||x.sport===sport);
+ const sports=FOLLOWABLE_SPORTS.filter(x=>followedSports.includes(x));
+ const filtered=preferredCalendar.filter(x=>x.sport===sport);
  const calendarNow=Date.now();
  const calendarIsPast=x=>{
   const ts=x.startsAt?new Date(x.startsAt).getTime():0;
@@ -795,6 +830,9 @@ export default function App(){
  },[]);
  const filteredStore=storeProducts.filter(x=>storeCategory==='TODOS'||String(x.category_id)===String(storeCategory));
  const cartCount=cart.reduce((n,x)=>n+x.qty,0);
+ APP_NAVIGATE=setScreen;
+ APP_OPEN_PORTAL=openClubPortal;
+ APP_PORTAL_TITLE=webPortal.title;
  const cartTotal=cart.reduce((n,x)=>n+Number(x.price||0)*x.qty,0);
  const selectedShipping=shippingOptions.find(x=>x.code===checkoutForm.shippingMethod)||{price:0};
  const checkoutTotal=cartTotal+Number(selectedShipping.price||0);
@@ -812,7 +850,7 @@ export default function App(){
   if(screen==='home')return;
   const fixed={
    news:'home',members:'home',benefits:'home',store:'home',calendar:'home',squads:'home',login:'home',scutHub:'home',
-   memberCard:'scutHub',account:'scutHub',tickets:'scutHub',notifications:'scutHub',matchDay:'scutHub',settings:'account',
+   memberCard:'scutHub',account:'scutHub',tickets:'scutHub',notifications:'scutHub',matchDay:'scutHub',settings:'account',webPortal:previousScreen||'home',
    benefitDetail:'benefits',product:'store',cart:'store',checkout:'cart'
   };
   let target=fixed[screen];
@@ -826,6 +864,13 @@ export default function App(){
 
  function Back({title,to='home'}){const light=appTheme==='light';return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={[s.back,light&&s.backLightTheme]}>‹</Text></Pressable><Text style={[s.pageTitle,light&&s.pageTitleLightTheme]}>{title}</Text></View>}
 
+ if(screen==='webPortal')return <Page scroll={false}><Back title={webPortal.title||'TORREENSE'} to={previousScreen||'home'}/>
+  <View style={s.portalFrame}>
+   {Platform.OS==='web'
+    ?React.createElement('iframe',{src:webPortal.url,title:webPortal.title||'Torreense',style:{width:'100%',height:'100%',border:0,backgroundColor:'#fff'}})
+    :<WebView source={{uri:webPortal.url}} style={s.portalWebView} javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled startInLoadingState renderLoading={()=><View style={s.portalLoading}><ActivityIndicator/></View>}/>}
+  </View>
+ </Page>;
  if(screen==='game'){
   const ev=gameInfo.event||game,home={name:ev?.strHomeTeam,logo:ev?.strHomeTeamBadge||ev?.strHomeTeamLogo},away={name:ev?.strAwayTeam,logo:ev?.strAwayTeamBadge||ev?.strAwayTeamLogo};
   const scoreKnown=ev?.intHomeScore!=null&&ev?.intAwayScore!=null;
@@ -990,7 +1035,7 @@ export default function App(){
   <View style={s.hubGrid}>
    <HubOption icon="card" title="CARTÃO DIGITAL" subtitle="Cartão de sócio e QR de identificação" onPress={()=>setScreen('memberCard')}/>
    <HubOption icon="members" title="ÁREA PESSOAL" subtitle="Dados, quotas, vantagens e compras" onPress={()=>setScreen('account')}/>
-   <HubOption icon="ticket" title="BILHETES" subtitle="Próximos jogos e bilheteira oficial" onPress={()=>setScreen('tickets')}/>
+   <HubOption icon="ticket" title="BILHETES" subtitle="Compra na bilheteira oficial" onPress={()=>setScreen('tickets')}/>
    <HubOption icon="match" title="MATCH CENTRE" subtitle="Resultado, onze, eventos e estatísticas" onPress={()=>openGame('scutHub',homeGame)}/>
    <HubOption icon="bell" title="NOTIFICAÇÕES" subtitle="Escolhe os alertas que queres receber" onPress={()=>setScreen('notifications')}/>
    <HubOption icon="calendar" title="DIA DE JOGO" subtitle="Tudo o que precisas para o próximo jogo" onPress={()=>setScreen('matchDay')}/>
@@ -1022,9 +1067,10 @@ export default function App(){
   </View>
   <Pressable style={s.accountRow} onPress={()=>setScreen('settings')}><Text style={s.accountRowTitle}>Configurações</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={s.accountRow} onPress={()=>setScreen('memberCard')}><Text style={s.accountRowTitle}>Cartão digital</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
+  <Pressable style={s.accountRow} onPress={()=>openClubPortal('ÁREA DE SÓCIO',CLUB_URLS.member,'account')}><Text style={s.accountRowTitle}>Quotas e Área de Sócio</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={s.accountRow} onPress={()=>setScreen('benefits')}><Text style={s.accountRowTitle}>Vantagens de sócio</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
-  <Pressable style={s.accountRow} onPress={()=>setScreen('cart')}><Text style={s.accountRowTitle}>Compras e carrinho</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
-  <Pressable style={s.accountRow} onPress={()=>{setMemberMessage('');setScreen('members')}}><Text style={s.accountRowTitle}>Adesão / dados de sócio</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
+  <Pressable style={s.accountRow} onPress={()=>setScreen('store')}><Text style={s.accountRowTitle}>Loja Oficial</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
+  <Pressable style={s.accountRow} onPress={()=>openClubPortal('FAZ-TE SÓCIO','https://www.torreense.com/faz-te-socio','account')}><Text style={s.accountRowTitle}>Faz-te Sócio</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={[s.hubPrimaryButton,{marginTop:10}]} onPress={()=>{setLoginMessage('');setScreen('login')}}><Text style={s.hubPrimaryButtonText}>INICIAR SESSÃO</Text></Pressable>
  </Page>;
 
@@ -1048,13 +1094,12 @@ export default function App(){
   </View>
  </Page>;
 
- if(screen==='tickets')return <Page><Back title="BILHETES" to="scutHub"/>
-  <View style={s.ticketHero}><ShortcutIcon type="ticket"/><View style={s.ticketHeroBody}><Text style={s.ticketHeroTitle}>BILHETEIRA SCUT</Text><Text style={s.ticketHeroText}>Compra os teus bilhetes e, numa próxima fase, guarda-os diretamente na app.</Text></View></View>
-  {ticketMatches.length?ticketMatches.map(item=><View key={item.id} style={s.ticketMatch}>
-   <View style={s.ticketDateBox}><Text style={s.ticketDate}>{item.date}</Text><Text style={s.ticketTime}>{item.time}</Text></View>
-   <View style={s.ticketMatchBody}><Text style={s.ticketCompetition}>{item.competition}</Text><Text style={s.ticketTeams} numberOfLines={2}>{item.homeName} × {item.awayName}</Text><Text style={s.ticketVenue} numberOfLines={1}>{item.venue}</Text></View>
-  </View>):<View style={s.infoCard}><Text style={s.muted}>Não existem jogos futuros disponíveis neste momento.</Text></View>}
-  <Pressable style={s.hubPrimaryButton} onPress={()=>openOfficialStore('https://torreense.com/bilheteira')}><Text style={s.hubPrimaryButtonText}>ABRIR BILHETEIRA OFICIAL</Text></Pressable>
+ if(screen==='tickets')return <Page scroll={false}><Back title="BILHETES" to="scutHub"/>
+  <View style={s.portalFrame}>
+   {Platform.OS==='web'
+    ?React.createElement('iframe',{src:CLUB_URLS.tickets,title:'Bilheteira Torreense',style:{width:'100%',height:'100%',border:0,backgroundColor:'#fff'}})
+    :<WebView source={{uri:CLUB_URLS.tickets}} style={s.portalWebView} javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled startInLoadingState/>}
+  </View>
  </Page>;
 
  if(screen==='notifications')return <Page><Back title="NOTIFICAÇÕES" to="scutHub"/>
@@ -1117,20 +1162,12 @@ export default function App(){
    {selectedBenefit.source_url?<Pressable onPress={()=>openOfficialStore(selectedBenefit.source_url)} style={s.benefitAction}><Text style={s.benefitActionText}>VER NO SITE OFICIAL</Text><Text style={s.benefitActionArrow}>›</Text></Pressable>:null}
   </View>:<View style={s.infoCard}><Text style={s.muted}>Vantagem indisponível.</Text></View>}
  </Page>;
- if(screen==='store')return <Page overlay={<CartNotice/>}><Back title="LOJA"/>
-  <Pressable style={s.cartTopButton} onPress={()=>setScreen('cart')}><ShortcutIcon type="shop"/><Text style={s.cartTopText}>CARRINHO</Text><View style={s.cartBadge}><Text style={s.cartBadgeText}>{cartCount}</Text></View><Text style={s.cartTopArrow}>›</Text></Pressable>
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filters} contentContainerStyle={s.filtersContent}>
-   <Pressable onPress={()=>setStoreCategory('TODOS')} style={[s.filter,storeCategory==='TODOS'&&s.filterOn]}><Text style={[s.filterText,storeCategory==='TODOS'&&s.filterTextOn]}>TODOS</Text></Pressable>
-   {storeCategories.map(cat=><Pressable key={cat.id} onPress={()=>setStoreCategory(String(cat.id))} style={[s.filter,String(storeCategory)===String(cat.id)&&s.filterOn]}><Text style={[s.filterText,String(storeCategory)===String(cat.id)&&s.filterTextOn]}>{cat.name}</Text></Pressable>)}
-  </ScrollView>
-  {filteredStore.length?<View style={s.storeGrid}>{filteredStore.map(p=><View key={p.id} style={s.storeCard}>
-   <Pressable onPress={()=>openProduct(p)}>{p.image_url?<Image source={{uri:p.image_url}} style={s.storeImage} resizeMode="contain"/>:<View style={[s.storeImage,s.storeImageFallback]}><ShortcutIcon type="shop"/></View>}</Pressable>
-   <Pressable onPress={()=>openProduct(p)}><Text style={s.storeName}>{p.name}</Text></Pressable>
-   <Text style={s.storePrice}>{Number(p.price)>0?moneyEUR(p.price):'Preço a confirmar'}</Text>
-   <Text style={[s.storeStock,p.in_stock===false&&s.storeStockOut]}>{p.in_stock===false?'ESGOTADO':(p.stock_status||'DISPONÍVEL').toUpperCase()}</Text>
-   <Pressable disabled={p.in_stock===false} onPress={()=>((p.options||[]).length?openProduct(p):addToCart(p))} style={[s.storeAdd,p.in_stock===false&&s.storeAddOff]}><Text style={s.storeAddText}>{p.in_stock===false?'INDISPONÍVEL':((p.options||[]).length?'ESCOLHER':'ADICIONAR')}</Text></Pressable>
-   <Pressable onPress={()=>openOfficialStore(p.url)}><Text style={s.storeOfficial}>VER ARTIGO ›</Text></Pressable>
-  </View>)}</View>:<View style={s.infoCard}><Text style={s.muted}>A loja está a sincronizar os artigos oficiais.</Text></View>}
+ if(screen==='store')return <Page scroll={false}><Back title="LOJA"/>
+  <View style={s.portalFrame}>
+   {Platform.OS==='web'
+    ?React.createElement('iframe',{src:CLUB_URLS.store,title:'Loja Oficial Torreense',style:{width:'100%',height:'100%',border:0,backgroundColor:'#fff'}})
+    :<WebView source={{uri:CLUB_URLS.store}} style={s.portalWebView} javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled startInLoadingState/>}
+  </View>
  </Page>;
  if(screen==='product')return <Page overlay={<CartNotice/>}><Back title="ARTIGO" to="store"/>
   {selectedProduct?<View style={s.productDetail}>
@@ -1357,7 +1394,8 @@ const _baseStyles=StyleSheet.create({
  ticketHero:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',marginBottom:9},ticketHeroBody:{flex:1,paddingLeft:9},ticketHeroTitle:{color:'#17324a',fontSize:fs(8.4),fontWeight:'900'},ticketHeroText:{color:'#667b8c',fontSize:fs(5.8),lineHeight:fs(8.6),marginTop:2},ticketMatch:{minHeight:62,borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',marginBottom:6,overflow:'hidden'},ticketDateBox:{width:78,alignSelf:'stretch',backgroundColor:'rgba(169,31,66,.07)',alignItems:'center',justifyContent:'center',paddingHorizontal:4},ticketDate:{color:'#a91f42',fontSize:fs(5.8),fontWeight:'800',textAlign:'center'},ticketTime:{color:'#17324a',fontSize:fs(6.4),fontWeight:'900',marginTop:2},ticketMatchBody:{flex:1,paddingHorizontal:9,paddingVertical:7},ticketCompetition:{color:'#f1b94f',fontSize:fs(5.2),fontWeight:'800'},ticketTeams:{color:'#17324a',fontSize:fs(7.1),fontWeight:'800',lineHeight:fs(9.5),marginTop:2},ticketVenue:{color:'#667b8c',fontSize:fs(5.3),marginTop:2},
  notifyCard:{borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden'},notifyHeading:{color:'#a91f42',fontSize:fs(6.1),fontWeight:'900',letterSpacing:.55,padding:11,paddingBottom:7},notifyRow:{minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:11,paddingVertical:8,borderTopWidth:1,borderTopColor:'#e8edf0'},notifyBody:{flex:1,paddingRight:10},notifyTitle:{color:'#17324a',fontSize:fs(6.9),fontWeight:'800'},notifySub:{color:'#667b8c',fontSize:fs(5.5),lineHeight:fs(8),marginTop:2},notifySwitch:{width:36,height:21,borderRadius:11,backgroundColor:'#d7dfe5',padding:2,justifyContent:'center'},notifySwitchOn:{backgroundColor:'#f1b94f'},notifyKnob:{width:17,height:17,borderRadius:9,backgroundColor:'#fff'},notifyKnobOn:{alignSelf:'flex-end'},notifyFootnote:{color:'#e4edf3',fontSize:fs(5.5),lineHeight:fs(8.5),textAlign:'center',marginTop:8,paddingHorizontal:8},
  matchDayCard:{padding:13,borderRadius:15,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},matchDayKicker:{color:'#a91f42',fontSize:fs(7),fontWeight:'900',letterSpacing:.7,textAlign:'center'},matchDayDate:{color:'#667b8c',fontSize:fs(6.2),textAlign:'center',marginTop:3},matchDayTeams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:14},matchDayTeam:{width:'38%',alignItems:'center'},matchDayLogo:{width:58,height:64},matchDayTeamName:{color:'#17324a',fontSize:fs(7),fontWeight:'800',textAlign:'center',marginTop:4},matchDayVs:{color:'#17324a',fontSize:fs(13),fontWeight:'900'},matchDayVenue:{color:'#667b8c',fontSize:fs(6.1),textAlign:'center',marginTop:10},matchDayActions:{flexDirection:'row',justifyContent:'space-between',marginTop:14},matchDayAction:{width:'32%',height:58,borderRadius:10,borderWidth:1,borderColor:'#e0e6eb',backgroundColor:'#f8fafb',alignItems:'center',justifyContent:'center'},matchDayActionText:{color:'#17324a',fontSize:fs(5.2),fontWeight:'800',marginTop:4,textAlign:'center'},
- settingsCard:{padding:12,borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},settingsTitle:{color:'#a91f42',fontSize:fs(7.2),fontWeight:'900',letterSpacing:.6},settingsIntro:{color:'#667b8c',fontSize:fs(6),lineHeight:fs(9),marginTop:3,marginBottom:7},activeThemeBadge:{alignSelf:'flex-start',paddingHorizontal:8,height:22,borderRadius:11,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center',marginBottom:10},activeThemeBadgeText:{color:'#fff',fontSize:fs(5.3),fontWeight:'900',letterSpacing:.35},themeOptions:{gap:8},themeOption:{minHeight:82,borderRadius:12,borderWidth:1,borderColor:'#d7e0e7',backgroundColor:'#f9fafb',padding:9,flexDirection:'row',alignItems:'center'},themeOptionOn:{borderColor:'#a91f42',backgroundColor:'#fff7f9'},themePreviewScut:{width:58,height:58,borderRadius:10,overflow:'hidden',backgroundColor:'#183b58',marginRight:9},themePreviewScutTop:{height:20,backgroundColor:'#8f173b'},themePreviewScutCard:{height:23,margin:7,borderRadius:5,backgroundColor:'#fff'},themePreviewLight:{width:58,height:58,borderRadius:10,overflow:'hidden',backgroundColor:'#f1f3f5',marginRight:9,borderWidth:1,borderColor:'#e3e7ea'},themePreviewLightTop:{height:16,backgroundColor:'#8f173b'},themePreviewLightCard:{height:25,margin:7,borderRadius:5,backgroundColor:'#fff',borderWidth:1,borderColor:'#e4e8eb'},themeOptionBody:{flex:1},themeOptionTitle:{color:'#17324a',fontSize:fs(7.2),fontWeight:'900',letterSpacing:.4},themeOptionText:{color:'#667b8c',fontSize:fs(5.5),lineHeight:fs(8.2),marginTop:2},themeRadio:{width:20,height:20,borderRadius:10,borderWidth:1.5,borderColor:'#b6c3cc',alignItems:'center',justifyContent:'center',marginLeft:8},themeRadioOn:{borderColor:'#a91f42'},themeRadioDot:{width:10,height:10,borderRadius:5,backgroundColor:'#a91f42'},
+ bottomNav:{position:'absolute',left:'5.5%',right:'5.5%',bottom:'1.1%',height:'9.2%',borderRadius:16,backgroundColor:'rgba(255,255,255,.97)',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'stretch',justifyContent:'space-around',overflow:'hidden',zIndex:50,elevation:12,shadowColor:'#000',shadowOpacity:.10,shadowRadius:10,shadowOffset:{width:0,height:-2}},bottomNavItem:{flex:1,alignItems:'center',justifyContent:'center',position:'relative',paddingTop:4},bottomNavIcon:{height:29,alignItems:'center',justifyContent:'center'},bottomNavIconMuted:{opacity:.48},bottomNavText:{color:'#72808b',fontSize:fs(4.9),fontWeight:'700',marginTop:1},bottomNavTextOn:{color:'#8f173b',fontWeight:'900'},bottomNavActive:{position:'absolute',top:0,width:28,height:3,borderRadius:2,backgroundColor:'#8f173b'},topCartIcon:{width:38,height:38,borderRadius:19,backgroundColor:'rgba(255,255,255,.96)',borderWidth:1,borderColor:'#d7e0e7',alignItems:'center',justifyContent:'center',zIndex:60,elevation:8},pageScrollContent:{paddingBottom:14},portalFrame:{flex:1,borderRadius:12,overflow:'hidden',backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7'},portalWebView:{flex:1,backgroundColor:'#fff'},portalLoading:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center',backgroundColor:'#fff'},
+  settingsCard:{padding:12,borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},settingsTitle:{color:'#a91f42',fontSize:fs(7.2),fontWeight:'900',letterSpacing:.6},settingsIntro:{color:'#667b8c',fontSize:fs(6),lineHeight:fs(9),marginTop:3,marginBottom:7},activeThemeBadge:{alignSelf:'flex-start',paddingHorizontal:8,height:22,borderRadius:11,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center',marginBottom:10},activeThemeBadgeText:{color:'#fff',fontSize:fs(5.3),fontWeight:'900',letterSpacing:.35},themeOptions:{gap:8},themeOption:{minHeight:82,borderRadius:12,borderWidth:1,borderColor:'#d7e0e7',backgroundColor:'#f9fafb',padding:9,flexDirection:'row',alignItems:'center'},themeOptionOn:{borderColor:'#a91f42',backgroundColor:'#fff7f9'},themePreviewScut:{width:58,height:58,borderRadius:10,overflow:'hidden',backgroundColor:'#183b58',marginRight:9},themePreviewScutTop:{height:20,backgroundColor:'#8f173b'},themePreviewScutCard:{height:23,margin:7,borderRadius:5,backgroundColor:'#fff'},themePreviewLight:{width:58,height:58,borderRadius:10,overflow:'hidden',backgroundColor:'#f1f3f5',marginRight:9,borderWidth:1,borderColor:'#e3e7ea'},themePreviewLightTop:{height:16,backgroundColor:'#8f173b'},themePreviewLightCard:{height:25,margin:7,borderRadius:5,backgroundColor:'#fff',borderWidth:1,borderColor:'#e4e8eb'},themeOptionBody:{flex:1},themeOptionTitle:{color:'#17324a',fontSize:fs(7.2),fontWeight:'900',letterSpacing:.4},themeOptionText:{color:'#667b8c',fontSize:fs(5.5),lineHeight:fs(8.2),marginTop:2},themeRadio:{width:20,height:20,borderRadius:10,borderWidth:1.5,borderColor:'#b6c3cc',alignItems:'center',justifyContent:'center',marginLeft:8},themeRadioOn:{borderColor:'#a91f42'},themeRadioDot:{width:10,height:10,borderRadius:5,backgroundColor:'#a91f42'},
    loginCard:{padding:14,borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},loginIconWrap:{width:48,height:48,borderRadius:14,backgroundColor:'rgba(241,185,79,.10)',alignItems:'center',justifyContent:'center',alignSelf:'center',marginBottom:8},loginTitle:{color:'#17324a',fontSize:fs(10),fontWeight:'800',letterSpacing:.6,textAlign:'center'},loginSub:{color:'#667b8c',fontSize:fs(6.5),lineHeight:fs(9.5),textAlign:'center',marginTop:4,marginBottom:12},loginInput:{height:36,borderRadius:9,borderWidth:1,borderColor:'rgba(120,164,197,.32)',backgroundColor:'#f3f6f8',color:'#17324a',fontSize:fs(7.2),paddingHorizontal:10,marginBottom:8},loginButton:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:2},loginButtonText:{color:'#082b48',fontSize:fs(7),fontWeight:'800',letterSpacing:.5},loginMessage:{color:'#667b8c',fontSize:fs(6.1),lineHeight:fs(9),textAlign:'center',marginTop:9},
   memberHero:{flexDirection:'row',alignItems:'center',padding:10,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',marginBottom:8},memberHeroIcon:{width:36,height:36,borderRadius:10,backgroundColor:'rgba(241,185,79,.10)',alignItems:'center',justifyContent:'center'},memberHeroText:{flex:1,paddingLeft:9},memberHeroTitle:{color:'#17324a',fontSize:fs(9.5),fontWeight:'700',letterSpacing:.55},memberHeroSub:{color:'#667b8c',fontSize:fs(6.3),lineHeight:fs(9),marginTop:2},
  memberFees:{borderRadius:10,overflow:'hidden',borderWidth:1,borderColor:'#d7e0e7',marginBottom:8},memberFeeRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderBottomColor:'#e5ebf0',backgroundColor:'#ffffff'},memberFeeMain:{flex:1},memberFeeName:{color:'#17324a',fontSize:fs(6.7),fontWeight:'600'},memberFeeAge:{color:'#667b8c',fontSize:fs(5.4),marginTop:1},memberFeeValue:{width:58,color:'#f1b94f',fontSize:fs(6.1),textAlign:'right'},memberFeeAnnual:{width:58,color:'#667b8c',fontSize:fs(5.8),textAlign:'right'},
