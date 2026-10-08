@@ -9,7 +9,8 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const LOGO_NATIVE_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/teams/scu-torreense.png';
-const INTRO_VERSION='cinematic-v2';
+const INTRO_VERSION='cinematic-v3';
+const INTRO_STADIUM_IMAGE='data:image/jpeg;base64,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';
 const fs=n=>{
  if(Platform.OS==='web')return n;
  if(n<6)return Math.round(n*1.75*10)/10;
@@ -400,119 +401,87 @@ function memberFeeAmount(category='',plan='annual'){
  if(monthly==null)return 0;
  return plan==='annual'?monthly*12:monthly;
 }
-function StadiumBlueprint(){
- return <Svg width="100%" height="100%" viewBox="0 0 360 520">
-  <Path d="M35 390 L82 300 L278 300 L325 390" stroke="rgba(134,180,224,.48)" strokeWidth="2" fill="none"/>
-  <Path d="M58 390 L95 325 L265 325 L302 390" stroke="rgba(134,180,224,.34)" strokeWidth="1.4" fill="none"/>
-  <Path d="M78 390 L108 346 L252 346 L282 390" stroke="rgba(134,180,224,.28)" strokeWidth="1.2" fill="none"/>
-  <Path d="M48 290 L312 290" stroke="rgba(134,180,224,.32)" strokeWidth="1.3"/>
-  <Path d="M70 270 L290 270" stroke="rgba(134,180,224,.23)" strokeWidth="1"/>
-  <Path d="M95 247 L265 247" stroke="rgba(134,180,224,.18)" strokeWidth="1"/>
-  <Path d="M110 215 L110 300 M250 215 L250 300" stroke="rgba(134,180,224,.26)" strokeWidth="1.1"/>
-  <Path d="M97 215 L123 215 M237 215 L263 215" stroke="rgba(134,180,224,.36)" strokeWidth="2"/>
-  <Path d="M105 215 L115 174 M255 215 L245 174" stroke="rgba(134,180,224,.30)" strokeWidth="1.5"/>
-  <Path d="M92 174 L128 174 M232 174 L268 174" stroke="rgba(134,180,224,.34)" strokeWidth="1.2"/>
-  <Path d="M180 300 L180 390" stroke="rgba(134,180,224,.20)" strokeWidth="1"/>
-  <Path d="M96 365 Q180 335 264 365" stroke="rgba(134,180,224,.22)" strokeWidth="1" fill="none"/>
-  <Path d="M96 365 Q180 410 264 365" stroke="rgba(134,180,224,.18)" strokeWidth="1" fill="none"/>
- </Svg>;
-}
-
 function StadiumIntro({mode='main',onClose}){
  const short=mode==='short';
- const {width}=useWindowDimensions();
- const lineX=useRef(new Animated.Value(0)).current;
+ const lightScale=useRef(new Animated.Value(0)).current;
  const logoOpacity=useRef(new Animated.Value(0)).current;
- const logoScale=useRef(new Animated.Value(short ? .72 : .52)).current;
- const blueprintOpacity=useRef(new Animated.Value(0)).current;
- const blueprintScale=useRef(new Animated.Value(.92)).current;
- const ringOpacity=useRef(new Animated.Value(0)).current;
- const ringScale=useRef(new Animated.Value(.72)).current;
+ const logoScale=useRef(new Animated.Value(short?.78:.64)).current;
+ const logoY=useRef(new Animated.Value(short?12:22)).current;
  const clubOpacity=useRef(new Animated.Value(0)).current;
- const clubY=useRef(new Animated.Value(12)).current;
- const futureOpacity=useRef(new Animated.Value(0)).current;
- const futureY=useRef(new Animated.Value(20)).current;
  const stadiumOpacity=useRef(new Animated.Value(0)).current;
- const stadiumY=useRef(new Animated.Value(18)).current;
- const glowOpacity=useRef(new Animated.Value(0)).current;
- const whiteFlash=useRef(new Animated.Value(0)).current;
- const vignette=useRef(new Animated.Value(0)).current;
+ const stadiumScale=useRef(new Animated.Value(1.08)).current;
+ const messageOpacity=useRef(new Animated.Value(0)).current;
+ const messageY=useRef(new Animated.Value(18)).current;
+ const titleOpacity=useRef(new Animated.Value(0)).current;
+ const titleY=useRef(new Animated.Value(16)).current;
+ const flash=useRef(new Animated.Value(0)).current;
 
  useEffect(()=>{
   const timers=[];
   const later=(ms,fn)=>timers.push(setTimeout(fn,ms));
 
-  Animated.timing(lineX,{toValue:1,duration:short?280:680,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start();
+  Animated.timing(lightScale,{toValue:1,duration:short?260:650,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start();
 
-  later(short?180:520,()=>Animated.parallel([
-   Animated.timing(logoOpacity,{toValue:1,duration:short?260:520,useNativeDriver:true}),
-   Animated.spring(logoScale,{toValue:1,friction:7,tension:62,useNativeDriver:true}),
-   Animated.timing(ringOpacity,{toValue:short ? .2 : .38,duration:short?320:620,useNativeDriver:true}),
-   Animated.spring(ringScale,{toValue:1.18,friction:8,tension:48,useNativeDriver:true}),
-   Animated.timing(glowOpacity,{toValue:short ? .18 : .32,duration:short?320:700,useNativeDriver:true})
+  later(short?170:560,()=>Animated.parallel([
+   Animated.timing(logoOpacity,{toValue:1,duration:short?260:500,useNativeDriver:true}),
+   Animated.spring(logoScale,{toValue:1,friction:7,tension:58,useNativeDriver:true}),
+   Animated.timing(logoY,{toValue:0,duration:short?300:520,easing:Easing.out(Easing.cubic),useNativeDriver:true})
   ]).start());
 
-  later(short?500:1180,()=>Animated.parallel([
-   Animated.timing(clubOpacity,{toValue:1,duration:short?300:520,useNativeDriver:true}),
-   Animated.timing(clubY,{toValue:0,duration:short?300:520,easing:Easing.out(Easing.cubic),useNativeDriver:true})
-  ]).start());
+  later(short?470:1250,()=>Animated.timing(clubOpacity,{toValue:1,duration:short?280:450,useNativeDriver:true}).start());
 
   if(!short){
    later(1750,()=>Animated.parallel([
-    Animated.timing(blueprintOpacity,{toValue:1,duration:850,useNativeDriver:true}),
-    Animated.timing(blueprintScale,{toValue:1,duration:900,easing:Easing.out(Easing.cubic),useNativeDriver:true}),
-    Animated.timing(vignette,{toValue:1,duration:900,useNativeDriver:true})
+    Animated.timing(stadiumOpacity,{toValue:1,duration:850,useNativeDriver:true}),
+    Animated.timing(stadiumScale,{toValue:1,duration:2400,easing:Easing.out(Easing.cubic),useNativeDriver:true})
    ]).start());
 
-   later(2950,()=>Animated.parallel([
-    Animated.timing(futureOpacity,{toValue:1,duration:560,useNativeDriver:true}),
-    Animated.timing(futureY,{toValue:0,duration:560,easing:Easing.out(Easing.cubic),useNativeDriver:true})
+   later(2500,()=>Animated.parallel([
+    Animated.timing(messageOpacity,{toValue:1,duration:550,useNativeDriver:true}),
+    Animated.timing(messageY,{toValue:0,duration:550,easing:Easing.out(Easing.cubic),useNativeDriver:true})
    ]).start());
 
-   later(4050,()=>Animated.parallel([
-    Animated.timing(stadiumOpacity,{toValue:1,duration:560,useNativeDriver:true}),
-    Animated.timing(stadiumY,{toValue:0,duration:560,easing:Easing.out(Easing.cubic),useNativeDriver:true})
+   later(3900,()=>Animated.parallel([
+    Animated.timing(titleOpacity,{toValue:1,duration:520,useNativeDriver:true}),
+    Animated.timing(titleY,{toValue:0,duration:520,easing:Easing.out(Easing.cubic),useNativeDriver:true})
    ]).start());
 
-   later(5450,()=>Animated.timing(whiteFlash,{toValue:1,duration:620,easing:Easing.inOut(Easing.cubic),useNativeDriver:true}).start());
-   later(6100,()=>onClose?.());
+   later(5550,()=>Animated.timing(flash,{toValue:1,duration:600,easing:Easing.inOut(Easing.cubic),useNativeDriver:true}).start());
+   later(6170,()=>onClose?.());
   }else{
-   later(1120,()=>Animated.timing(whiteFlash,{toValue:1,duration:420,easing:Easing.inOut(Easing.cubic),useNativeDriver:true}).start());
-   later(1580,()=>onClose?.());
+   later(1050,()=>Animated.timing(flash,{toValue:1,duration:400,easing:Easing.inOut(Easing.cubic),useNativeDriver:true}).start());
+   later(1470,()=>onClose?.());
   }
-
   return()=>timers.forEach(clearTimeout);
  },[mode,onClose]);
 
- return <View style={s.cineIntroRoot}>
+ return <View style={s.storyIntroRoot}>
   <StatusBar hidden/>
-  <View pointerEvents="none" style={s.cineIntroBg}/>
-  <Animated.View pointerEvents="none" style={[s.cineIntroGlow,{opacity:glowOpacity}]}/>
-  {!short?<Animated.View pointerEvents="none" style={[s.cineBlueprint,{opacity:blueprintOpacity,transform:[{scale:blueprintScale}]}]}><StadiumBlueprint/></Animated.View>:null}
-  {!short?<Animated.View pointerEvents="none" style={[s.cineVignette,{opacity:vignette}]}/>:null}
+  {!short?<Animated.Image pointerEvents="none" source={{uri:INTRO_STADIUM_IMAGE}} resizeMode="cover" style={[s.storyStadium,{opacity:stadiumOpacity,transform:[{scale:stadiumScale}]}]}/>:null}
+  <View pointerEvents="none" style={s.storyDarkWash}/>
+  {!short?<View pointerEvents="none" style={s.storyBurgundyWash}/>:null}
 
-  <Animated.View pointerEvents="none" style={[s.cineLightLine,{transform:[{scaleX:lineX}]}]}/>
-  <Animated.View pointerEvents="none" style={[s.cineRing,{opacity:ringOpacity,transform:[{scale:ringScale}]}]}/>
-
-  <Animated.View pointerEvents="none" style={[s.cineLogoWrap,{opacity:logoOpacity,transform:[{scale:logoScale}]}]}>
-   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.cineLogo} alt="SCU Torreense"/>
+  <Animated.View pointerEvents="none" style={[s.storyLightLine,{transform:[{scaleX:lightScale}]}]}/>
+  <Animated.View pointerEvents="none" style={[s.storyLogoHalo,{opacity:logoOpacity}]}/>
+  <Animated.View pointerEvents="none" style={[s.storyLogoWrap,{opacity:logoOpacity,transform:[{scale:logoScale},{translateY:logoY}]}]}>
+   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.storyLogo} alt="SCU Torreense"/>
   </Animated.View>
+  <Animated.Text pointerEvents="none" style={[s.storyClubName,{opacity:clubOpacity}]}>SCU TORREENSE</Animated.Text>
 
-  <Animated.Text pointerEvents="none" style={[s.cineClubName,{opacity:clubOpacity,transform:[{translateY:clubY}]}]}>SCU TORREENSE</Animated.Text>
-
-  {!short?<Animated.View pointerEvents="none" style={[s.cineFutureBlock,{opacity:futureOpacity,transform:[{translateY:futureY}]}]}>
-   <Text style={s.cineFutureEyebrow}>O FUTURO COMEÇA</Text>
-   <Text style={s.cineFutureNow}>AGORA</Text>
+  {!short?<Animated.View pointerEvents="none" style={[s.storyMessage,{opacity:messageOpacity,transform:[{translateY:messageY}]}]}>
+   <Text style={s.storyMessageSmall}>O FUTURO</Text>
+   <Text style={s.storyMessageMain}>COMEÇA</Text>
+   <Text style={s.storyMessageAccent}>AGORA</Text>
   </Animated.View>:null}
 
-  {!short?<Animated.View pointerEvents="none" style={[s.cineStadiumBlock,{opacity:stadiumOpacity,transform:[{translateY:stadiumY}]}]}>
-   <View style={s.cineStadiumRule}/>
-   <Text style={s.cineStadiumTitle}>NOVO ESTÁDIO MANUEL MARQUES</Text>
-   <Text style={s.cineStadiumSub}>TRADIÇÃO · COMUNIDADE · FUTURO</Text>
+  {!short?<Animated.View pointerEvents="none" style={[s.storyStadiumTitleWrap,{opacity:titleOpacity,transform:[{translateY:titleY}]}]}>
+   <View style={s.storyStadiumRule}/>
+   <Text style={s.storyStadiumTitle}>NOVO ESTÁDIO</Text>
+   <Text style={s.storyStadiumName}>MANUEL MARQUES</Text>
   </Animated.View>:null}
 
-  <Pressable onPress={onClose} style={s.cineSkip}><Text style={s.cineSkipText}>SALTAR</Text></Pressable>
-  <Animated.View pointerEvents="none" style={[s.cineWhiteFlash,{opacity:whiteFlash}]}/>
+  <Pressable onPress={onClose} style={s.storySkip}><Text style={s.storySkipText}>SALTAR</Text></Pressable>
+  <Animated.View pointerEvents="none" style={[s.storyFlash,{opacity:flash}]}/>
  </View>;
 }
 
@@ -1624,7 +1593,7 @@ export default function App(){
 }
 
 const _baseStyles=StyleSheet.create({
- cineIntroRoot:{flex:1,backgroundColor:'#09111f',overflow:'hidden',alignItems:'center',justifyContent:'center'},cineIntroBg:{...StyleSheet.absoluteFillObject,backgroundColor:'#09111f'},cineIntroGlow:{position:'absolute',alignSelf:'center',top:'24%',width:310,height:310,borderRadius:155,backgroundColor:'#8f173b'},cineBlueprint:{position:'absolute',left:'4%',right:'4%',top:'12%',bottom:'4%'},cineVignette:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(4,8,16,.20)'},cineLightLine:{position:'absolute',top:'49.5%',width:'88%',height:2,backgroundColor:'#b32850',shadowColor:'#ff416e',shadowOpacity:.95,shadowRadius:14,elevation:8},cineRing:{position:'absolute',top:'28.5%',width:230,height:230,borderRadius:115,borderWidth:1.5,borderColor:'rgba(255,255,255,.72)'},cineLogoWrap:{position:'absolute',top:'29%',width:178,height:198,alignItems:'center',justifyContent:'center'},cineLogo:{width:146,height:170},cineClubName:{position:'absolute',top:'58.5%',left:20,right:20,color:'#fff',fontSize:28,fontWeight:'900',letterSpacing:2.6,textAlign:'center'},cineFutureBlock:{position:'absolute',left:'8%',right:'8%',top:'68%',alignItems:'center'},cineFutureEyebrow:{color:'#dce2ec',fontSize:13,fontWeight:'800',letterSpacing:1.7,textAlign:'center'},cineFutureNow:{color:'#b32850',fontSize:28,fontWeight:'900',letterSpacing:2.6,textAlign:'center',marginTop:2},cineStadiumBlock:{position:'absolute',left:'8%',right:'8%',bottom:'6.5%',alignItems:'center'},cineStadiumRule:{width:45,height:2,backgroundColor:'#b32850',marginBottom:10},cineStadiumTitle:{color:'#fff',fontSize:14,fontWeight:'900',letterSpacing:1.0,textAlign:'center'},cineStadiumSub:{color:'#95a4ba',fontSize:9,fontWeight:'700',letterSpacing:1.45,textAlign:'center',marginTop:6},cineSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,backgroundColor:'rgba(7,14,23,.38)',borderWidth:1,borderColor:'rgba(255,255,255,.38)',alignItems:'center',justifyContent:'center',zIndex:8},cineSkipText:{color:'#fff',fontSize:11,fontWeight:'900',letterSpacing:.8},cineWhiteFlash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6',zIndex:20},
+ storyIntroRoot:{flex:1,backgroundColor:'#07101c',overflow:'hidden',alignItems:'center',justifyContent:'center'},storyStadium:{...StyleSheet.absoluteFillObject,width:'100%',height:'100%'},storyDarkWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(5,10,18,.44)'},storyBurgundyWash:{position:'absolute',left:0,right:0,top:0,height:'56%',backgroundColor:'rgba(85,8,34,.22)'},storyLightLine:{position:'absolute',top:'49%',width:'88%',height:2,backgroundColor:'#d13b63',shadowColor:'#ff4a78',shadowOpacity:1,shadowRadius:18,elevation:10},storyLogoHalo:{position:'absolute',top:'25%',width:245,height:245,borderRadius:123,backgroundColor:'rgba(143,23,59,.26)'},storyLogoWrap:{position:'absolute',top:'27%',width:185,height:205,alignItems:'center',justifyContent:'center'},storyLogo:{width:155,height:182},storyClubName:{position:'absolute',top:'58%',left:16,right:16,color:'#fff',fontSize:26,fontWeight:'900',letterSpacing:2.2,textAlign:'center'},storyMessage:{position:'absolute',left:'8%',right:'8%',top:'63%',alignItems:'center'},storyMessageSmall:{color:'#e3e7ed',fontSize:13,fontWeight:'800',letterSpacing:1.8},storyMessageMain:{color:'#fff',fontSize:31,fontWeight:'900',letterSpacing:1.2,marginTop:1},storyMessageAccent:{color:'#d13b63',fontSize:34,fontWeight:'900',letterSpacing:1.8,marginTop:-2},storyStadiumTitleWrap:{position:'absolute',left:'8%',right:'8%',bottom:'7.5%',alignItems:'center'},storyStadiumRule:{width:48,height:2,backgroundColor:'#d13b63',marginBottom:10},storyStadiumTitle:{color:'#fff',fontSize:13,fontWeight:'800',letterSpacing:1.6},storyStadiumName:{color:'#fff',fontSize:18,fontWeight:'900',letterSpacing:.8,marginTop:3},storySkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,backgroundColor:'rgba(5,10,18,.45)',borderWidth:1,borderColor:'rgba(255,255,255,.42)',alignItems:'center',justifyContent:'center',zIndex:8},storySkipText:{color:'#fff',fontSize:11,fontWeight:'900',letterSpacing:.8},storyFlash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6',zIndex:20},
   root:{flex:1,backgroundColor:Platform.OS==='web'?'#00142c':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
  card:{width:'100%',backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#17324a',fontSize:fs(8),letterSpacing:.55},round:{color:'#17324a',fontSize:fs(8.5),marginTop:3},date:{color:'#17324a',fontSize:fs(8)},
