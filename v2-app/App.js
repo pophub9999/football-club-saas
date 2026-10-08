@@ -118,7 +118,7 @@ function BottomNav(){
 }
 function Page({children,scroll=true,overlay=null}){
  const {width,height}=useWindowDimensions();
- const light=APP_THEME==='light';
+ const light=true;
  const swipeBackResponder=useRef(PanResponder.create({
   onMoveShouldSetPanResponder:(evt,g)=>{
    if(Platform.OS==='web')return false;
@@ -163,7 +163,7 @@ function NewsVisual({uri,style}){
 }
 
 function ShortcutIcon({type}) {
- const gold=APP_THEME==='light'?'#a91f42':'#f1b94f',common={stroke:gold,strokeWidth:1.35,strokeLinecap:'round',strokeLinejoin:'round',fill:'none'};
+ const gold='#a91f42',common={stroke:gold,strokeWidth:1.35,strokeLinecap:'round',strokeLinejoin:'round',fill:'none'};
  return <Svg width={27} height={27} viewBox="0 0 24 24">
   {type==='home'?<><Path d="M3 11.5 12 4l9 7.5" {...common}/><Path d="M5.5 10v10h13V10M9.5 20v-6h5v6" {...common}/></>:null}
   {type==='calendar'?<><Rect x="4" y="6" width="16" height="14" rx="2" {...common}/><Path d="M8 3v6M16 3v6M4 10h16" {...common}/></>:null}
@@ -454,8 +454,8 @@ export default function App(){
  const [storeCategories,setStoreCategories]=useState([]),[storeProducts,setStoreProducts]=useState([]),[storeCategory,setStoreCategory]=useState('TODOS');
  const [loginForm,setLoginForm]=useState({email:'',password:''}),[loginMessage,setLoginMessage]=useState('');
  const [webPortal,setWebPortal]=useState({title:'',url:''});
- const [appTheme,setAppTheme]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?(window.localStorage.getItem('scut_theme')||'scut'):'scut'}catch{return 'scut'}});
- APP_THEME=appTheme;
+ const appTheme='light';
+ APP_THEME='light';
  const [followedSports,setFollowedSports]=useState(()=>{try{if(Platform.OS==='web'&&typeof window!=='undefined'){const saved=JSON.parse(window.localStorage.getItem('scut_followed_sports')||'null');if(Array.isArray(saved)&&saved.length)return saved.filter(x=>FOLLOWABLE_SPORTS.includes(x))}}catch{}return [...FOLLOWABLE_SPORTS]});
  const [notificationPrefs,setNotificationPrefs]=useState({kickoff:true,goals:true,lineup:true,results:true,news:true,shop:false});
  const [selectedProduct,setSelectedProduct]=useState(null),[productChoices,setProductChoices]=useState({});
@@ -466,7 +466,6 @@ export default function App(){
  const [syncVersion,setSyncVersion]=useState(null);
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
 
- useEffect(()=>{if(Platform.OS==='web'&&typeof window!=='undefined'){try{window.localStorage.setItem('scut_theme',appTheme)}catch{}}},[appTheme]);
  useEffect(()=>{
   const t=setInterval(()=>setNowTick(Date.now()),1000);
   return()=>clearInterval(t);
@@ -1138,8 +1137,7 @@ export default function App(){
    <HubOption icon="match" title="MATCH CENTRE" subtitle="Resultado, onze, eventos e estatísticas" onPress={()=>openGame('scutHub',homeGame)}/>
    <HubOption icon="bell" title="NOTIFICAÇÕES" subtitle="Escolhe os alertas que queres receber" onPress={()=>setScreen('notifications')}/>
    <HubOption icon="calendar" title="DIA DE JOGO" subtitle="Tudo o que precisas para o próximo jogo" onPress={()=>setScreen('matchDay')}/>
-   <HubOption icon="settings" title="CONFIGURAÇÕES" subtitle="Tema, modalidades e preferências da app" onPress={()=>setScreen('settings')}/>
-  </View>
+   </View>
  </Page>;
 
  if(screen==='memberCard')return <Page><Back title="CARTÃO DIGITAL" to="scutHub"/>
@@ -1164,7 +1162,6 @@ export default function App(){
    })}
    <Text style={s.profileSportsHint}>Mantém pelo menos uma modalidade selecionada.</Text>
   </View>
-  <Pressable style={s.accountRow} onPress={()=>setScreen('settings')}><Text style={s.accountRowTitle}>Configurações</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={s.accountRow} onPress={()=>setScreen('memberCard')}><Text style={s.accountRowTitle}>Cartão digital</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={s.accountRow} onPress={()=>openClubPortal('ÁREA DE SÓCIO',CLUB_URLS.member,'account')}><Text style={s.accountRowTitle}>Quotas e Área de Sócio</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
   <Pressable style={s.accountRow} onPress={()=>setScreen('benefits')}><Text style={s.accountRowTitle}>Vantagens de sócio</Text><Text style={s.accountRowArrow}>›</Text></Pressable>
@@ -1175,21 +1172,8 @@ export default function App(){
 
  if(screen==='settings')return <Page><Back title="CONFIGURAÇÕES" to="scutHub"/>
   <View style={s.settingsCard}>
-   <Text style={s.settingsTitle}>TEMA DA APP</Text>
-   <Text style={s.settingsIntro}>Escolhe o aspeto que preferes. Podes mudar a qualquer momento.</Text>
-   <View style={s.activeThemeBadge}><Text style={s.activeThemeBadgeText}>TEMA ATIVO · {appTheme==='light'?'LIGHT':'SCUT'}</Text></View>
-   <View style={s.themeOptions}>
-    <Pressable style={[s.themeOption,appTheme==='scut'&&s.themeOptionOn]} onPress={()=>setAppTheme('scut')}>
-     <View style={s.themePreviewScut}><View style={s.themePreviewScutTop}/><View style={s.themePreviewScutCard}/></View>
-     <View style={s.themeOptionBody}><Text style={s.themeOptionTitle}>SCUT</Text><Text style={s.themeOptionText}>Castelo, azul e grená. Identidade atual da app.</Text></View>
-     <View style={[s.themeRadio,appTheme==='scut'&&s.themeRadioOn]}>{appTheme==='scut'?<View style={s.themeRadioDot}/>:null}</View>
-    </Pressable>
-    <Pressable style={[s.themeOption,appTheme==='light'&&s.themeOptionOn]} onPress={()=>setAppTheme('light')}>
-     <View style={s.themePreviewLight}><View style={s.themePreviewLightTop}/><View style={s.themePreviewLightCard}/></View>
-     <View style={s.themeOptionBody}><Text style={s.themeOptionTitle}>LIGHT</Text><Text style={s.themeOptionText}>Mais claro, minimalista e com grená como destaque.</Text></View>
-     <View style={[s.themeRadio,appTheme==='light'&&s.themeRadioOn]}>{appTheme==='light'?<View style={s.themeRadioDot}/>:null}</View>
-    </Pressable>
-   </View>
+   <Text style={s.settingsTitle}>APARÊNCIA</Text>
+   <Text style={s.settingsIntro}>A aplicação utiliza um único tema claro, com a identidade grená do SCU Torreense.</Text>
   </View>
  </Page>;
 
@@ -1695,6 +1679,6 @@ function lightThemeStyle(name,base){
 const s=new Proxy(_baseStyles,{
  get(target,prop){
   const base=target[prop];
-  return APP_THEME==='light'?lightThemeStyle(String(prop),base):base;
+  return lightThemeStyle(String(prop),base);
  }
 });
