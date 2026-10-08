@@ -397,6 +397,7 @@ export default function App(){
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
  const [news,setNews]=useState([]),[selectedNews,setSelectedNews]=useState(null),[articleLoading,setArticleLoading]=useState(false);
  const [calendar,setCalendar]=useState([]),[sport,setSport]=useState('FUTEBOL'),[calendarLoading,setCalendarLoading]=useState(false),[calendarTab,setCalendarTab]=useState('CALENDÁRIO');
+ const [calendarView,setCalendarView]=useState('MÊS'),[calendarMonth,setCalendarMonth]=useState(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1)}),[calendarDay,setCalendarDay]=useState(null);
  const [classificationSport,setClassificationSport]=useState('FUTEBOL'),[classificationCompetition,setClassificationCompetition]=useState('LP Meu Super');
  const calendarScrollRef=useRef(null),calendarPositionKeyRef=useRef('');
  const [players,setPlayers]=useState([]),[squadTeam,setSquadTeam]=useState(''),[standings,setStandings]=useState([]),[selectedPlayer,setSelectedPlayer]=useState(null),[playerDetailTab,setPlayerDetailTab]=useState('ESTATÍSTICAS');
@@ -582,6 +583,10 @@ export default function App(){
  }
  async function openCalendar(){
   setCalendarTab('CALENDÁRIO');
+  setCalendarView('MÊS');
+  const target=futureClubMatches[0]?.startsAt?new Date(futureClubMatches[0].startsAt):new Date();
+  setCalendarMonth(new Date(target.getFullYear(),target.getMonth(),1));
+  setCalendarDay(null);
   setScreen('calendar');
   setCalendarLoading(false);
  }
@@ -779,6 +784,33 @@ export default function App(){
  const upcomingCalendarMatches=futureMatches.slice(1);
  const olderCalendarMatches=pastMatches.slice(1).reverse();
  const matchMonthLabel=x=>x?.startsAt?new Date(x.startsAt).toLocaleDateString('pt-PT',{month:'long',year:'numeric',timeZone:'Europe/Lisbon'}).toUpperCase():'';
+ const monthYear=calendarMonth.getFullYear(),monthIndex=calendarMonth.getMonth();
+ const monthStart=new Date(monthYear,monthIndex,1);
+ const monthEnd=new Date(monthYear,monthIndex+1,0);
+ const monthDays=monthEnd.getDate();
+ const mondayFirst=(monthStart.getDay()+6)%7;
+ const monthKey=(y,m,d)=>String(y)+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+ const matchDayKey=x=>{
+  if(!x?.startsAt)return '';
+  const dt=new Date(x.startsAt);
+  const parts=new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Europe/Lisbon'}).format(dt);
+  return parts;
+ };
+ const monthMatchMap=filtered.reduce((acc,x)=>{
+  const key=matchDayKey(x);
+  if(!key)return acc;
+  (acc[key]||(acc[key]=[])).push(x);
+  return acc;
+ },{});
+ const monthCells=[
+  ...Array.from({length:mondayFirst},()=>null),
+  ...Array.from({length:monthDays},(_,i)=>({day:i+1,key:monthKey(monthYear,monthIndex,i+1)}))
+ ];
+ while(monthCells.length%7)monthCells.push(null);
+ const todayKey=new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Europe/Lisbon'}).format(new Date());
+ const selectedCalendarDay=calendarDay&&calendarDay.startsWith(String(monthYear)+'-'+String(monthIndex+1).padStart(2,'0'))?calendarDay:null;
+ const selectedDayMatches=selectedCalendarDay?(monthMatchMap[selectedCalendarDay]||[]):[];
+ const monthLabel=calendarMonth.toLocaleDateString('pt-PT',{month:'long',year:'numeric'}).toUpperCase();
  const calendarPositionKey=sport+'|'+(lastCalendarMatch?.id||'none')+'|'+(nextCalendarMatch?.id||'none');
  const classificationSports=[...new Set(preferredCalendar.map(x=>x.sport).filter(x=>x&&x!=='TODAS'&&x!=='FORMAÇÃO'))]
   .sort((a,b)=>sports.indexOf(a)-sports.indexOf(b));
@@ -1290,7 +1322,7 @@ export default function App(){
   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.calendarSportBar} contentContainerStyle={s.filtersContent}>
    {sports.map(x=><Pressable key={x} onPress={()=>{
     calendarPositionKeyRef.current='';
-    setSport(x);setClassificationSport(x);setClassificationCompetition('');
+    setSport(x);setClassificationSport(x);setClassificationCompetition('');setCalendarDay(null);
     const firstTeam=squadTeams.find(t=>teamSportKey(t)===x);setSquadTeam(firstTeam?String(firstTeam.id):'');
    }} style={[s.filter,sport===x&&s.filterOn]}><Text style={[s.filterText,sport===x&&s.filterTextOn]}>{sportLabel(x).toUpperCase()}</Text></Pressable>)}
   </ScrollView>
@@ -1298,33 +1330,70 @@ export default function App(){
    {[['CALENDÁRIO','JOGOS'],['RESULTADOS','RESULTADOS'],['CLASSIFICAÇÃO','CLASSIFICAÇÃO'],['PLANTEL','PLANTEL']].map(([id,label])=><Pressable key={id} onPress={()=>setCalendarTab(id)} style={[s.calendarTopTab,calendarTab===id&&s.calendarTopTabOn]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[s.calendarTopTabText,calendarTab===id&&s.calendarTopTabTextOn]}>{label}</Text></Pressable>)}
   </View>
 
-  {calendarTab==='CALENDÁRIO'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.calendarTimelineContent}>
-   {calendarLoading?<ActivityIndicator/>:<>
-    {nextCalendarMatch?<>
-     <Text style={s.gamesMonthTitle}>{matchMonthLabel(nextCalendarMatch)}</Text>
-     <Pressable style={s.fixtureFeature} onPress={()=>openCalendarGame(nextCalendarMatch)}>
-      <View style={s.fixtureMetaRow}><Text style={s.fixtureCompetition}>{nextCalendarMatch.competition}</Text><Text style={s.fixtureDateText}>{nextCalendarMatch.date}</Text></View>
-      <View style={s.fixtureTeamsRow}>
-       <View style={s.fixtureTeam}><TeamLogo name={nextCalendarMatch.homeFullName} uri={nextCalendarMatch.homeLogo} style={s.fixtureLogo}/><Text style={s.fixtureTeamName}>{nextCalendarMatch.homeName}</Text></View>
-       <View style={s.fixtureCenter}><Text style={s.fixtureTime}>{nextCalendarMatch.time}</Text><Text style={s.fixtureVs}>VS</Text></View>
-       <View style={s.fixtureTeam}><TeamLogo name={nextCalendarMatch.awayFullName} uri={nextCalendarMatch.awayLogo} style={s.fixtureLogo}/><Text style={s.fixtureTeamName}>{nextCalendarMatch.awayName}</Text></View>
-      </View>
-      <Text style={s.fixtureVenue}>⌖ {nextCalendarMatch.venue}</Text>
-      <View style={s.fixtureActions}><Text style={s.fixtureMore}>MAIS INFORMAÇÃO</Text>{/torreense/i.test(nextCalendarMatch.homeFullName||'')?<Pressable onPress={e=>{e?.stopPropagation?.();openClubPortal('BILHETES',CLUB_URLS.tickets,'calendar')}} style={s.fixtureBuy}><Text style={s.fixtureBuyText}>BILHETES</Text></Pressable>:null}</View>
-     </Pressable>
-    </>:<View style={s.infoCard}><Text style={s.muted}>Não existem próximos jogos publicados para esta modalidade.</Text></View>}
+  {calendarTab==='CALENDÁRIO'?<View style={s.calendarTabBody}>
+   <View style={s.calendarViewToggle}>
+    {['MÊS','LISTA'].map(v=><Pressable key={v} onPress={()=>setCalendarView(v)} style={[s.calendarViewButton,calendarView===v&&s.calendarViewButtonOn]}><Text style={[s.calendarViewButtonText,calendarView===v&&s.calendarViewButtonTextOn]}>{v}</Text></Pressable>)}
+   </View>
 
-    {upcomingCalendarMatches.map((x,i)=>{
-     const prev=i===0?nextCalendarMatch:upcomingCalendarMatches[i-1];
-     const newMonth=!prev||matchMonthLabel(prev)!==matchMonthLabel(x);
-     return <React.Fragment key={x.id}>{newMonth?<Text style={s.gamesMonthTitle}>{matchMonthLabel(x)}</Text>:null}<Pressable style={s.fixtureRowCard} onPress={()=>openCalendarGame(x)}>
-      <View style={s.fixtureRowHead}><Text style={s.fixtureRowDate}>{x.date}</Text><Text style={s.fixtureRowCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text></View>
-      <View style={s.fixtureRowTeams}><Text style={s.fixtureRowTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.fixtureRowLogo}/><View style={s.fixtureRowTimeBox}><Text style={s.fixtureRowTime}>{x.time}</Text></View><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.fixtureRowLogo}/><Text style={[s.fixtureRowTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
+   {calendarView==='MÊS'?<ScrollView style={s.calendarMonthScroll} showsVerticalScrollIndicator={false} contentContainerStyle={s.calendarTimelineContent}>
+    <View style={s.monthCalendarCard}>
+     <View style={s.monthCalendarHead}>
+      <Pressable onPress={()=>{setCalendarMonth(new Date(monthYear,monthIndex-1,1));setCalendarDay(null)}} style={s.monthArrow}><Text style={s.monthArrowText}>‹</Text></Pressable>
+      <Text style={s.monthCalendarTitle}>{monthLabel}</Text>
+      <Pressable onPress={()=>{setCalendarMonth(new Date(monthYear,monthIndex+1,1));setCalendarDay(null)}} style={s.monthArrow}><Text style={s.monthArrowText}>›</Text></Pressable>
+     </View>
+     <View style={s.monthWeekRow}>{['SEG','TER','QUA','QUI','SEX','SÁB','DOM'].map(x=><Text key={x} style={s.monthWeekDay}>{x}</Text>)}</View>
+     <View style={s.monthGrid}>{monthCells.map((cell,i)=>{
+      if(!cell)return <View key={'empty-'+i} style={s.monthDayCell}/>;
+      const matches=monthMatchMap[cell.key]||[];
+      const selected=selectedCalendarDay===cell.key;
+      const today=todayKey===cell.key;
+      const hasFuture=matches.some(x=>!calendarIsPast(x));
+      const hasPast=matches.some(calendarIsPast);
+      return <Pressable key={cell.key} onPress={()=>setCalendarDay(cell.key)} style={[s.monthDayCell,selected&&s.monthDayCellSelected]}>
+       <View style={[s.monthDayNumberWrap,today&&s.monthDayToday]}><Text style={[s.monthDayNumber,selected&&s.monthDayNumberSelected,today&&s.monthDayTodayText]}>{cell.day}</Text></View>
+       {matches.length?<View style={s.monthDots}>{hasFuture?<View style={s.monthDotFuture}/>:null}{hasPast?<View style={s.monthDotPast}/>:null}{matches.length>1?<Text style={s.monthMatchCount}>{matches.length}</Text>:null}</View>:null}
+      </Pressable>;
+     })}</View>
+     <View style={s.monthLegend}><View style={s.monthLegendItem}><View style={s.monthDotFuture}/><Text style={s.monthLegendText}>Próximo</Text></View><View style={s.monthLegendItem}><View style={s.monthDotPast}/><Text style={s.monthLegendText}>Resultado</Text></View></View>
+    </View>
+
+    {selectedCalendarDay?<View style={s.monthSelectedSection}>
+     <Text style={s.monthSelectedTitle}>{new Date(selectedCalendarDay+'T12:00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'2-digit',month:'long'}).toUpperCase()}</Text>
+     {selectedDayMatches.length?selectedDayMatches.map(x=><Pressable key={x.id} style={s.fixtureRowCard} onPress={()=>openCalendarGame(x)}>
+      <View style={s.fixtureRowHead}><Text style={s.fixtureRowDate}>{calendarIsPast(x)?'RESULTADO':x.time}</Text><Text style={s.fixtureRowCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text></View>
+      <View style={s.fixtureRowTeams}><Text style={s.fixtureRowTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.fixtureRowLogo}/><View style={[s.fixtureRowTimeBox,calendarIsPast(x)&&s.resultScoreBox]}><Text style={[s.fixtureRowTime,calendarIsPast(x)&&s.resultScore]}>{calendarIsPast(x)?(String(x.homeScore??'–')+'  '+String(x.awayScore??'–')):x.time}</Text></View><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.fixtureRowLogo}/><Text style={[s.fixtureRowTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
       <Text style={s.fixtureRowVenue}>⌖ {x.venue}</Text>
-     </Pressable></React.Fragment>;
-    })}
-   </>}
-  </ScrollView>:null}
+     </Pressable>):<View style={s.monthNoGame}><Text style={s.muted}>Não há jogos neste dia.</Text></View>}
+    </View>:<Text style={s.monthTapHint}>Toca num dia para ver os jogos.</Text>}
+   </ScrollView>:<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.calendarTimelineContent}>
+    {calendarLoading?<ActivityIndicator/>:<>
+     {nextCalendarMatch?<>
+      <Text style={s.gamesMonthTitle}>{matchMonthLabel(nextCalendarMatch)}</Text>
+      <Pressable style={s.fixtureFeature} onPress={()=>openCalendarGame(nextCalendarMatch)}>
+       <View style={s.fixtureMetaRow}><Text style={s.fixtureCompetition}>{nextCalendarMatch.competition}</Text><Text style={s.fixtureDateText}>{nextCalendarMatch.date}</Text></View>
+       <View style={s.fixtureTeamsRow}>
+        <View style={s.fixtureTeam}><TeamLogo name={nextCalendarMatch.homeFullName} uri={nextCalendarMatch.homeLogo} style={s.fixtureLogo}/><Text style={s.fixtureTeamName}>{nextCalendarMatch.homeName}</Text></View>
+        <View style={s.fixtureCenter}><Text style={s.fixtureTime}>{nextCalendarMatch.time}</Text><Text style={s.fixtureVs}>VS</Text></View>
+        <View style={s.fixtureTeam}><TeamLogo name={nextCalendarMatch.awayFullName} uri={nextCalendarMatch.awayLogo} style={s.fixtureLogo}/><Text style={s.fixtureTeamName}>{nextCalendarMatch.awayName}</Text></View>
+       </View>
+       <Text style={s.fixtureVenue}>⌖ {nextCalendarMatch.venue}</Text>
+       <View style={s.fixtureActions}><Text style={s.fixtureMore}>MAIS INFORMAÇÃO</Text>{/torreense/i.test(nextCalendarMatch.homeFullName||'')?<Pressable onPress={e=>{e?.stopPropagation?.();openClubPortal('BILHETES',CLUB_URLS.tickets,'calendar')}} style={s.fixtureBuy}><Text style={s.fixtureBuyText}>BILHETES</Text></Pressable>:null}</View>
+      </Pressable>
+     </>:<View style={s.infoCard}><Text style={s.muted}>Não existem próximos jogos publicados para esta modalidade.</Text></View>}
+
+     {upcomingCalendarMatches.map((x,i)=>{
+      const prev=i===0?nextCalendarMatch:upcomingCalendarMatches[i-1];
+      const newMonth=!prev||matchMonthLabel(prev)!==matchMonthLabel(x);
+      return <React.Fragment key={x.id}>{newMonth?<Text style={s.gamesMonthTitle}>{matchMonthLabel(x)}</Text>:null}<Pressable style={s.fixtureRowCard} onPress={()=>openCalendarGame(x)}>
+       <View style={s.fixtureRowHead}><Text style={s.fixtureRowDate}>{x.date}</Text><Text style={s.fixtureRowCompetition}>{x.competition}{x.round?' · '+x.round:''}</Text></View>
+       <View style={s.fixtureRowTeams}><Text style={s.fixtureRowTeam}>{x.homeName}</Text><TeamLogo name={x.homeFullName} uri={x.homeLogo} style={s.fixtureRowLogo}/><View style={s.fixtureRowTimeBox}><Text style={s.fixtureRowTime}>{x.time}</Text></View><TeamLogo name={x.awayFullName} uri={x.awayLogo} style={s.fixtureRowLogo}/><Text style={[s.fixtureRowTeam,{textAlign:'left'}]}>{x.awayName}</Text></View>
+       <Text style={s.fixtureRowVenue}>⌖ {x.venue}</Text>
+      </Pressable></React.Fragment>;
+     })}
+    </>}
+   </ScrollView>}
+  </View>:null}
 
   {calendarTab==='RESULTADOS'?<ScrollView style={s.calendarTabBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.calendarTimelineContent}>
    {pastMatches.length?pastMatches.map((x,i)=>{
@@ -1434,7 +1503,8 @@ const _baseStyles=StyleSheet.create({
  newsVisualFallback:{backgroundColor:'#eef3f6',alignItems:'center',justifyContent:'center'},newsVisualFallbackLogo:{width:42,height:48},newsLeadCard:{borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden',marginBottom:10},newsLeadImage:{width:'100%',height:185,backgroundColor:'#eef3f6'},newsLeadBody:{paddingHorizontal:12,paddingTop:10,paddingBottom:12},newsEditorialMeta:{color:'#a91f42',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.5,marginBottom:4,textTransform:'uppercase'},newsLeadTitle:{color:'#17324a',fontSize:fs(12.2),fontWeight:'800',lineHeight:fs(16)},newsLeadExcerpt:{color:'#667b8c',fontSize:fs(6.4),lineHeight:fs(9.4),marginTop:6},newsGrid:{flexDirection:'row',justifyContent:'space-between',marginBottom:11},newsGridCard:{width:'48.6%',borderRadius:11,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden'},newsGridImage:{width:'100%',height:96,backgroundColor:'#eef3f6'},newsGridBody:{padding:8},newsGridTitle:{color:'#17324a',fontSize:fs(7.4),fontWeight:'700',lineHeight:fs(10.2)},newsListSection:{marginTop:2},newsListHeading:{color:'#fff',fontSize:fs(7.2),fontWeight:'800',letterSpacing:.65,marginBottom:7},newsEditorialRow:{minHeight:84,marginBottom:7,borderRadius:11,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden',flexDirection:'row'},newsEditorialRowImage:{width:112,minHeight:84,backgroundColor:'#eef3f6'},newsEditorialRowBody:{flex:1,paddingHorizontal:9,paddingVertical:8,justifyContent:'center'},newsEditorialRowTitle:{color:'#17324a',fontSize:fs(7.7),fontWeight:'700',lineHeight:fs(10.7)},
  pageHead:{flexDirection:'row',alignItems:'center',marginBottom:14},back:{color:'#fff',fontSize:fs(30),lineHeight:fs(30),paddingRight:12},pageTitle:{color:'#fff',fontSize:fs(14),letterSpacing:.8},backLightTheme:{color:'#8f173b'},pageTitleLightTheme:{color:'#25282d',fontWeight:'900'},newsHeadingLightTheme:{color:'#25282d'},notifyFootnoteLightTheme:{color:'#6f747a'},detailCard:{backgroundColor:'#ffffff',borderRadius:14,padding:14,borderWidth:1,borderColor:'#d7e0e7'},kicker:{color:'#f1b94f',fontSize:fs(7),letterSpacing:.5},detailDate:{color:'#17324a',fontSize:fs(9),marginTop:4,textAlign:'right'},blockTitle:{color:'#f1b94f',fontSize:fs(7.5),letterSpacing:.7,marginTop:14,marginBottom:6},infoCard:{backgroundColor:'#ffffff',borderRadius:10,padding:11,borderWidth:1,borderColor:'#d7e0e7'},body:{color:'#17324a',fontSize:fs(8),lineHeight:fs(13)},muted:{color:'#667b8c',fontSize:fs(8),lineHeight:fs(12)},statRow:{minHeight:32,flexDirection:'row',alignItems:'center',paddingVertical:5,borderBottomWidth:1,borderBottomColor:'#e5ebf0'},gameSectionLabel:{color:'#f1b94f',fontSize:fs(6.1),fontWeight:'800',letterSpacing:.55,marginBottom:6},gameEventRow:{flexDirection:'row',alignItems:'flex-start',paddingVertical:5,borderBottomWidth:1,borderBottomColor:'#e5ebf0'},gameEventMinute:{width:34,color:'#f1b94f',fontSize:fs(6.6),fontWeight:'800'},gameEventBody:{flex:1},gameEventTitle:{color:'#17324a',fontSize:fs(7),fontWeight:'700'},gameEventDetail:{color:'#667b8c',fontSize:fs(5.9),lineHeight:fs(8.5),marginTop:1},gameStatsHead:{flexDirection:'row',alignItems:'center',paddingBottom:7,borderBottomWidth:1,borderBottomColor:'#dce4ea'},gameStatsTeam:{flex:1,color:'#17324a',fontSize:fs(5.8),fontWeight:'800',textAlign:'center'},gameStatsLabel:{width:'42%',color:'#667b8c',fontSize:fs(5.4),fontWeight:'700',textAlign:'center'},gameStatValue:{width:'24%',color:'#17324a',fontSize:fs(7.4),fontWeight:'800',textAlign:'center'},gameStatName:{flex:1,color:'#667b8c',fontSize:fs(5.7),textAlign:'center',textTransform:'capitalize'},lineupTeamBlock:{marginBottom:11},lineupTeamTitle:{color:'#17324a',fontSize:fs(8.2),fontWeight:'900',paddingBottom:5,borderBottomWidth:1,borderBottomColor:'#dce4ea'},lineupGroupTitle:{color:'#f1b94f',fontSize:fs(5.5),fontWeight:'800',letterSpacing:.55,marginTop:7,marginBottom:3},lineupPlayerRow:{minHeight:40,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:'#e9eef2',paddingVertical:4},lineupPhoto:{width:31,height:34,borderRadius:6,overflow:'hidden',backgroundColor:'#f3f6f8'},lineupNumber:{width:31,color:'#f1b94f',fontSize:fs(7.4),fontWeight:'800',textAlign:'center'},lineupPlayerBody:{flex:1},lineupPlayerName:{color:'#17324a',fontSize:fs(6.8),fontWeight:'700'},lineupPosition:{color:'#667b8c',fontSize:fs(5.5),marginTop:1},
  articleCard:{backgroundColor:'#ffffff',borderRadius:14,padding:14,borderWidth:1,borderColor:'#d7e0e7'},articleTitle:{color:'#17324a',fontSize:fs(14),lineHeight:fs(19),marginBottom:12},articleBody:{color:'#17324a',fontSize:fs(8.5),lineHeight:fs(14)},articleParagraph:{color:'#17324a',fontSize:fs(8.5),lineHeight:fs(14),marginBottom:9},articleHeroImage:{width:'100%',height:190,borderRadius:12,marginBottom:16},articleInlineImage:{width:'100%',height:210,borderRadius:10,marginVertical:10},
- gamesMonthTitle:{color:'#17324a',fontSize:fs(9),fontWeight:'900',textTransform:'uppercase',textAlign:'center',marginTop:6,marginBottom:8,letterSpacing:.3},fixtureFeature:{borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',padding:12,marginBottom:10},fixtureMetaRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},fixtureCompetition:{color:'#8f173b',fontSize:fs(6.1),fontWeight:'800'},fixtureDateText:{color:'#667b8c',fontSize:fs(5.8),fontWeight:'700'},fixtureTeamsRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:12},fixtureTeam:{width:'36%',alignItems:'center'},fixtureLogo:{width:52,height:58},fixtureTeamName:{color:'#17324a',fontSize:fs(7.5),fontWeight:'800',textAlign:'center',marginTop:4},fixtureCenter:{width:'24%',alignItems:'center'},fixtureTime:{color:'#17324a',fontSize:fs(11),fontWeight:'900'},fixtureVs:{color:'#8f173b',fontSize:fs(5.4),fontWeight:'800',marginTop:2},fixtureVenue:{color:'#667b8c',fontSize:fs(6.2),textAlign:'center',marginTop:10},fixtureActions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:10},fixtureMore:{flex:1,height:30,borderRadius:8,backgroundColor:'#eef2f5',color:'#17324a',fontSize:fs(5.8),fontWeight:'800',textAlign:'center',textAlignVertical:'center',paddingTop:7},fixtureBuy:{height:30,borderRadius:8,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center',paddingHorizontal:12,marginLeft:7},fixtureBuyText:{color:'#fff',fontSize:fs(5.7),fontWeight:'900'},fixtureRowCard:{borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:9,marginBottom:7},fixtureRowHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8},fixtureRowDate:{color:'#17324a',fontSize:fs(6.2),fontWeight:'900'},fixtureRowCompetition:{color:'#667b8c',fontSize:fs(5.4)},fixtureRowTeams:{flexDirection:'row',alignItems:'center',justifyContent:'center'},fixtureRowTeam:{width:'25%',color:'#17324a',fontSize:fs(6.4),fontWeight:'800',textAlign:'right'},fixtureRowLogo:{width:29,height:33,marginHorizontal:5},fixtureRowTimeBox:{minWidth:54,height:31,borderRadius:8,backgroundColor:'#eef2f5',alignItems:'center',justifyContent:'center',marginHorizontal:3},fixtureRowTime:{color:'#17324a',fontSize:fs(7.1),fontWeight:'900'},fixtureRowVenue:{color:'#667b8c',fontSize:fs(5.6),textAlign:'center',marginTop:7},resultRowCard:{borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:9,marginBottom:7},resultTeamsRow:{flexDirection:'row',alignItems:'center',justifyContent:'center'},resultScoreBox:{minWidth:60,height:34,borderRadius:8,backgroundColor:'#17324a',alignItems:'center',justifyContent:'center',marginHorizontal:3},resultScore:{color:'#fff',fontSize:fs(8.6),fontWeight:'900'},resultMediaRow:{flexDirection:'row',justifyContent:'center',marginTop:7},
+ calendarViewToggle:{height:31,flexDirection:'row',alignSelf:'center',backgroundColor:'#eef2f5',borderRadius:16,padding:3,marginBottom:7},calendarViewButton:{minWidth:72,height:25,borderRadius:13,alignItems:'center',justifyContent:'center',paddingHorizontal:12},calendarViewButtonOn:{backgroundColor:'#8f173b'},calendarViewButtonText:{color:'#667b8c',fontSize:fs(5.7),fontWeight:'800'},calendarViewButtonTextOn:{color:'#fff'},calendarMonthScroll:{flex:1,minHeight:0},monthCalendarCard:{borderRadius:14,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:10,marginBottom:9},monthCalendarHead:{height:38,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},monthCalendarTitle:{color:'#17324a',fontSize:fs(8.2),fontWeight:'900',letterSpacing:.35},monthArrow:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center',backgroundColor:'#f3f6f8'},monthArrowText:{color:'#8f173b',fontSize:fs(19),lineHeight:fs(22),fontWeight:'700'},monthWeekRow:{flexDirection:'row',marginTop:5,borderBottomWidth:1,borderBottomColor:'#edf1f4',paddingBottom:5},monthWeekDay:{width:'14.2857%',textAlign:'center',color:'#7a8791',fontSize:fs(4.8),fontWeight:'800'},monthGrid:{flexDirection:'row',flexWrap:'wrap',paddingTop:4},monthDayCell:{width:'14.2857%',height:52,alignItems:'center',justifyContent:'flex-start',paddingTop:5,borderRadius:8},monthDayCellSelected:{backgroundColor:'#f9edf1'},monthDayNumberWrap:{width:26,height:26,borderRadius:13,alignItems:'center',justifyContent:'center'},monthDayToday:{borderWidth:1.5,borderColor:'#8f173b'},monthDayNumber:{color:'#27313a',fontSize:fs(6.3),fontWeight:'700'},monthDayNumberSelected:{color:'#8f173b',fontWeight:'900'},monthDayTodayText:{color:'#8f173b',fontWeight:'900'},monthDots:{height:13,flexDirection:'row',alignItems:'center',justifyContent:'center',marginTop:2},monthDotFuture:{width:6,height:6,borderRadius:3,backgroundColor:'#8f173b',marginHorizontal:1},monthDotPast:{width:6,height:6,borderRadius:3,backgroundColor:'#667b8c',marginHorizontal:1},monthMatchCount:{color:'#667b8c',fontSize:fs(4.3),fontWeight:'800',marginLeft:2},monthLegend:{flexDirection:'row',justifyContent:'center',marginTop:5,paddingTop:7,borderTopWidth:1,borderTopColor:'#edf1f4'},monthLegendItem:{flexDirection:'row',alignItems:'center',marginHorizontal:8},monthLegendText:{color:'#667b8c',fontSize:fs(5.1),marginLeft:4},monthSelectedSection:{marginTop:2},monthSelectedTitle:{color:'#17324a',fontSize:fs(6.7),fontWeight:'900',letterSpacing:.3,marginBottom:6},monthNoGame:{borderRadius:10,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:12},monthTapHint:{color:'#667b8c',fontSize:fs(5.8),textAlign:'center',marginTop:3,marginBottom:10},
+  gamesMonthTitle:{color:'#17324a',fontSize:fs(9),fontWeight:'900',textTransform:'uppercase',textAlign:'center',marginTop:6,marginBottom:8,letterSpacing:.3},fixtureFeature:{borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',padding:12,marginBottom:10},fixtureMetaRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},fixtureCompetition:{color:'#8f173b',fontSize:fs(6.1),fontWeight:'800'},fixtureDateText:{color:'#667b8c',fontSize:fs(5.8),fontWeight:'700'},fixtureTeamsRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:12},fixtureTeam:{width:'36%',alignItems:'center'},fixtureLogo:{width:52,height:58},fixtureTeamName:{color:'#17324a',fontSize:fs(7.5),fontWeight:'800',textAlign:'center',marginTop:4},fixtureCenter:{width:'24%',alignItems:'center'},fixtureTime:{color:'#17324a',fontSize:fs(11),fontWeight:'900'},fixtureVs:{color:'#8f173b',fontSize:fs(5.4),fontWeight:'800',marginTop:2},fixtureVenue:{color:'#667b8c',fontSize:fs(6.2),textAlign:'center',marginTop:10},fixtureActions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:10},fixtureMore:{flex:1,height:30,borderRadius:8,backgroundColor:'#eef2f5',color:'#17324a',fontSize:fs(5.8),fontWeight:'800',textAlign:'center',textAlignVertical:'center',paddingTop:7},fixtureBuy:{height:30,borderRadius:8,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center',paddingHorizontal:12,marginLeft:7},fixtureBuyText:{color:'#fff',fontSize:fs(5.7),fontWeight:'900'},fixtureRowCard:{borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:9,marginBottom:7},fixtureRowHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8},fixtureRowDate:{color:'#17324a',fontSize:fs(6.2),fontWeight:'900'},fixtureRowCompetition:{color:'#667b8c',fontSize:fs(5.4)},fixtureRowTeams:{flexDirection:'row',alignItems:'center',justifyContent:'center'},fixtureRowTeam:{width:'25%',color:'#17324a',fontSize:fs(6.4),fontWeight:'800',textAlign:'right'},fixtureRowLogo:{width:29,height:33,marginHorizontal:5},fixtureRowTimeBox:{minWidth:54,height:31,borderRadius:8,backgroundColor:'#eef2f5',alignItems:'center',justifyContent:'center',marginHorizontal:3},fixtureRowTime:{color:'#17324a',fontSize:fs(7.1),fontWeight:'900'},fixtureRowVenue:{color:'#667b8c',fontSize:fs(5.6),textAlign:'center',marginTop:7},resultRowCard:{borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:9,marginBottom:7},resultTeamsRow:{flexDirection:'row',alignItems:'center',justifyContent:'center'},resultScoreBox:{minWidth:60,height:34,borderRadius:8,backgroundColor:'#17324a',alignItems:'center',justifyContent:'center',marginHorizontal:3},resultScore:{color:'#fff',fontSize:fs(8.6),fontWeight:'900'},resultMediaRow:{flexDirection:'row',justifyContent:'center',marginTop:7},
   calendarTabBody:{flex:1,minHeight:0},calendarSportBar:{height:36,maxHeight:36,flexGrow:0,flexShrink:0,marginBottom:7},calendarTimeline:{flex:1,minHeight:0},calendarTimelineContent:{paddingBottom:18},calendarBoundaryNote:{marginBottom:8},
  calendarTabs:{height:40,maxHeight:40,flexGrow:0,flexShrink:0,flexDirection:'row',alignItems:'center',marginBottom:8,borderBottomWidth:1,borderBottomColor:'rgba(255,255,255,.10)'},calendarTabsContent:{height:40,alignItems:'center'},calendarTopTab:{flex:1,height:39,justifyContent:'center',alignItems:'center',paddingHorizontal:1,borderBottomWidth:2,borderBottomColor:'transparent'},calendarTopTabOn:{borderBottomColor:'#f1b94f'},calendarTopTabText:{width:'100%',color:'#dce8ef',fontSize:fs(5.8),fontWeight:'700',letterSpacing:.18,textAlign:'center'},calendarTopTabTextOn:{color:'#fff'},
  calendarLastCard:{padding:9,borderRadius:10,backgroundColor:'rgba(255,255,255,.96)',marginBottom:8},calendarCompetitionInline:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginBottom:5},calendarCardCompetition:{color:'#7e8790',fontSize:fs(6.1),fontWeight:'700',textAlign:'center'},calendarLastRow:{flexDirection:'row',alignItems:'center',justifyContent:'center'},calendarLastTeam:{width:'34%',flexDirection:'row',alignItems:'center',justifyContent:'flex-end'},calendarLastTeamName:{color:'#6f7880',fontSize:fs(7.5),fontWeight:'700',textAlign:'right',flexShrink:1},calendarLastLogo:{width:28,height:32,marginHorizontal:5},calendarLastScoreBox:{width:'25%',alignItems:'center'},calendarLastScore:{color:'#313a42',fontSize:fs(13),fontWeight:'800'},calendarLastDate:{color:'#7e8790',fontSize:fs(6.2),fontWeight:'700',marginTop:1},
@@ -1516,6 +1586,11 @@ function lightThemeStyle(name,base){
  if(name==='calendarTabs'){out.borderBottomColor='#d9dde1'}
  if(name==='bottomNav'){out.backgroundColor='rgba(255,255,255,.98)';out.borderColor='#dde0e4'}
  if(name==='bottomNavText')out.color='#59626b';
+ if(['calendarViewButtonText','monthCalendarTitle','monthDayNumber','monthSelectedTitle'].includes(name))out.color='#34383d';
+ if(name==='calendarViewButton'){out.backgroundColor='transparent'}
+ if(name==='calendarViewToggle'){out.backgroundColor='#e9eaed'}
+ if(name==='calendarViewButtonOn'){out.backgroundColor='#8f173b'}
+ if(name==='calendarViewButtonTextOn')out.color='#ffffff';
  if(LIGHT_PRIMARY_BG.has(name)){out.backgroundColor='#8f173b';out.borderColor='#8f173b'}
  if(LIGHT_PRIMARY_TEXT.has(name))out.color='#ffffff';
  if(LIGHT_SELECTED_BG.has(name)){out.backgroundColor='#8f173b';out.borderColor='#8f173b'}
