@@ -28,7 +28,7 @@ function teamSportKey(team){
  const gender=String(team?.gender||'').toUpperCase();
  const age=String(team?.age_group||'').toUpperCase();
  if(age&&age!=='SENIORES'&&age!=='SENIOR')return 'FORMAÇÃO';
- const female=/FEM|FEMALE|WOMEN|MULHER/.test(gender);
+ const female=gender==='F'||/FEM|FEMALE|WOMEN|MULHER/.test(gender);
  if(/FUTSAL/.test(sport))return female?'FUTSAL FEMININO':'FUTSAL MASCULINO';
  if(/FUTEBOL|FOOTBALL|SOCCER/.test(sport))return female?'FUTEBOL FEMININO':'FUTEBOL';
  return null;
