@@ -29,11 +29,13 @@ const INTRO_PARTICLES=(()=>{
  });
 })();
 const fs=n=>{
- if(Platform.OS==='web')return n;
- if(n<6)return Math.round(n*1.75*10)/10;
- if(n<10)return Math.round(n*1.60*10)/10;
- if(n<15)return Math.round(n*1.30*10)/10;
- return n;
+ let v=n;
+ if(Platform.OS!=='web'){
+  if(n<6)v=n*1.75;
+  else if(n<10)v=n*1.60;
+  else if(n<15)v=n*1.30;
+ }
+ return Math.round((v+2)*10)/10;
 };
 const FOLLOWABLE_SPORTS=['FUTEBOL','FUTEBOL FEMININO','FUTSAL MASCULINO','FUTSAL FEMININO','FORMAÇÃO'];
 const sportLabel=v=>({
@@ -552,8 +554,14 @@ function StadiumIntro({mode='main',onClose}){
  </Animated.View>;
 }
 export default function App(){
+ const [introDone,setIntroDone]=useState(false);
+ if(!introDone)return <StadiumIntro mode="main" onClose={()=>setIntroDone(true)}/>;
+ return <MainApp/>;
+}
+
+function MainApp(){
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
- const [introMode,setIntroMode]=useState('main'),[nowTick,setNowTick]=useState(Date.now());
+ const [nowTick,setNowTick]=useState(Date.now());
  APP_SWIPE_SCREEN=screen;
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
@@ -580,10 +588,6 @@ export default function App(){
  const [cartNotice,setCartNotice]=useState(''),cartNoticeTimer=useRef(null);
  const [syncVersion,setSyncVersion]=useState(null);
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
-
- function finishIntro(){
-  setIntroMode('done');
- }
 
  useEffect(()=>{
   const t=setInterval(()=>setNowTick(Date.now()),1000);
@@ -1078,8 +1082,6 @@ export default function App(){
  APP_SWIPE_BACK=swipeBack;
 
  function Back({title,to='home'}){const light=appTheme==='light';return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={[s.back,light&&s.backLightTheme]}>‹</Text></Pressable><Text style={[s.pageTitle,light&&s.pageTitleLightTheme]}>{title}</Text></View>}
-
- if(introMode==='main'||introMode==='short')return <StadiumIntro mode={introMode} onClose={finishIntro}/>;
 
  if(screen==='webPortal')return <Page scroll={false}><Back title={webPortal.title||'TORREENSE'} to={previousScreen||'home'}/>
   <View style={s.portalFrame}>
@@ -1585,27 +1587,70 @@ export default function App(){
  </Page>;
  
  const home={name:homeGame?.strHomeTeam,logo:homeGame?.strHomeTeamBadge||homeGame?.strHomeTeamLogo},away={name:homeGame?.strAwayTeam,logo:homeGame?.strAwayTeamBadge||homeGame?.strAwayTeamLogo};
+ const homeGameFinished=homeGame?.strStatus==='finished'||(homeGame?.intHomeScore!=null&&homeGame?.intAwayScore!=null&&homeGameTime>0&&homeGameTime<Date.now());
+ const homeScoreKnown=homeGame?.intHomeScore!=null&&homeGame?.intAwayScore!=null;
+ const standingFor=name=>{
+  const n=String(name||'').toLowerCase().trim();
+  return preferredStandings.find(x=>{
+   const full=String(x.team?.name||'').toLowerCase().trim(),short=String(x.team?.short_name||'').toLowerCase().trim();
+   return n&&(full===n||short===n||full.includes(n)||n.includes(full));
+  });
+ };
+ const homeStandingInfo=homeGame?._homeStanding||standingFor(home.name);
+ const awayStandingInfo=homeGame?._awayStanding||standingFor(away.name);
+ const kickoffLabel=homeGameTime?new Intl.DateTimeFormat('pt-PT',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'}).format(new Date(homeGameTime)).replace(',',' ·').toUpperCase():'DATA A CONFIRMAR';
+ const matchEyebrow=homeGameFinished?'ÚLTIMO RESULTADO':'PRÓXIMO JOGO';
+ const roundLabel=homeGame?.intRound?'JORNADA '+homeGame.intRound:'';
+ const venueLabel=homeGame?.strVenue||'Local a confirmar';
  return <Page>
   <View style={s.homeMatchHero}>
    <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.homeMatchWatermark} alt="SCU Torreense"/>
    {loading?<View style={s.homeMatchLoading}><ActivityIndicator color="#fff"/></View>:error||!homeGame?<View style={s.homeMatchLoading}><Text style={s.homeMatchEmpty}>Não existem jogos para as modalidades selecionadas.</Text></View>:<>
-    <View style={s.homeMatchTop}><Text style={s.homeMatchCompetition}>{homeGame?.strLeague||'COMPETIÇÃO'}</Text><Pressable onPress={openCalendar}><Text style={s.homeMatchCalendarLink}>CALENDÁRIO ›</Text></Pressable></View>
-    <View style={s.homeMatchTeams}>
-     <View style={s.homeMatchTeam}><TeamLogo name={home.name} uri={home.logo} style={s.homeMatchLogo}/><Text style={s.homeMatchTeamName}>{home.name}</Text></View>
-     <View style={s.homeMatchCenter}>
-      <Text style={s.homeMatchDate}>{fmtGameDate(homeGame)}</Text>
-      {homeCountdownActive?<><Text style={s.homeMatchCountdownLabel}>FALTA</Text><Text style={s.homeMatchCountdown}>{fmtCountdown(homeCountdownMs)}</Text></>:<Text style={s.homeMatchVs}>VS</Text>}
-     </View>
-     <View style={s.homeMatchTeam}><TeamLogo name={away.name} uri={away.logo} style={s.homeMatchLogo}/><Text style={s.homeMatchTeamName}>{away.name}</Text></View>
+    <View style={s.homeMatchContextRow}>
+     <Text style={s.homeMatchEyebrow}>{matchEyebrow}</Text>
+     {roundLabel?<Text style={s.homeMatchRound}>{roundLabel}</Text>:null}
     </View>
-    <Text style={s.homeMatchMeta}>{homeGame?.intRound?'Jornada '+homeGame.intRound+' · ':''}{homeGame?.strVenue||'Local a confirmar'}</Text>
+    <View style={s.homeMatchTop}>
+     <View style={s.homeMatchCompetitionWrap}><Text style={s.homeMatchCompetition}>{homeGame?.strLeague||'COMPETIÇÃO'}</Text></View>
+     <Pressable onPress={openCalendar}><Text style={s.homeMatchCalendarLink}>CALENDÁRIO ›</Text></Pressable>
+    </View>
+
+    <Text style={s.homeMatchKickoff}>{kickoffLabel}</Text>
+
+    <View style={s.homeMatchTeams}>
+     <View style={s.homeMatchTeam}>
+      <TeamLogo name={home.name} uri={home.logo} style={s.homeMatchLogo}/>
+      <Text style={s.homeMatchTeamName} numberOfLines={2}>{home.name}</Text>
+      {homeStandingInfo?<Text style={s.homeMatchStanding}>{homeStandingInfo.position}.º · {homeStandingInfo.points} pts</Text>:null}
+     </View>
+
+     <View style={s.homeMatchCenter}>
+      {homeGameFinished&&homeScoreKnown
+       ?<><Text style={s.homeMatchStatus}>FINAL</Text><Text style={s.homeMatchScore}>{homeGame.intHomeScore} - {homeGame.intAwayScore}</Text></>
+       :homeCountdownActive
+        ?<><Text style={s.homeMatchCountdownLabel}>COMEÇA EM</Text><Text style={s.homeMatchCountdown}>{fmtCountdown(homeCountdownMs)}</Text></>
+        :<><Text style={s.homeMatchStatus}>ENCONTRO</Text><Text style={s.homeMatchVs}>VS</Text></>}
+     </View>
+
+     <View style={s.homeMatchTeam}>
+      <TeamLogo name={away.name} uri={away.logo} style={s.homeMatchLogo}/>
+      <Text style={s.homeMatchTeamName} numberOfLines={2}>{away.name}</Text>
+      {awayStandingInfo?<Text style={s.homeMatchStanding}>{awayStandingInfo.position}.º · {awayStandingInfo.points} pts</Text>:null}
+     </View>
+    </View>
+
+    <View style={s.homeMatchInfoPanel}>
+     <View style={s.homeMatchInfoRow}><Text style={s.homeMatchInfoLabel}>ESTÁDIO</Text><Text style={s.homeMatchInfoValue} numberOfLines={1}>{venueLabel}</Text></View>
+     <View style={s.homeMatchInfoDivider}/>
+     <View style={s.homeMatchInfoRow}><Text style={s.homeMatchInfoLabel}>ESTADO</Text><Text style={s.homeMatchInfoValue}>{homeGameFinished?'Terminado':homeGame?._timeConfirmed===false?'Horário por confirmar':'Agendado'}</Text></View>
+    </View>
+
     <View style={s.homeMatchActions}>
-     <Pressable onPress={()=>openClubPortal('BILHETES',CLUB_URLS.tickets,'home')} style={s.homeMatchTicket}><Text style={s.homeMatchTicketText}>BILHETES</Text></Pressable>
-     <Pressable onPress={()=>openGame('home',homeGame)} style={s.homeMatchGame}><Text style={s.homeMatchGameText}>GAME CENTER</Text></Pressable>
+     {!homeGameFinished?<Pressable onPress={()=>openClubPortal('BILHETES',CLUB_URLS.tickets,'home')} style={s.homeMatchTicket}><Text style={s.homeMatchTicketText}>BILHETES</Text></Pressable>:null}
+     <Pressable onPress={()=>openGame('home',homeGame)} style={[s.homeMatchGame,homeGameFinished&&s.homeMatchGameWide]}><Text style={s.homeMatchGameText}>DETALHES DO JOGO</Text></Pressable>
     </View>
    </>}
   </View>
-
   <View style={s.homeSectionHead}><Text style={[s.homeSectionTitle,appTheme==='light'&&s.newsHeadingLightTheme]}>ÚLTIMAS NOTÍCIAS</Text><Pressable onPress={()=>setScreen('news')}><Text style={s.homeSectionLink}>VER TODAS ›</Text></Pressable></View>
   {newsLead?<Pressable style={s.homeLeadNews} onPress={()=>openArticle(newsLead)}>
    <NewsVisual uri={newsLead.hero} style={s.homeLeadNewsImage}/>
@@ -1650,7 +1695,7 @@ brandIntroLoading:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zI
  teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamLogoFallback:{borderRadius:999,backgroundColor:'rgba(255,255,255,.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'rgba(255,255,255,.18)'},teamLogoFallbackText:{color:'#dce7ef',fontSize:fs(8),fontWeight:'700'},teamName:{color:'#17324a',fontSize:fs(8),marginTop:3,textAlign:'center',minHeight:16},teamStanding:{color:'#17324a',fontSize:fs(6),marginTop:1},vs:{color:'#17324a',fontSize:fs(12)},score:{color:'#17324a',fontSize:fs(19)},stadium:{color:'#17324a',fontSize:fs(8),textAlign:'center',marginTop:4},gameStatus:{color:'#f1b94f',fontSize:fs(6),textAlign:'center'},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#17324a',fontSize:fs(24)},
  youtubeBadge:{width:15,height:11,alignItems:'center',justifyContent:'center',marginLeft:5},youtubeIcon:{width:15,height:10,borderRadius:3,backgroundColor:'#ff0033',alignItems:'center',justifyContent:'center',position:'relative'},youtubePlay:{color:'#fff',fontSize:fs(4.7),lineHeight:fs(6),fontWeight:'900',marginLeft:1},youtubeSummaryMark:{position:'absolute',right:-3,bottom:-3,width:7,height:7,borderRadius:4,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#fff'},youtubeSummaryMarkText:{color:'#17212a',fontSize:fs(3.8),fontWeight:'900',lineHeight:fs(5)},homeDateRow:{flexDirection:'row',alignItems:'center'},gameStatusRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',marginTop:3},
  scutvScreen:{flex:1},scutvPlayer:{width:'100%',aspectRatio:16/9,borderRadius:12,overflow:'hidden',backgroundColor:'#000'},scutvWebView:{flex:1,backgroundColor:'#000'},scutvInfo:{paddingTop:10},scutvTitleRow:{flexDirection:'row',alignItems:'center'},scutvTitle:{flex:1,color:'#fff',fontSize:fs(8.2),fontWeight:'700',lineHeight:fs(11)},scutvLive:{color:'#ff4967',fontSize:fs(6.4),fontWeight:'800',marginTop:7},scutvReplay:{color:Platform.OS==='web'?'#8fa9bc':'#b6c9d7',fontSize:fs(6.1),fontWeight:'700',marginTop:7},
- homeMatchHero:{minHeight:310,borderRadius:0,backgroundColor:'#11182d',overflow:'hidden',position:'relative',paddingHorizontal:'5.5%',paddingVertical:14,marginHorizontal:'-5.82%',marginBottom:3,borderTopWidth:1,borderBottomWidth:1,borderColor:'rgba(255,255,255,.10)'},homeMatchWatermark:{position:'absolute',right:-58,top:24,width:250,height:285,opacity:.075},homeMatchLoading:{minHeight:280,alignItems:'center',justifyContent:'center'},homeMatchEmpty:{color:'#fff',fontSize:fs(7),textAlign:'center'},homeMatchTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},homeMatchCompetition:{alignSelf:'flex-start',backgroundColor:'#5f718c',color:'#fff',fontSize:fs(6.3),fontWeight:'900',letterSpacing:.45,paddingHorizontal:12,paddingVertical:6,borderRadius:16},homeMatchCalendarLink:{color:'#b7c0cf',fontSize:fs(5.2),fontWeight:'800'},homeMatchTeams:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:21},homeMatchTeam:{width:'30%',alignItems:'center'},homeMatchLogo:{width:67,height:76},homeMatchTeamName:{color:'#fff',fontSize:fs(8.2),lineHeight:fs(10.4),fontWeight:'900',textAlign:'center',marginTop:7},homeMatchCenter:{width:'40%',alignItems:'center',paddingHorizontal:2},homeMatchDate:{color:'#aeb7c7',fontSize:fs(6.1),fontWeight:'800',textAlign:'center'},homeMatchCountdownLabel:{color:'#b7c0cf',fontSize:fs(4.8),fontWeight:'800',marginTop:8,letterSpacing:1},homeMatchCountdown:{color:'#fff',fontSize:fs(10.3),fontWeight:'900',marginTop:2,textAlign:'center'},homeMatchVs:{color:'#fff',fontSize:fs(14),fontWeight:'900',marginTop:10},homeMatchMeta:{color:'#aeb7c7',fontSize:fs(6),textAlign:'center',marginTop:18},homeMatchActions:{flexDirection:'row',justifyContent:'space-between',marginTop:14},homeMatchTicket:{width:'49%',height:37,borderRadius:10,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center'},homeMatchTicketText:{color:'#fff',fontSize:fs(6.2),fontWeight:'900'},homeMatchGame:{width:'49%',height:37,borderRadius:10,borderWidth:1.5,borderColor:'#fff',alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.03)'},homeMatchGameText:{color:'#fff',fontSize:fs(6.2),fontWeight:'900'},
+ homeMatchHero:{minHeight:400,borderRadius:0,backgroundColor:'#11182d',overflow:'hidden',position:'relative',paddingHorizontal:'5.5%',paddingTop:16,paddingBottom:15,marginHorizontal:'-5.82%',marginBottom:3,borderTopWidth:1,borderBottomWidth:1,borderColor:'rgba(255,255,255,.10)'},homeMatchWatermark:{position:'absolute',right:-68,top:50,width:285,height:325,opacity:.055},homeMatchLoading:{minHeight:360,alignItems:'center',justifyContent:'center'},homeMatchEmpty:{color:'#fff',fontSize:fs(7),textAlign:'center'},homeMatchContextRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:8},homeMatchEyebrow:{color:'#f1b94f',fontSize:fs(5.6),fontWeight:'900',letterSpacing:1.25},homeMatchRound:{color:'#c3ccda',fontSize:fs(5.5),fontWeight:'800',letterSpacing:.7},homeMatchTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},homeMatchCompetitionWrap:{maxWidth:'72%'},homeMatchCompetition:{color:'#fff',fontSize:fs(7.2),fontWeight:'900',letterSpacing:.25},homeMatchCalendarLink:{color:'#c8d0dc',fontSize:fs(5.8),fontWeight:'800'},homeMatchKickoff:{color:'#aeb7c7',fontSize:fs(6.1),fontWeight:'800',textAlign:'center',marginTop:13,letterSpacing:.4},homeMatchTeams:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:15},homeMatchTeam:{width:'31%',alignItems:'center'},homeMatchLogo:{width:72,height:82},homeMatchTeamName:{color:'#fff',fontSize:fs(8.1),lineHeight:fs(10.3),fontWeight:'900',textAlign:'center',marginTop:7,minHeight:34},homeMatchStanding:{color:'#f1b94f',fontSize:fs(5.5),fontWeight:'800',textAlign:'center',marginTop:3},homeMatchCenter:{width:'38%',alignItems:'center',paddingHorizontal:3},homeMatchStatus:{color:'#9fabbc',fontSize:fs(5.1),fontWeight:'900',letterSpacing:1.2,marginBottom:5},homeMatchScore:{color:'#fff',fontSize:fs(18),fontWeight:'900',letterSpacing:1},homeMatchCountdownLabel:{color:'#9fabbc',fontSize:fs(5.1),fontWeight:'900',letterSpacing:1,marginBottom:5},homeMatchCountdown:{color:'#fff',fontSize:fs(10.5),fontWeight:'900',textAlign:'center'},homeMatchVs:{color:'#fff',fontSize:fs(16),fontWeight:'900'},homeMatchInfoPanel:{marginTop:18,borderRadius:11,backgroundColor:'rgba(255,255,255,.07)',borderWidth:1,borderColor:'rgba(255,255,255,.10)',paddingHorizontal:11,paddingVertical:8},homeMatchInfoRow:{minHeight:25,flexDirection:'row',alignItems:'center'},homeMatchInfoLabel:{width:67,color:'#8e9bad',fontSize:fs(4.9),fontWeight:'900',letterSpacing:.7},homeMatchInfoValue:{flex:1,color:'#f5f7fa',fontSize:fs(5.8),fontWeight:'700',textAlign:'right'},homeMatchInfoDivider:{height:1,backgroundColor:'rgba(255,255,255,.08)'},homeMatchActions:{flexDirection:'row',justifyContent:'space-between',marginTop:12},homeMatchTicket:{width:'49%',height:41,borderRadius:10,backgroundColor:'#8f173b',alignItems:'center',justifyContent:'center'},homeMatchTicketText:{color:'#fff',fontSize:fs(6.3),fontWeight:'900'},homeMatchGame:{width:'49%',height:41,borderRadius:10,borderWidth:1.5,borderColor:'#fff',alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.03)'},homeMatchGameWide:{width:'100%'},homeMatchGameText:{color:'#fff',fontSize:fs(6.3),fontWeight:'900'},
   homeLeadNews:{height:305,borderRadius:16,overflow:'hidden',backgroundColor:'#172f46',position:'relative',marginBottom:9},homeLeadNewsImage:{width:'100%',height:'100%',backgroundColor:'#eef3f6'},homeLeadNewsShade:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(7,20,34,.35)'},homeLeadNewsBody:{position:'absolute',left:13,right:13,bottom:13},homeLeadNewsMeta:{color:'#fff',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.5,textTransform:'uppercase',marginBottom:5},homeLeadNewsTitle:{color:'#fff',fontSize:fs(13.3),lineHeight:fs(17),fontWeight:'900'},homeNewsGrid:{flexDirection:'row',justifyContent:'space-between',marginBottom:5},homeNewsSmall:{width:'48.7%',borderRadius:12,overflow:'hidden',backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7'},homeNewsSmallImage:{width:'100%',height:105,backgroundColor:'#eef3f6'},homeNewsSmallBody:{padding:8},homeNewsSmallTitle:{color:'#17324a',fontSize:fs(7.1),lineHeight:fs(9.8),fontWeight:'800'},homeSectionHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:15,marginBottom:7},homeSectionTitle:{color:'#fff',fontSize:fs(8.1),fontWeight:'900',letterSpacing:.5},homeSectionLink:{color:'#f1b94f',fontSize:fs(5.8),fontWeight:'800'},homeFixtureRow:{minHeight:64,borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',marginBottom:6,overflow:'hidden'},homeFixtureDate:{width:65,alignSelf:'stretch',backgroundColor:'#f3f6f8',alignItems:'center',justifyContent:'center'},homeFixtureDay:{color:'#8f173b',fontSize:fs(6.1),fontWeight:'900'},homeFixtureTime:{color:'#17324a',fontSize:fs(6.2),fontWeight:'800',marginTop:2},homeFixtureBody:{flex:1,paddingHorizontal:8},homeFixtureSport:{color:'#667b8c',fontSize:fs(5.1),marginBottom:4},homeFixtureTeams:{flexDirection:'row',alignItems:'center'},homeFixtureLogo:{width:22,height:25},homeFixtureNames:{flex:1,color:'#17324a',fontSize:fs(6.4),fontWeight:'800',textAlign:'center',paddingHorizontal:5},homeFixtureArrow:{color:'#8f173b',fontSize:fs(18),paddingRight:8},homeStandingsCard:{borderRadius:12,overflow:'hidden',backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7'},homeStandingsTitleRow:{paddingHorizontal:9,paddingVertical:7,backgroundColor:'#f3f6f8'},homeStandingsCompetition:{color:'#8f173b',fontSize:fs(5.8),fontWeight:'900'},homeStandingRow:{minHeight:34,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderTopWidth:1,borderTopColor:'#edf1f4'},homeStandingClub:{backgroundColor:'rgba(169,31,66,.07)'},homeStandingPos:{width:22,color:'#17324a',fontSize:fs(6.4),fontWeight:'900'},homeStandingLogo:{width:21,height:24,marginRight:6},homeStandingTeam:{flex:1,color:'#17324a',fontSize:fs(6.2),fontWeight:'700'},homeStandingPlayed:{width:34,color:'#667b8c',fontSize:fs(5.7),textAlign:'right'},homeStandingPts:{width:48,color:'#17324a',fontSize:fs(6.3),fontWeight:'900',textAlign:'right'},homeStoreGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},homeStoreCard:{width:'48.5%',borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',padding:7,marginBottom:7},homeStoreImage:{width:'100%',height:115,borderRadius:8,backgroundColor:'#fff'},homeStoreName:{color:'#17324a',fontSize:fs(6.3),fontWeight:'700',lineHeight:fs(8.5),marginTop:5,minHeight:18},homeStorePrice:{color:'#8f173b',fontSize:fs(7),fontWeight:'900',marginTop:3},homePortalBanner:{height:72,borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',paddingHorizontal:12},homePortalBannerBody:{flex:1,paddingHorizontal:10},homePortalBannerTitle:{color:'#17324a',fontSize:fs(7.1),fontWeight:'900'},homePortalBannerText:{color:'#667b8c',fontSize:fs(5.5),lineHeight:fs(8),marginTop:2},homePortalBannerArrow:{color:'#8f173b',fontSize:fs(20)},homeBenefitsCard:{borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#d7e0e7',overflow:'hidden'},homeBenefitRow:{minHeight:48,flexDirection:'row',alignItems:'center',paddingHorizontal:9,borderTopWidth:1,borderTopColor:'#edf1f4'},homeBenefitAvatar:{width:29,height:29,borderRadius:8,backgroundColor:'rgba(169,31,66,.08)',alignItems:'center',justifyContent:'center'},homeBenefitAvatarText:{color:'#8f173b',fontSize:fs(8),fontWeight:'900'},homeBenefitBody:{flex:1,paddingHorizontal:8},homeBenefitName:{color:'#17324a',fontSize:fs(6.5),fontWeight:'800'},homeBenefitMeta:{color:'#667b8c',fontSize:fs(5.2),marginTop:1},homeBenefitArrow:{color:'#8f173b',fontSize:fs(17)},
   clubLine:{color:'#fff',fontSize:fs(15),letterSpacing:.2},clubLight:{color:'#f1f6f9'},clubLineLightTheme:{color:'#8f173b',fontWeight:'900'},clubLightTheme:{color:'#8f173b'},homeTopActions:{flexDirection:'row',justifyContent:'space-between',marginBottom:8},homeTopAction:{width:'32.3%',height:34,borderRadius:10,backgroundColor:'rgba(255,255,255,.94)',borderWidth:1,borderColor:'#d7e0e7',flexDirection:'row',alignItems:'center',justifyContent:'center',paddingHorizontal:4},homeTopActionText:{color:'#17324a',fontSize:fs(5.7),fontWeight:'800',letterSpacing:.25,marginLeft:3},homeCartBadge:{minWidth:17,height:17,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginLeft:4},homeCartBadgeText:{color:'#082b48',fontSize:fs(5.7),fontWeight:'900'},quickSection:{marginTop:11,padding:7,borderRadius:14,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7'},quickRow:{flexDirection:'row',justifyContent:'space-between'},quickCard:{width:'18.4%',height:61,borderRadius:10,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',alignItems:'center',justifyContent:'center',paddingHorizontal:1,overflow:'hidden'},quickIconFallback:{color:'#f1b94f',fontSize:fs(22),lineHeight:fs(26)},quickText:{width:'100%',color:'#17324a',fontSize:Platform.OS==='web'?5.9:7.2,lineHeight:Platform.OS==='web'?7.5:9,letterSpacing:Platform.OS==='web'?.18:0,marginTop:4,textAlign:'center'},squadShortcut:{height:33,marginTop:7,borderRadius:9,borderWidth:1,borderColor:'#d7e0e7',backgroundColor:'#ffffff',flexDirection:'row',alignItems:'center',paddingHorizontal:10},squadShortcutText:{color:'#17324a',fontSize:fs(7),letterSpacing:.6,marginLeft:8,flex:1},squadShortcutArrow:{color:'#f1b94f',fontSize:fs(18)},
  hubIntro:{padding:12,borderRadius:12,backgroundColor:'rgba(255,255,255,.94)',borderWidth:1,borderColor:'#d7e0e7',marginBottom:9},hubIntroTitle:{color:'#17324a',fontSize:fs(9.3),fontWeight:'900',letterSpacing:.6},hubIntroText:{color:'#667b8c',fontSize:fs(6.4),lineHeight:fs(9.2),marginTop:3},hubGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},hubOption:{width:'48.5%',minHeight:112,borderRadius:12,backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',padding:10,marginBottom:8},hubIcon:{width:37,height:37,borderRadius:10,backgroundColor:'rgba(241,185,79,.12)',alignItems:'center',justifyContent:'center',marginBottom:8},hubOptionTitle:{color:'#17324a',fontSize:fs(7),fontWeight:'900',letterSpacing:.35},hubOptionSub:{color:'#667b8c',fontSize:fs(5.7),lineHeight:fs(8.2),marginTop:3},hubPrimaryButton:{height:36,borderRadius:9,backgroundColor:'#f1b94f',alignItems:'center',justifyContent:'center',marginTop:10},hubPrimaryButtonText:{color:'#082b48',fontSize:fs(6.8),fontWeight:'900',letterSpacing:.45},
