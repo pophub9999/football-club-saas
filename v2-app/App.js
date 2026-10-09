@@ -9,7 +9,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const LOGO_NATIVE_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/teams/scu-torreense.png';
-const INTRO_VERSION='brand-particles-v1';
+const INTRO_VERSION='brand-particles-v2-hard-gate';
 const AnimatedPath=Animated.createAnimatedComponent(Path);
 const INTRO_PARTICLES=(()=>{
  const anchors=[[55,48],[82,31],[105,26],[128,31],[155,48],[158,86],[158,120],[148,157],[128,188],[105,216],[82,188],[62,157],[52,120],[52,86],[55,48]];
@@ -1078,9 +1078,7 @@ export default function App(){
 
  function Back({title,to='home'}){const light=appTheme==='light';return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={[s.back,light&&s.backLightTheme]}>‹</Text></Pressable><Text style={[s.pageTitle,light&&s.pageTitleLightTheme]}>{title}</Text></View>}
 
- const introOverlay=(introMode==='main'||introMode==='short')
-  ?<StadiumIntro mode={introMode} onClose={finishIntro}/>
-  :null;
+ if(introMode==='main'||introMode==='short')return <StadiumIntro mode={introMode} onClose={finishIntro}/>;
 
  if(screen==='webPortal')return <Page scroll={false}><Back title={webPortal.title||'TORREENSE'} to={previousScreen||'home'}/>
   <View style={s.portalFrame}>
@@ -1586,7 +1584,7 @@ export default function App(){
  </Page>;
  
  const home={name:homeGame?.strHomeTeam,logo:homeGame?.strHomeTeamBadge||homeGame?.strHomeTeamLogo},away={name:homeGame?.strAwayTeam,logo:homeGame?.strAwayTeamBadge||homeGame?.strAwayTeamLogo};
- return <View style={s.appShell}><Page>
+ return <Page>
   <View style={s.homeMatchHero}>
    <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={s.homeMatchWatermark} alt="SCU Torreense"/>
    {loading?<View style={s.homeMatchLoading}><ActivityIndicator color="#fff"/></View>:error||!homeGame?<View style={s.homeMatchLoading}><Text style={s.homeMatchEmpty}>Não existem jogos para as modalidades selecionadas.</Text></View>:<>
@@ -1639,12 +1637,12 @@ export default function App(){
   {newsRest.length?<><View style={s.homeSectionHead}><Text style={[s.homeSectionTitle,appTheme==='light'&&s.newsHeadingLightTheme]}>MAIS NOTÍCIAS</Text><Pressable onPress={()=>setScreen('news')}><Text style={s.homeSectionLink}>VER TODAS ›</Text></Pressable></View>
    {newsRest.slice(0,4).map(item=><Pressable key={item.id||item.title} style={s.newsCard} onPress={()=>openArticle(item)}><View style={s.newsAccent}/><NewsThumb uri={item.hero} title={item.title}/><View style={s.newsBody}><Text style={s.newsMeta}>{item.category}</Text><Text style={s.newsTitle} numberOfLines={2}>{item.title}</Text></View><Text style={s.newsArrow}>›</Text></Pressable>)}
   </>:null}
- </Page>{introOverlay}</View>
+ </Page>
 
 }
 
 const _baseStyles=StyleSheet.create({
- appShell:{flex:1,position:'relative'},brandIntroLoading:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000},brandIntroRoot:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000,alignItems:'center',justifyContent:'center',overflow:'hidden'},brandLine:{position:'absolute',top:'50%',width:'72%',height:2,backgroundColor:'#8F173B',borderRadius:2},brandConstruction:{position:'absolute',top:'23%',width:210,height:250,alignItems:'center',justifyContent:'center'},brandOutlineWrap:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center'},brandParticleLayer:{position:'absolute',left:0,top:0,width:210,height:250},brandParticle:{position:'absolute',backgroundColor:'#8F173B'},brandLogoWrap:{position:'absolute',top:'24%',width:156,height:188,alignItems:'center',justifyContent:'center'},brandLogo:{width:128,height:158},brandNameBlock:{position:'absolute',top:'57%',left:24,right:24,alignItems:'center'},brandClubName:{color:'#252A36',fontSize:25,fontWeight:'900',letterSpacing:2.0,textAlign:'center'},brandUnderline:{width:78,height:2.5,borderRadius:2,backgroundColor:'#8F173B',marginTop:12},brandTagline:{position:'absolute',top:'66%',left:24,right:24,color:'#555A63',fontSize:12.5,fontWeight:'700',letterSpacing:2.4,textAlign:'center'},brandSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,borderWidth:1,borderColor:'#D6D7DA',backgroundColor:'rgba(255,255,255,.72)',alignItems:'center',justifyContent:'center'},brandSkipText:{color:'#555A63',fontSize:11,fontWeight:'800',letterSpacing:.8},
+brandIntroLoading:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000},brandIntroRoot:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000,alignItems:'center',justifyContent:'center',overflow:'hidden'},brandLine:{position:'absolute',top:'50%',width:'72%',height:2,backgroundColor:'#8F173B',borderRadius:2},brandConstruction:{position:'absolute',top:'23%',width:210,height:250,alignItems:'center',justifyContent:'center'},brandOutlineWrap:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center'},brandParticleLayer:{position:'absolute',left:0,top:0,width:210,height:250},brandParticle:{position:'absolute',backgroundColor:'#8F173B'},brandLogoWrap:{position:'absolute',top:'24%',width:156,height:188,alignItems:'center',justifyContent:'center'},brandLogo:{width:128,height:158},brandNameBlock:{position:'absolute',top:'57%',left:24,right:24,alignItems:'center'},brandClubName:{color:'#252A36',fontSize:25,fontWeight:'900',letterSpacing:2.0,textAlign:'center'},brandUnderline:{width:78,height:2.5,borderRadius:2,backgroundColor:'#8F173B',marginTop:12},brandTagline:{position:'absolute',top:'66%',left:24,right:24,color:'#555A63',fontSize:12.5,fontWeight:'700',letterSpacing:2.4,textAlign:'center'},brandSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,borderWidth:1,borderColor:'#D6D7DA',backgroundColor:'rgba(255,255,255,.72)',alignItems:'center',justifyContent:'center'},brandSkipText:{color:'#555A63',fontSize:11,fontWeight:'800',letterSpacing:.8},
  root:{flex:1,backgroundColor:Platform.OS==='web'?'#00142c':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
  card:{width:'100%',backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#17324a',fontSize:fs(8),letterSpacing:.55},round:{color:'#17324a',fontSize:fs(8.5),marginTop:3},date:{color:'#17324a',fontSize:fs(8)},
