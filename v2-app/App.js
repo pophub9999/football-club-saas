@@ -9,6 +9,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const LOGO_NATIVE_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/teams/scu-torreense.png';
+const INTRO_VIDEO_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/scut-intro-4s.mp4';
 const fs=n=>{
  let v=n;
  if(Platform.OS!=='web'){
@@ -406,7 +407,7 @@ function StadiumIntro({onClose}){
  const closedRef=useRef(false);
  useEffect(()=>{onCloseRef.current=onClose},[onClose]);
 
- const player=useVideoPlayer(require('./assets/scut-intro-storyboard.mp4'),p=>{
+ const player=useVideoPlayer(INTRO_VIDEO_URL,p=>{
   p.loop=false;
   p.muted=true;
   p.volume=0;
@@ -424,8 +425,8 @@ function StadiumIntro({onClose}){
     player.currentTime=0;
     player.play();
    }catch(e){}
-  },850);
-  const fallback=setTimeout(finish,9500);
+  },120);
+  const fallback=setTimeout(finish,6500);
   return()=>{
    clearTimeout(startTimer);
    clearTimeout(fallback);
