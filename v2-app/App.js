@@ -457,40 +457,40 @@ function StadiumIntro({mode='main',onClose}){
    later(980,()=>Animated.timing(rootOpacity,{toValue:0,duration:300,easing:Easing.inOut(Easing.cubic),useNativeDriver:true}).start());
    later(1300,()=>onCloseRef.current?.());
   }else{
-   Animated.timing(lineScale,{toValue:1,duration:520,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start();
+   later(180,()=>Animated.timing(lineScale,{toValue:1,duration:520,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start());
 
-   later(420,()=>Animated.parallel([
+   later(600,()=>Animated.parallel([
     Animated.timing(lineOpacity,{toValue:0,duration:300,useNativeDriver:true}),
     Animated.timing(outlineOpacity,{toValue:1,duration:260,useNativeDriver:true}),
     Animated.timing(particleProgress,{toValue:1,duration:1050,easing:Easing.out(Easing.cubic),useNativeDriver:true})
    ]).start());
 
-   later(450,()=>Animated.timing(outlineProgress,{
+   later(630,()=>Animated.timing(outlineProgress,{
     toValue:1,duration:900,easing:Easing.inOut(Easing.cubic),useNativeDriver:false
    }).start());
 
-   later(1320,()=>Animated.parallel([
+   later(1500,()=>Animated.parallel([
     Animated.timing(outlineOpacity,{toValue:0,duration:520,useNativeDriver:true}),
     Animated.timing(logoOpacity,{toValue:1,duration:560,easing:Easing.out(Easing.cubic),useNativeDriver:true}),
     Animated.timing(logoScale,{toValue:1,duration:650,easing:Easing.out(Easing.back(1.08)),useNativeDriver:true}),
     Animated.timing(logoY,{toValue:0,duration:560,easing:Easing.out(Easing.cubic),useNativeDriver:true})
    ]).start());
 
-   later(2200,()=>Animated.parallel([
+   later(2380,()=>Animated.parallel([
     Animated.timing(clubOpacity,{toValue:1,duration:420,useNativeDriver:true}),
     Animated.timing(clubY,{toValue:0,duration:420,easing:Easing.out(Easing.cubic),useNativeDriver:true}),
     Animated.timing(underlineScale,{toValue:1,duration:460,easing:Easing.out(Easing.cubic),useNativeDriver:true})
    ]).start());
 
-   later(2920,()=>Animated.parallel([
+   later(3100,()=>Animated.parallel([
     Animated.timing(taglineOpacity,{toValue:1,duration:360,useNativeDriver:true}),
     Animated.timing(taglineY,{toValue:0,duration:360,easing:Easing.out(Easing.cubic),useNativeDriver:true})
    ]).start());
 
-   later(3500,()=>Animated.timing(rootOpacity,{
+   later(3680,()=>Animated.timing(rootOpacity,{
     toValue:0,duration:390,easing:Easing.inOut(Easing.cubic),useNativeDriver:true
    }).start());
-   later(3920,()=>onCloseRef.current?.());
+   later(4100,()=>onCloseRef.current?.());
   }
 
   return()=>timers.forEach(clearTimeout);
@@ -552,7 +552,7 @@ function StadiumIntro({mode='main',onClose}){
 }
 export default function App(){
  const [screen,setScreen]=useState('home'),[previousScreen,setPreviousScreen]=useState('home');
- const [introMode,setIntroMode]=useState('loading'),[nowTick,setNowTick]=useState(Date.now());
+ const [introMode,setIntroMode]=useState('main'),[nowTick,setNowTick]=useState(Date.now());
  APP_SWIPE_SCREEN=screen;
  const [game,setGame]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [gameInfo,setGameInfo]=useState({event:null,stats:[],lineup:[],timeline:[],results:[]}),[gameLoading,setGameLoading]=useState(false),[gameTab,setGameTab]=useState('RESUMO');
@@ -580,23 +580,8 @@ export default function App(){
  const [syncVersion,setSyncVersion]=useState(null);
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
 
- useEffect(()=>{
-  let live=true;
-  (async()=>{
-   try{
-    const seen=await AsyncStorage.getItem('scut_intro_version');
-    if(live)setIntroMode(seen===INTRO_VERSION?'short':'main');
-   }catch(e){
-    if(live)setIntroMode('main');
-   }
-  })();
-  return()=>{live=false};
- },[]);
-
- async function finishIntro(){
-  const wasMain=introMode==='main';
+ function finishIntro(){
   setIntroMode('done');
-  if(wasMain){try{await AsyncStorage.setItem('scut_intro_version',INTRO_VERSION)}catch(e){}}
  }
 
  useEffect(()=>{
@@ -1093,11 +1078,9 @@ export default function App(){
 
  function Back({title,to='home'}){const light=appTheme==='light';return <View style={s.pageHead}><Pressable onPress={()=>setScreen(to)}><Text style={[s.back,light&&s.backLightTheme]}>‹</Text></Pressable><Text style={[s.pageTitle,light&&s.pageTitleLightTheme]}>{title}</Text></View>}
 
- const introOverlay=introMode==='loading'
-  ?<View style={s.brandIntroLoading}/>
-  :(introMode==='main'||introMode==='short')
-   ?<StadiumIntro mode={introMode} onClose={finishIntro}/>
-   :null;
+ const introOverlay=(introMode==='main'||introMode==='short')
+  ?<StadiumIntro mode={introMode} onClose={finishIntro}/>
+  :null;
 
  if(screen==='webPortal')return <Page scroll={false}><Back title={webPortal.title||'TORREENSE'} to={previousScreen||'home'}/>
   <View style={s.portalFrame}>
