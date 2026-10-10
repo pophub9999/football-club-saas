@@ -4,12 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput, PanResponder, Animated, Easing } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { WebView } from 'react-native-webview';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
 const LOGO_NATIVE_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/teams/scu-torreense.png';
-const INTRO_VIDEO_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/scut-intro-4s.mp4';
 const fs=n=>{
  let v=n;
  if(Platform.OS!=='web'){
@@ -402,60 +400,177 @@ function memberFeeAmount(category='',plan='annual'){
  if(monthly==null)return 0;
  return plan==='annual'?monthly*12:monthly;
 }
+const INTRO_BUBBLES=[
+ {x:.13,y:.83,size:7,start:.02,lift:.48},{x:.23,y:.76,size:4,start:.08,lift:.56},
+ {x:.34,y:.88,size:9,start:.14,lift:.62},{x:.45,y:.79,size:5,start:.18,lift:.52},
+ {x:.57,y:.91,size:6,start:.10,lift:.67},{x:.68,y:.82,size:4,start:.24,lift:.58},
+ {x:.78,y:.75,size:8,start:.30,lift:.52},{x:.87,y:.87,size:5,start:.34,lift:.64},
+ {x:.18,y:.69,size:3,start:.38,lift:.50},{x:.74,y:.68,size:3,start:.44,lift:.54},
+ {x:.29,y:.93,size:4,start:.48,lift:.70},{x:.61,y:.86,size:8,start:.52,lift:.58}
+];
+
 function StadiumIntro({onClose}){
- const onCloseRef=useRef(onClose);
+ const {width,height}=useWindowDimensions();
+ const progress=useRef(new Animated.Value(0)).current;
  const closedRef=useRef(false);
+ const onCloseRef=useRef(onClose);
  useEffect(()=>{onCloseRef.current=onClose},[onClose]);
 
- const player=useVideoPlayer(INTRO_VIDEO_URL,p=>{
-  p.loop=false;
-  p.muted=true;
-  p.volume=0;
- });
-
  useEffect(()=>{
+  closedRef.current=false;
+  progress.setValue(0);
   const finish=()=>{
    if(closedRef.current)return;
    closedRef.current=true;
    onCloseRef.current?.();
   };
-  const endSub=player.addListener('playToEnd',finish);
-  const startTimer=setTimeout(()=>{
-   try{
-    player.currentTime=0;
-    player.play();
-   }catch(e){}
-  },120);
-  const fallback=setTimeout(finish,6500);
+  const animation=Animated.timing(progress,{
+   toValue:1,
+   duration:4000,
+   easing:Easing.bezier(.18,.76,.23,1),
+   useNativeDriver:Platform.OS!=='web'
+  });
+  animation.start(({finished})=>{if(finished)finish()});
+  const fallback=setTimeout(finish,4450);
   return()=>{
-   clearTimeout(startTimer);
    clearTimeout(fallback);
-   endSub?.remove?.();
+   animation.stop();
   };
- },[player]);
+ },[progress]);
 
- const skip=()=>{
-  if(closedRef.current)return;
-  closedRef.current=true;
-  try{player.pause()}catch(e){}
-  onCloseRef.current?.();
- };
+ const crestSize=Math.min(width*.58,248);
+ const crestTranslateY=progress.interpolate({
+  inputRange:[0,.16,.55,.72,.84,1],
+  outputRange:[height*.70,height*.63,height*.31,height*.10,-height*.018,0]
+ });
+ const crestScale=progress.interpolate({
+  inputRange:[0,.18,.58,.78,.90,1],
+  outputRange:[.70,.74,.88,1.04,1.015,1]
+ });
+ const crestOpacity=progress.interpolate({
+  inputRange:[0,.08,.42,.66,1],
+  outputRange:[.04,.28,.68,1,1]
+ });
+ const crestRotate=progress.interpolate({
+  inputRange:[0,.45,.72,.88,1],
+  outputRange:['-8deg','-6deg','-2deg','1deg','0deg']
+ });
+ const lightOpacity=progress.interpolate({
+  inputRange:[0,.48,.68,.82,1],
+  outputRange:[.05,.10,.38,.86,1]
+ });
+ const glowOpacity=progress.interpolate({
+  inputRange:[0,.55,.72,.88,1],
+  outputRange:[0,.05,.42,.86,.68]
+ });
+ const waterFlash=progress.interpolate({
+  inputRange:[0,.50,.68,.80,.92,1],
+  outputRange:[0,0,.35,1,.28,.08]
+ });
+ const splashOpacity=progress.interpolate({
+  inputRange:[0,.54,.69,.80,.92,1],
+  outputRange:[0,0,.15,1,.25,0]
+ });
+ const splashScale=progress.interpolate({
+  inputRange:[0,.64,.80,1],
+  outputRange:[.25,.35,1.12,1.65]
+ });
+ const reflectionOpacity=progress.interpolate({
+  inputRange:[0,.60,.78,.92,1],
+  outputRange:[0,.08,.42,.24,.18]
+ });
+ const reflectionScaleY=progress.interpolate({
+  inputRange:[0,.68,.86,1],
+  outputRange:[.3,.55,1.15,.8]
+ });
 
- return <View style={s.introVideoRoot}>
+ return <View style={s.introNativeRoot}>
   <StatusBar hidden/>
-  <VideoView
-   style={s.introVideo}
-   player={player}
-   nativeControls={false}
-   contentFit="cover"
-   surfaceType="textureView"
-  />
-  <Pressable onPress={skip} style={s.introVideoSkip}><Text style={s.introVideoSkipText}>SALTAR</Text></Pressable>
+
+  <View pointerEvents="none" style={s.introHazeLeft}/>
+  <View pointerEvents="none" style={s.introHazeLeftSoft}/>
+  <View pointerEvents="none" style={s.introHazeRight}/>
+  <View pointerEvents="none" style={s.introHazeRightSoft}/>
+
+  <Animated.View pointerEvents="none" style={[s.introBeam,{left:width*.33,width:width*.34,height:height*.72,opacity:lightOpacity}]}/>
+  <Animated.View pointerEvents="none" style={[s.introBeamSide,{left:width*.17,width:width*.20,height:height*.63,opacity:lightOpacity,transform:[{rotate:'9deg'}]}]}/>
+  <Animated.View pointerEvents="none" style={[s.introBeamSide,{right:width*.17,width:width*.20,height:height*.63,opacity:lightOpacity,transform:[{rotate:'-9deg'}]}]}/>
+
+  <Animated.View pointerEvents="none" style={[s.introCrestStage,{
+   top:height*.34,
+   transform:[{translateY:crestTranslateY},{scale:crestScale},{rotate:crestRotate}],
+   opacity:crestOpacity
+  }]}>
+   <Animated.View style={[s.introCrestGlow,{width:crestSize*1.34,height:crestSize*1.34,borderRadius:crestSize,opacity:glowOpacity}]}/>
+   <Image source={require('./assets/scut-logo.png')} style={{width:crestSize,height:crestSize}} resizeMode="contain"/>
+  </Animated.View>
+
+  <Animated.View pointerEvents="none" style={[s.introReflection,{
+   left:(width-crestSize*.56)/2,
+   top:height*.64,
+   width:crestSize*.56,
+   height:crestSize*.72,
+   opacity:reflectionOpacity,
+   transform:[{scaleY:reflectionScaleY}]
+  }]}/>
+
+  <View pointerEvents="none" style={[s.introWater,{top:height*.635}]}/>
+  <Animated.View pointerEvents="none" style={[s.introWaterSheen,{top:height*.625,opacity:waterFlash}]}/>
+  <View pointerEvents="none" style={[s.introWaterLine,{top:height*.635}]}/>
+
+  <Animated.View pointerEvents="none" style={[s.introSplashRing,{
+   left:width*.14,
+   top:height*.618,
+   width:width*.72,
+   height:42,
+   opacity:splashOpacity,
+   transform:[{scaleX:splashScale},{scaleY:splashScale}]
+  }]}/>
+  <Animated.View pointerEvents="none" style={[s.introSplashRingInner,{
+   left:width*.24,
+   top:height*.626,
+   width:width*.52,
+   height:27,
+   opacity:splashOpacity,
+   transform:[{scaleX:splashScale},{scaleY:splashScale}]
+  }]}/>
+
+  {INTRO_BUBBLES.map((b,i)=>{
+   const end=Math.min(b.start+.44,1);
+   const opacity=progress.interpolate({
+    inputRange:[0,b.start,Math.min(b.start+.08,end),end,1],
+    outputRange:[0,0,.9,0,0]
+   });
+   const translateY=progress.interpolate({
+    inputRange:[0,b.start,end,1],
+    outputRange:[0,0,-height*b.lift,-height*b.lift]
+   });
+   const drift=progress.interpolate({
+    inputRange:[0,1],
+    outputRange:[0,(i%2===0?1:-1)*(8+(i%4)*4)]
+   });
+   return <Animated.View key={i} pointerEvents="none" style={[s.introBubble,{
+    left:width*b.x,
+    top:height*b.y,
+    width:b.size,
+    height:b.size,
+    borderRadius:b.size,
+    opacity,
+    transform:[{translateY},{translateX:drift}]
+   }]}/>;
+  })}
+
+  <Animated.View pointerEvents="none" style={[s.introFinalSpark,{
+   left:width*.49-3,
+   top:height*.25,
+   opacity:glowOpacity,
+   transform:[{scale:progress.interpolate({inputRange:[0,.78,.90,1],outputRange:[.2,.2,1.45,.6]})}]
+  }]}/>
  </View>;
 }
 export default function App(){
  const [introDone,setIntroDone]=useState(false);
- if(!introDone)return <StadiumIntro mode="main" onClose={()=>setIntroDone(true)}/>;
+ if(!introDone)return <StadiumIntro onClose={()=>setIntroDone(true)}/>;
  return <MainApp/>;
 }
 
@@ -1585,7 +1700,23 @@ function MainApp(){
 }
 
 const _baseStyles=StyleSheet.create({
- introVideoRoot:{flex:1,backgroundColor:'#050508',overflow:'hidden'},introVideo:{...StyleSheet.absoluteFillObject,width:'100%',height:'100%',backgroundColor:'#050508'},introVideoSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,backgroundColor:'rgba(0,0,0,.38)',borderWidth:1,borderColor:'rgba(255,255,255,.55)',alignItems:'center',justifyContent:'center',zIndex:20},introVideoSkipText:{color:'#fff',fontSize:12,fontWeight:'900',letterSpacing:.8},
+ introNativeRoot:{flex:1,backgroundColor:'#03060c',overflow:'hidden'},
+ introHazeLeft:{position:'absolute',left:'-32%',top:'18%',width:'78%',height:'68%',borderRadius:999,backgroundColor:'rgba(143,23,59,.32)',transform:[{rotate:'-12deg'}]},
+ introHazeLeftSoft:{position:'absolute',left:'-18%',top:'43%',width:'56%',height:'42%',borderRadius:999,backgroundColor:'rgba(214,33,70,.14)'},
+ introHazeRight:{position:'absolute',right:'-34%',top:'17%',width:'82%',height:'70%',borderRadius:999,backgroundColor:'rgba(15,50,89,.36)',transform:[{rotate:'11deg'}]},
+ introHazeRightSoft:{position:'absolute',right:'-20%',top:'44%',width:'58%',height:'42%',borderRadius:999,backgroundColor:'rgba(40,99,150,.12)'},
+ introBeam:{position:'absolute',top:'-14%',borderRadius:999,backgroundColor:'rgba(255,190,93,.16)',zIndex:1},
+ introBeamSide:{position:'absolute',top:'-11%',borderRadius:999,backgroundColor:'rgba(255,174,67,.07)',zIndex:1},
+ introCrestStage:{position:'absolute',left:0,right:0,alignItems:'center',justifyContent:'center',zIndex:4},
+ introCrestGlow:{position:'absolute',backgroundColor:'rgba(255,176,61,.14)',shadowColor:'#ffb13d',shadowOpacity:.9,shadowRadius:34,shadowOffset:{width:0,height:0}},
+ introWater:{position:'absolute',left:0,right:0,bottom:0,backgroundColor:'rgba(0,19,40,.70)',zIndex:5},
+ introWaterSheen:{position:'absolute',left:0,right:0,height:54,backgroundColor:'rgba(255,184,74,.10)',zIndex:6},
+ introWaterLine:{position:'absolute',left:'5%',right:'5%',height:2,borderRadius:2,backgroundColor:'rgba(255,205,123,.52)',shadowColor:'#ffc468',shadowOpacity:.75,shadowRadius:8,shadowOffset:{width:0,height:0},zIndex:7},
+ introReflection:{position:'absolute',borderRadius:999,backgroundColor:'rgba(132,56,64,.13)',shadowColor:'#d88c54',shadowOpacity:.35,shadowRadius:22,shadowOffset:{width:0,height:0},zIndex:6},
+ introSplashRing:{position:'absolute',borderRadius:999,borderWidth:1.5,borderColor:'rgba(255,224,177,.78)',backgroundColor:'rgba(255,196,113,.04)',zIndex:8},
+ introSplashRingInner:{position:'absolute',borderRadius:999,borderWidth:1,borderColor:'rgba(255,243,219,.72)',zIndex:8},
+ introBubble:{position:'absolute',borderWidth:1,borderColor:'rgba(255,231,190,.82)',backgroundColor:'rgba(255,255,255,.10)',shadowColor:'#ffc468',shadowOpacity:.6,shadowRadius:4,shadowOffset:{width:0,height:0},zIndex:9},
+ introFinalSpark:{position:'absolute',width:6,height:6,borderRadius:6,backgroundColor:'#ffd18a',shadowColor:'#ffd18a',shadowOpacity:1,shadowRadius:14,shadowOffset:{width:0,height:0},zIndex:10},
 brandIntroLoading:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000},brandIntroRoot:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000,alignItems:'center',justifyContent:'center',overflow:'hidden'},brandLine:{position:'absolute',top:'50%',width:'72%',height:2,backgroundColor:'#8F173B',borderRadius:2},brandConstruction:{position:'absolute',top:'21%',width:210,height:250,alignItems:'center',justifyContent:'center'},brandOutlineWrap:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center'},brandParticleLayer:{position:'absolute',left:0,top:0,width:210,height:250},brandParticle:{position:'absolute',backgroundColor:'#8F173B',shadowColor:'#8F173B',shadowOpacity:.24,shadowRadius:3},brandLogoWrap:{position:'absolute',top:'22%',width:174,height:204,alignItems:'center',justifyContent:'center'},brandLogo:{width:148,height:178},brandNameBlock:{position:'absolute',top:'58%',left:24,right:24,alignItems:'center'},brandClubName:{color:'#252A36',fontSize:25,fontWeight:'900',letterSpacing:2.0,textAlign:'center'},brandUnderline:{width:78,height:2.5,borderRadius:2,backgroundColor:'#8F173B',marginTop:12},brandTagline:{position:'absolute',top:'67%',left:24,right:24,color:'#555A63',fontSize:12.5,fontWeight:'700',letterSpacing:2.4,textAlign:'center'},brandSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,borderWidth:1,borderColor:'#D6D7DA',backgroundColor:'rgba(255,255,255,.72)',alignItems:'center',justifyContent:'center'},brandSkipText:{color:'#555A63',fontSize:11,fontWeight:'800',letterSpacing:.8},
  root:{flex:1,backgroundColor:Platform.OS==='web'?'#00142c':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
  card:{width:'100%',backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
