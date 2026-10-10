@@ -1,0 +1,31 @@
+name: Install SCUT intro video
+on:
+  push:
+    branches:
+      - v2-visual-first
+    paths:
+      - .github/workflows/install-scut-intro.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+      - name: Download exact SCUT intro
+        run: |
+          mkdir -p v2-app/assets
+          curl -fL 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/f4cac562-953d-43eb-9b2d-ef6a44a48d3d.mp4?_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlIYXNoIjoiZTQ2MDEwZjU1NGYzZTlkZCIsImJ1Y2tldCI6InJ1bndheS1kYXRhc2V0cyIsInN0YWdlIjoicHJvZCIsImV4cCI6MTc5MTc2OTg0NX0.wrd6msXBB0HD5a9_seq1wG2WQAZLTXTUUxc6jdaaJSs' -o v2-app/assets/scut-intro-storyboard.mp4
+          echo "ff02dd5cd4ce3bc27d2b9bc12e10ec520659f1e100fb20e3f56afc8bd59b1f12  v2-app/assets/scut-intro-storyboard.mp4" | sha256sum -c -
+      - name: Commit bundled intro
+        run: |
+          rm -f .github/workflows/install-scut-intro.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Install final 4s SCUT intro MP4"
+          git push origin HEAD:v2-visual-first
