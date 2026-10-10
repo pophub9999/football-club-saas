@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput, PanResponder, Animated, Easing } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { WebView } from 'react-native-webview';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/v2-visual-first/v2-app/assets/torreense-logo.svg';
@@ -400,172 +401,64 @@ function memberFeeAmount(category='',plan='annual'){
  if(monthly==null)return 0;
  return plan==='annual'?monthly*12:monthly;
 }
-const INTRO_BUBBLES=[
- {x:.13,y:.83,size:7,start:.02,lift:.48},{x:.23,y:.76,size:4,start:.08,lift:.56},
- {x:.34,y:.88,size:9,start:.14,lift:.62},{x:.45,y:.79,size:5,start:.18,lift:.52},
- {x:.57,y:.91,size:6,start:.10,lift:.67},{x:.68,y:.82,size:4,start:.24,lift:.58},
- {x:.78,y:.75,size:8,start:.30,lift:.52},{x:.87,y:.87,size:5,start:.34,lift:.64},
- {x:.18,y:.69,size:3,start:.38,lift:.50},{x:.74,y:.68,size:3,start:.44,lift:.54},
- {x:.29,y:.93,size:4,start:.48,lift:.70},{x:.61,y:.86,size:8,start:.52,lift:.58}
-];
-
 function StadiumIntro({onClose}){
- const {width,height}=useWindowDimensions();
- const progress=useRef(new Animated.Value(0)).current;
- const closedRef=useRef(false);
  const onCloseRef=useRef(onClose);
+ const closedRef=useRef(false);
  useEffect(()=>{onCloseRef.current=onClose},[onClose]);
+
+ const player=useVideoPlayer(require('./assets/scut-intro-storyboard.mp4'),p=>{
+  p.loop=false;
+  p.muted=true;
+  p.volume=0;
+ });
 
  useEffect(()=>{
   closedRef.current=false;
-  progress.setValue(0);
   const finish=()=>{
    if(closedRef.current)return;
    closedRef.current=true;
    onCloseRef.current?.();
   };
-  const animation=Animated.timing(progress,{
-   toValue:1,
-   duration:4000,
-   easing:Easing.bezier(.18,.76,.23,1),
-   useNativeDriver:Platform.OS!=='web'
-  });
-  animation.start(({finished})=>{if(finished)finish()});
-  const fallback=setTimeout(finish,4450);
+  const endSub=player.addListener('playToEnd',finish);
+  const startTimer=setTimeout(()=>{
+   try{
+    player.currentTime=0;
+    player.muted=true;
+    player.volume=0;
+    player.play();
+   }catch(e){}
+  },80);
+  const fallback=setTimeout(finish,4800);
   return()=>{
+   clearTimeout(startTimer);
    clearTimeout(fallback);
-   animation.stop();
+   endSub?.remove?.();
   };
- },[progress]);
+ },[player]);
 
- const crestSize=Math.min(width*.58,248);
- const crestTranslateY=progress.interpolate({
-  inputRange:[0,.16,.55,.72,.84,1],
-  outputRange:[height*.70,height*.63,height*.31,height*.10,-height*.018,0]
- });
- const crestScale=progress.interpolate({
-  inputRange:[0,.18,.58,.78,.90,1],
-  outputRange:[.70,.74,.88,1.04,1.015,1]
- });
- const crestOpacity=progress.interpolate({
-  inputRange:[0,.08,.42,.66,1],
-  outputRange:[.04,.28,.68,1,1]
- });
- const crestRotate=progress.interpolate({
-  inputRange:[0,.45,.72,.88,1],
-  outputRange:['-8deg','-6deg','-2deg','1deg','0deg']
- });
- const lightOpacity=progress.interpolate({
-  inputRange:[0,.48,.68,.82,1],
-  outputRange:[.05,.10,.38,.86,1]
- });
- const glowOpacity=progress.interpolate({
-  inputRange:[0,.55,.72,.88,1],
-  outputRange:[0,.05,.42,.86,.68]
- });
- const waterFlash=progress.interpolate({
-  inputRange:[0,.50,.68,.80,.92,1],
-  outputRange:[0,0,.35,1,.28,.08]
- });
- const splashOpacity=progress.interpolate({
-  inputRange:[0,.54,.69,.80,.92,1],
-  outputRange:[0,0,.15,1,.25,0]
- });
- const splashScale=progress.interpolate({
-  inputRange:[0,.64,.80,1],
-  outputRange:[.25,.35,1.12,1.65]
- });
- const reflectionOpacity=progress.interpolate({
-  inputRange:[0,.60,.78,.92,1],
-  outputRange:[0,.08,.42,.24,.18]
- });
- const reflectionScaleY=progress.interpolate({
-  inputRange:[0,.68,.86,1],
-  outputRange:[.3,.55,1.15,.8]
- });
+ const skip=()=>{
+  if(closedRef.current)return;
+  closedRef.current=true;
+  try{player.pause()}catch(e){}
+  onCloseRef.current?.();
+ };
 
- return <View style={s.introNativeRoot}>
+ return <View style={{flex:1,backgroundColor:'#050508',overflow:'hidden'}}>
   <StatusBar hidden/>
-
-  <View pointerEvents="none" style={s.introHazeLeft}/>
-  <View pointerEvents="none" style={s.introHazeLeftSoft}/>
-  <View pointerEvents="none" style={s.introHazeRight}/>
-  <View pointerEvents="none" style={s.introHazeRightSoft}/>
-
-  <Animated.View pointerEvents="none" style={[s.introBeam,{left:width*.33,width:width*.34,height:height*.72,opacity:lightOpacity}]}/>
-  <Animated.View pointerEvents="none" style={[s.introBeamSide,{left:width*.17,width:width*.20,height:height*.63,opacity:lightOpacity,transform:[{rotate:'9deg'}]}]}/>
-  <Animated.View pointerEvents="none" style={[s.introBeamSide,{right:width*.17,width:width*.20,height:height*.63,opacity:lightOpacity,transform:[{rotate:'-9deg'}]}]}/>
-
-  <Animated.View pointerEvents="none" style={[s.introCrestStage,{
-   top:height*.34,
-   transform:[{translateY:crestTranslateY},{scale:crestScale},{rotate:crestRotate}],
-   opacity:crestOpacity
-  }]}>
-   <Animated.View style={[s.introCrestGlow,{width:crestSize*1.34,height:crestSize*1.34,borderRadius:crestSize,opacity:glowOpacity}]}/>
-   <Image source={require('./assets/scut-logo.png')} style={{width:crestSize,height:crestSize}} resizeMode="contain"/>
-  </Animated.View>
-
-  <Animated.View pointerEvents="none" style={[s.introReflection,{
-   left:(width-crestSize*.56)/2,
-   top:height*.64,
-   width:crestSize*.56,
-   height:crestSize*.72,
-   opacity:reflectionOpacity,
-   transform:[{scaleY:reflectionScaleY}]
-  }]}/>
-
-  <View pointerEvents="none" style={[s.introWater,{top:height*.635}]}/>
-  <Animated.View pointerEvents="none" style={[s.introWaterSheen,{top:height*.625,opacity:waterFlash}]}/>
-  <View pointerEvents="none" style={[s.introWaterLine,{top:height*.635}]}/>
-
-  <Animated.View pointerEvents="none" style={[s.introSplashRing,{
-   left:width*.14,
-   top:height*.618,
-   width:width*.72,
-   height:42,
-   opacity:splashOpacity,
-   transform:[{scaleX:splashScale},{scaleY:splashScale}]
-  }]}/>
-  <Animated.View pointerEvents="none" style={[s.introSplashRingInner,{
-   left:width*.24,
-   top:height*.626,
-   width:width*.52,
-   height:27,
-   opacity:splashOpacity,
-   transform:[{scaleX:splashScale},{scaleY:splashScale}]
-  }]}/>
-
-  {INTRO_BUBBLES.map((b,i)=>{
-   const end=Math.min(b.start+.44,1);
-   const opacity=progress.interpolate({
-    inputRange:[0,b.start,Math.min(b.start+.08,end),end,1],
-    outputRange:[0,0,.9,0,0]
-   });
-   const translateY=progress.interpolate({
-    inputRange:[0,b.start,end,1],
-    outputRange:[0,0,-height*b.lift,-height*b.lift]
-   });
-   const drift=progress.interpolate({
-    inputRange:[0,1],
-    outputRange:[0,(i%2===0?1:-1)*(8+(i%4)*4)]
-   });
-   return <Animated.View key={i} pointerEvents="none" style={[s.introBubble,{
-    left:width*b.x,
-    top:height*b.y,
-    width:b.size,
-    height:b.size,
-    borderRadius:b.size,
-    opacity,
-    transform:[{translateY},{translateX:drift}]
-   }]}/>;
-  })}
-
-  <Animated.View pointerEvents="none" style={[s.introFinalSpark,{
-   left:width*.49-3,
-   top:height*.25,
-   opacity:glowOpacity,
-   transform:[{scale:progress.interpolate({inputRange:[0,.78,.90,1],outputRange:[.2,.2,1.45,.6]})}]
-  }]}/>
+  <VideoView
+   style={{...StyleSheet.absoluteFillObject,width:'100%',height:'100%',backgroundColor:'#050508'}}
+   player={player}
+   nativeControls={false}
+   contentFit="cover"
+  />
+  <Pressable
+   accessibilityRole="button"
+   accessibilityLabel="Saltar introdução"
+   onPress={skip}
+   style={{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,backgroundColor:'rgba(0,0,0,.38)',borderWidth:1,borderColor:'rgba(255,255,255,.55)',alignItems:'center',justifyContent:'center',zIndex:20}}
+  >
+   <Text style={{color:'#fff',fontSize:12,fontWeight:'900',letterSpacing:.8}}>SALTAR</Text>
+  </Pressable>
  </View>;
 }
 export default function App(){
