@@ -428,7 +428,7 @@ function StadiumIntro({onClose}){
     player.play();
    }catch(e){}
   },80);
-  const fallback=setTimeout(finish,4800);
+  const fallback=setTimeout(finish,4000);
   return()=>{
    clearTimeout(startTimer);
    clearTimeout(fallback);
