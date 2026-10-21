@@ -1,7 +1,7 @@
 import '@expo/metro-runtime';
 import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput, PanResponder, Animated, Easing } from 'react-native';
+import { View, Image, StyleSheet, Platform, useWindowDimensions, Text, Pressable, ActivityIndicator, ScrollView, Linking, TextInput, PanResponder, Animated, Easing, AppState } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -518,6 +518,26 @@ function MainApp(){
   }
  },[followedSports]);
 
+ useEffect(()=>{
+  let disposed=false;
+  const check=async()=>{
+   try{
+    const v=await sb('app_sync?select=version&id=eq.1');
+    const next=v?.[0]?.version||null;
+    if(!disposed&&syncVersion!=null&&next!=null&&String(next)!==String(syncVersion))setRefreshKey(x=>x+1);
+   }catch{}
+  };
+  const timer=setInterval(check,60000);
+  let appSub=null,onVisible=null;
+  if(Platform.OS==='web'&&typeof document!=='undefined'){
+   onVisible=()=>{if(document.visibilityState==='visible')check()};
+   document.addEventListener('visibilitychange',onVisible);
+  }else{
+   appSub=AppState.addEventListener('change',state=>{if(state==='active')check()});
+  }
+  return()=>{disposed=true;clearInterval(timer);if(onVisible&&typeof document!=='undefined')document.removeEventListener('visibilitychange',onVisible);appSub?.remove?.()};
+ },[syncVersion]);
+
  useEffect(()=>{let live=true;(async()=>{try{
   setLoading(true);
   const [v,n,m,p,st,sc,sp,sh,bf,tv,hl]=await Promise.all([
@@ -626,7 +646,7 @@ function MainApp(){
   if(live)setError('Não foi possível ler os dados em cache.');
  }finally{
   if(live)setLoading(false);
- }})();return()=>{live=false}},[]);
+ }})();return()=>{live=false}},[refreshKey]);
 
  async function loadGameDetails(ev){
   if(!ev)return;
