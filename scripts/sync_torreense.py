@@ -548,6 +548,34 @@ def _as_int(value):
     except Exception:
         return None
 
+def _sports_soup(url,required_selector):
+    candidates=[
+        url,
+        url+("?_" if "?" in url else "?_")+str(int(datetime.now(timezone.utc).timestamp())),
+        url.replace("https://www.torreense.com/","https://torreense.com/")+("?_" if "?" in url else "?_")+str(int(datetime.now(timezone.utc).timestamp())),
+    ]
+    last=None
+    lean_headers={
+        "User-Agent":"Mozilla/5.0",
+        "Accept":"text/html,*/*",
+    }
+    for attempt,candidate in enumerate(candidates,1):
+        try:
+            req=urllib.request.Request(candidate,headers=lean_headers)
+            with urllib.request.urlopen(req,timeout=25) as r:
+                body=r.read().decode("utf-8","ignore")
+            soup=BeautifulSoup(body,"html.parser")
+            found=soup.select(required_selector)
+            print("SPORTS_FETCH",attempt,candidate,"bytes",len(body),"selector",required_selector,"found",len(found))
+            if found:
+                return soup
+            last=RuntimeError("selector not found in "+candidate)
+        except Exception as e:
+            last=e
+            print("SPORTS_FETCH_RETRY",attempt,candidate,repr(e))
+    raise RuntimeError("Official Torreense sports page unavailable: "+repr(last))
+
+
 def _team_key(value):
     s=normalize_person_name(value)
     aliases={
@@ -607,7 +635,7 @@ def _sync_status(source,message,count,status="success"):
 
 def sync_main_standings():
     print("SPORTS_SYNC_STANDINGS_START",MAIN_STANDINGS_URL)
-    soup=BeautifulSoup(get(MAIN_STANDINGS_URL),"html.parser")
+    soup=_sports_soup(MAIN_STANDINGS_URL,"table")
     table=soup.find("table")
     if table is None:
         raise RuntimeError("Official Torreense standings table not found")
@@ -669,7 +697,7 @@ def sync_main_standings():
 
 def sync_main_matches():
     print("SPORTS_SYNC_MATCHES_START",MAIN_CALENDAR_URL)
-    soup=BeautifulSoup(get(MAIN_CALENDAR_URL),"html.parser")
+    soup=_sports_soup(MAIN_CALENDAR_URL,".match-row")
     rows=soup.select(".match-row")
     if not rows:
         raise RuntimeError("Official Torreense match rows not found")
