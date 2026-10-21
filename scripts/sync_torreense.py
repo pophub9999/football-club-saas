@@ -816,7 +816,8 @@ def sync_sports():
         # Do not block news/photo refresh if one sports source changes markup.
         _sync_status("torreense_sports","; ".join(errors),0,status="error")
     else:
-        _sync_status("torreense_sports","Official Torreense sports sync",2)
+        now=_sync_status("torreense_sports","Official Torreense sports sync",2)
+        api("app_sync?id=eq.1","PATCH",{"version":int(datetime.now().timestamp()),"updated_at":now})
 
 
 def sync_club_assets():
