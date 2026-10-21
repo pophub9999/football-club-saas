@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-cloud-preview.yml'
 
-# Publish trigger: SCUT intro video and latest home layout
+# Publish trigger: refreshed sports data and responsive web/app data refresh
 jobs:
   publish:
     name: Publish Expo Go preview
