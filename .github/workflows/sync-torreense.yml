@@ -8,7 +8,12 @@ on:
     paths:
       - '.github/workflows/sync-torreense.yml'
   schedule:
-    - cron: '*/15 * * * *'
+    # Three daily refreshes (UTC): morning, afternoon and evening.
+    - cron: '0 7,13,19 * * *'
+
+concurrency:
+  group: sync-torreense-data
+  cancel-in-progress: true
 
 jobs:
   sync:
