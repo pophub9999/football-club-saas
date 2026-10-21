@@ -18,17 +18,16 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install beautifulsoup4
-      - name: Probe FPF current competitions
+      - name: Probe zerozero competitions
         run: |
           python - <<'PY'
-          import urllib.request,re,urllib.parse
+          import urllib.request
           from bs4 import BeautifulSoup
-          UA={"User-Agent":"Mozilla/5.0","Accept":"text/html,*/*"}
+          UA={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36","Accept":"text/html,*/*","Accept-Language":"pt-PT,pt;q=0.9,en;q=0.7"}
           urls=[
-            "https://resultados.fpf.pt/",
-            "https://resultados.fpf.pt/Competition",
-            "https://resultados.fpf.pt/Competition/Details?seasonId=101&competitionId=19539",
-            "https://resultados.fpf.pt/Competition/Details?seasonId=101&competitionId=18535",
+            "https://www.zerozero.pt/competicao/liga-portuguesa-feminina?redirm=1",
+            "https://www.zerozero.pt/competicao/i-divisao-futsal?redirm=1",
+            "https://www.zerozero.pt/competicao/i-divisao-feminina-futsal?redirm=1"
           ]
           for u in urls:
             print("\nURL",u)
@@ -39,21 +38,14 @@ jobs:
               print("STATUS",getattr(r,"status",200),"BYTES",len(body),"FINAL",r.geturl())
               soup=BeautifulSoup(body,"html.parser")
               print("TITLE",soup.title.get_text(" ",strip=True) if soup.title else "")
-              for sel in soup.find_all("select"):
-                txt=" | ".join(o.get_text(" ",strip=True)+":"+str(o.get("value")) for o in sel.find_all("option")[:30])
-                if "2026" in txt or "época" in (sel.get("name") or "").lower() or "season" in (sel.get("name") or "").lower():
-                  print("SELECT",sel.get("name"),sel.get("id"),txt[:2500])
-              links=[]
-              for a in soup.find_all("a",href=True):
-                label=a.get_text(" ",strip=True)
-                href=urllib.parse.urljoin(u,a["href"])
-                if any(k in (label+" "+href).lower() for k in ["liga bpi","liga placard","feminina placard","competition/details"]):
-                  links.append((label,href))
-              print("LINKS",links[:100])
-              for pat in [r'competitionId[=:](\d+)',r'seasonId[=:](\d+)']:
-                vals=sorted(set(re.findall(pat,body,re.I)))
-                print("PAT",pat,vals[-40:])
-              print("HAS_2026_2027", "2026-2027" in body or "2026/2027" in body)
+              tables=soup.find_all("table")
+              print("TABLES",len(tables))
+              for ti,t in enumerate(tables[:8]):
+                rows=[]
+                for tr in t.find_all("tr")[:8]:
+                  row=[c.get_text(" ",strip=True) for c in tr.find_all(["th","td"])]
+                  if row: rows.append(row)
+                if rows: print("TABLE",ti,rows)
             except Exception as e:
               print("ERR",repr(e))
           PY
