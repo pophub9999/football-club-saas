@@ -1,0 +1,25 @@
+name: Test SCUT Sports Sync
+on:
+  push:
+    branches: ['v2-visual-first']
+    paths:
+      - '.github/workflows/test-sports-sync.yml'
+permissions:
+  contents: read
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install beautifulsoup4 -q
+      - name: Run only sports sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python -c "import scripts.sync_torreense as s; s.sync_sports()"
