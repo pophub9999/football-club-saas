@@ -1,6 +1,7 @@
 name: Sync Torreense Data
 # Sync trigger: persist news hero images
 # Sports parser retry hardened
+# App version refresh after sports sync
 
 on:
   workflow_dispatch:
