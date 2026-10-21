@@ -18,21 +18,17 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install beautifulsoup4
-      - name: Probe official sports pages
+      - name: Probe FPF current competitions
         run: |
           python - <<'PY'
-          import urllib.request,re
+          import urllib.request,re,urllib.parse
           from bs4 import BeautifulSoup
           UA={"User-Agent":"Mozilla/5.0","Accept":"text/html,*/*"}
           urls=[
-            "https://www.torreense.com/futebol-profissional/equipa-principal/calendario",
-            "https://www.torreense.com/futebol-profissional/equipa-principal/classificacao",
-            "https://www.torreense.com/futebol-profissional/seniores-feminino/calendario",
-            "https://www.torreense.com/futebol-profissional/seniores-feminino/classificacao",
-            "https://www.torreense.com/futsal/seniores-futsal-masculinos/calendario",
-            "https://www.torreense.com/futsal/seniores-futsal-masculinos/classificacao",
-            "https://www.torreense.com/futsal/seniores-feminino-futsal/calendario",
-            "https://www.torreense.com/futsal/seniores-feminino-futsal/classificacao",
+            "https://resultados.fpf.pt/",
+            "https://resultados.fpf.pt/Competition",
+            "https://resultados.fpf.pt/Competition/Details?seasonId=101&competitionId=19539",
+            "https://resultados.fpf.pt/Competition/Details?seasonId=101&competitionId=18535",
           ]
           for u in urls:
             print("\nURL",u)
@@ -40,18 +36,24 @@ jobs:
               req=urllib.request.Request(u,headers=UA)
               with urllib.request.urlopen(req,timeout=25) as r:
                 body=r.read().decode("utf-8","ignore")
-              print("STATUS",getattr(r,"status",200),"BYTES",len(body))
+              print("STATUS",getattr(r,"status",200),"BYTES",len(body),"FINAL",r.geturl())
               soup=BeautifulSoup(body,"html.parser")
               print("TITLE",soup.title.get_text(" ",strip=True) if soup.title else "")
-              tables=soup.find_all("table")
-              print("TABLES",len(tables))
-              for ti,t in enumerate(tables[:3]):
-                rows=[]
-                for tr in t.find_all("tr")[:6]:
-                  rows.append([c.get_text(" ",strip=True) for c in tr.find_all(["th","td"])])
-                print("TABLE",ti,rows)
-              txt=soup.get_text(" ",strip=True)
-              print("TEXT",txt[:1200])
+              for sel in soup.find_all("select"):
+                txt=" | ".join(o.get_text(" ",strip=True)+":"+str(o.get("value")) for o in sel.find_all("option")[:30])
+                if "2026" in txt or "época" in (sel.get("name") or "").lower() or "season" in (sel.get("name") or "").lower():
+                  print("SELECT",sel.get("name"),sel.get("id"),txt[:2500])
+              links=[]
+              for a in soup.find_all("a",href=True):
+                label=a.get_text(" ",strip=True)
+                href=urllib.parse.urljoin(u,a["href"])
+                if any(k in (label+" "+href).lower() for k in ["liga bpi","liga placard","feminina placard","competition/details"]):
+                  links.append((label,href))
+              print("LINKS",links[:100])
+              for pat in [r'competitionId[=:](\d+)',r'seasonId[=:](\d+)']:
+                vals=sorted(set(re.findall(pat,body,re.I)))
+                print("PAT",pat,vals[-40:])
+              print("HAS_2026_2027", "2026-2027" in body or "2026/2027" in body)
             except Exception as e:
               print("ERR",repr(e))
           PY
