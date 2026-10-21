@@ -536,11 +536,267 @@ def sync_player_photos():
         print("PLAYER_PHOTOS_TEAM",team_name,len(seen),"/",len(players))
     print("PLAYER_PHOTOS_UPDATED",total)
 
+
+MAIN_CALENDAR_URL="https://www.torreense.com/futebol-profissional/equipa-principal/calendario"
+MAIN_STANDINGS_URL="https://www.torreense.com/futebol-profissional/equipa-principal/classificacao"
+MAIN_COMPETITION_ID=1
+MAIN_SPORT_ID=1
+
+def _as_int(value):
+    try:
+        return int(str(value).strip())
+    except Exception:
+        return None
+
+def _team_key(value):
+    s=normalize_person_name(value)
+    aliases={
+        "scu torreense":"scu torreense",
+        "torreense":"scu torreense",
+        "academica":"academica",
+        "academica oaf":"academica",
+        "l lourosa fc":"l lourosa fc",
+        "lusitania lourosa":"l lourosa fc",
+        "fc felgueiras 1932":"fc felgueiras",
+        "felgueiras":"fc felgueiras",
+        "uniao de leiria":"u leiria",
+        "ud leiria":"u leiria",
+    }
+    return aliases.get(s,s)
+
+def _team_map(sport_id=None):
+    suffix="&sport_id=eq."+str(sport_id) if sport_id else ""
+    rows=json.loads(api("teams?select=id,name,short_name,sport_id,gender&active=eq.true"+suffix+"&limit=500"))
+    out={}
+    for row in rows:
+        for label in (row.get("name"),row.get("short_name")):
+            if label:
+                out[_team_key(label)]=row
+    return out
+
+def _merge_match_date(existing_iso,official_date,time_confirmed=False):
+    d=datetime.strptime(official_date,"%d.%m.%Y")
+    if existing_iso:
+        try:
+            old=datetime.fromisoformat(existing_iso.replace("Z","+00:00"))
+            if old.tzinfo is None:
+                old=old.replace(tzinfo=timezone.utc)
+            # Keep an already confirmed kick-off time while applying any official date correction.
+            if time_confirmed:
+                return old.replace(year=d.year,month=d.month,day=d.day).isoformat()
+        except Exception:
+            pass
+    # The Torreense calendar currently exposes the date but not the kick-off time.
+    # Noon UTC is only a placeholder; raw_data.time_confirmed=false prevents the app
+    # from displaying it as an official hour.
+    return d.replace(hour=12,minute=0,second=0,tzinfo=timezone.utc).isoformat()
+
+def _sync_status(source,message,count,status="success"):
+    now=datetime.now(timezone.utc).isoformat()
+    payload={
+        "source":source,
+        "last_sync":now,
+        "last_success":now if status=="success" else None,
+        "status":status,
+        "message":message,
+        "items_processed":count,
+        "updated_at":now,
+    }
+    api("sync_status?on_conflict=source","POST",[payload])
+    return now
+
+def sync_main_standings():
+    print("SPORTS_SYNC_STANDINGS_START",MAIN_STANDINGS_URL)
+    soup=BeautifulSoup(get(MAIN_STANDINGS_URL),"html.parser")
+    table=soup.find("table")
+    if table is None:
+        raise RuntimeError("Official Torreense standings table not found")
+
+    teams=_team_map(MAIN_SPORT_ID)
+    existing=json.loads(api(
+        "standings?select=id,team_id,competition_id&competition_id=eq."+str(MAIN_COMPETITION_ID)+"&limit=100"
+    ))
+    existing_by_team={int(x["team_id"]):x for x in existing if x.get("team_id") is not None}
+    now=datetime.now(timezone.utc).isoformat()
+    updated=0
+    missing=[]
+
+    for tr in table.find_all("tr"):
+        cells=[x.get_text(" ",strip=True) for x in tr.find_all("td")]
+        if len(cells)<9 or not str(cells[0]).strip().isdigit():
+            continue
+        pos=_as_int(cells[0])
+        team_name=cells[1].strip()
+        team=teams.get(_team_key(team_name))
+        if not team:
+            missing.append(team_name)
+            continue
+        played,wins,draws,losses,gf,ga,points=[_as_int(x) for x in cells[2:9]]
+        if None in (pos,played,wins,draws,losses,gf,ga,points):
+            print("STANDINGS_ROW_SKIPPED",cells)
+            continue
+        payload={
+            "competition_id":MAIN_COMPETITION_ID,
+            "team_id":team["id"],
+            "position":pos,
+            "played":played,
+            "wins":wins,
+            "draws":draws,
+            "losses":losses,
+            "goals_for":gf,
+            "goals_against":ga,
+            "goal_difference":gf-ga,
+            "points":points,
+            "source":"torreense",
+            "updated_at":now,
+        }
+        if int(team["id"]) in existing_by_team:
+            api(
+                "standings?competition_id=eq."+str(MAIN_COMPETITION_ID)+"&team_id=eq."+str(team["id"]),
+                "PATCH",
+                payload
+            )
+        else:
+            api("standings","POST",payload)
+        updated+=1
+
+    if updated<10:
+        raise RuntimeError("Official Torreense standings sync returned only "+str(updated)+" rows")
+    if missing:
+        print("STANDINGS_TEAMS_MISSING",missing)
+    _sync_status("torreense_standings","Official Torreense first-team standings sync",updated)
+    print("SPORTS_SYNC_STANDINGS_DONE",updated)
+
+def sync_main_matches():
+    print("SPORTS_SYNC_MATCHES_START",MAIN_CALENDAR_URL)
+    soup=BeautifulSoup(get(MAIN_CALENDAR_URL),"html.parser")
+    rows=soup.select(".match-row")
+    if not rows:
+        raise RuntimeError("Official Torreense match rows not found")
+
+    teams=_team_map(MAIN_SPORT_ID)
+    existing=json.loads(api(
+        "matches?select=id,source_id,starts_at,venue,raw_data&competition_id=eq."+str(MAIN_COMPETITION_ID)+"&limit=100"
+    ))
+    existing_by_source={x.get("source_id"):x for x in existing if x.get("source_id")}
+    now=datetime.now(timezone.utc).isoformat()
+    updated=0
+    missing=[]
+
+    for row in rows:
+        date_el=row.select_one(".label-date")
+        if not date_el:
+            continue
+        label=date_el.get_text(" ",strip=True)
+        m=re.search(r"(\d{2}\.\d{2}\.\d{4})\s*\|\s*(J\d+)",label,re.I)
+        if not m:
+            continue
+        official_date,round_label=m.group(1),m.group(2).upper()
+        comp_img=row.select_one("img.competition-logo")
+        comp_label=(comp_img.get("alt") if comp_img else "") or ""
+        if comp_label and "meu super" not in comp_label.casefold() and "liga portugal" not in comp_label.casefold():
+            continue
+
+        logos=row.select("img.teamlogo-list")
+        names=[]
+        for img in logos:
+            name=(img.get("alt") or "").strip()
+            if name and name not in names:
+                names.append(name)
+        if len(names)<2:
+            # Desktop headings are a safe fallback if image alt text changes.
+            heads=[x.get_text(" ",strip=True) for x in row.select("h3") if x.get_text(" ",strip=True)]
+            for name in heads:
+                if name not in names:
+                    names.append(name)
+        if len(names)<2:
+            print("MATCH_TEAMS_UNREADABLE",label)
+            continue
+        home_name,away_name=names[0],names[1]
+        home=teams.get(_team_key(home_name))
+        away=teams.get(_team_key(away_name))
+        if not home or not away:
+            missing.append((home_name,away_name))
+            continue
+
+        score_el=row.select_one(".vs-label-front")
+        score=(score_el.get_text(" ",strip=True) if score_el else "").replace(" ","")
+        sm=re.fullmatch(r"(\d+)-(\d+)",score)
+        home_score=_as_int(sm.group(1)) if sm else None
+        away_score=_as_int(sm.group(2)) if sm else None
+        match_status="finished" if sm else "scheduled"
+
+        round_num=re.sub(r"\D","",round_label)
+        source_id="liga-2026-2027-j"+round_num
+        old=existing_by_source.get(source_id) or {}
+        raw=dict(old.get("raw_data") or {})
+        time_confirmed=raw.get("time_confirmed") is True
+        raw.update({
+            "source_url":MAIN_CALENDAR_URL,
+            "official_date":official_date,
+            "time_confirmed":time_confirmed,
+            "official_sync":True,
+        })
+        post_link=None
+        for a in row.find_all("a",href=True):
+            href=a.get("href") or ""
+            if "vsports.pt" in href:
+                post_link=href
+                break
+        if post_link:
+            raw["post_match_url"]=post_link
+
+        payload={
+            "sport_id":MAIN_SPORT_ID,
+            "competition_id":MAIN_COMPETITION_ID,
+            "home_team_id":home["id"],
+            "away_team_id":away["id"],
+            "event_type":"match",
+            "round":round_label,
+            "starts_at":_merge_match_date(old.get("starts_at"),official_date,time_confirmed),
+            "status":match_status,
+            "home_score":home_score,
+            "away_score":away_score,
+            "source":"torreense",
+            "source_id":source_id,
+            "source_torreense_id":source_id,
+            "raw_data":raw,
+            "updated_at":now,
+        }
+        if old.get("id"):
+            api("matches?id=eq."+str(old["id"]),"PATCH",payload)
+        else:
+            api("matches","POST",payload)
+        updated+=1
+
+    if updated<20:
+        raise RuntimeError("Official Torreense calendar sync returned only "+str(updated)+" matches")
+    if missing:
+        print("MATCH_TEAMS_MISSING",missing)
+    _sync_status("torreense_matches","Official Torreense first-team calendar/results sync",updated)
+    print("SPORTS_SYNC_MATCHES_DONE",updated)
+
+def sync_sports():
+    errors=[]
+    for name,fn in (("standings",sync_main_standings),("matches",sync_main_matches)):
+        try:
+            fn()
+        except Exception as e:
+            errors.append(name+": "+repr(e))
+            print("SPORTS_SYNC_FAILED",name,repr(e))
+    if errors:
+        # Do not block news/photo refresh if one sports source changes markup.
+        _sync_status("torreense_sports","; ".join(errors),0,status="error")
+    else:
+        _sync_status("torreense_sports","Official Torreense sports sync",2)
+
+
 def sync_club_assets():
     sync_team_logos()
     sync_player_photos()
 
 def main():
+    sync_sports()
     sync_club_assets()
     urls=discover_news()
 
