@@ -11,7 +11,11 @@ const LOGO_URL='https://raw.githubusercontent.com/pophub9999/football-club-saas/
 const LOGO_NATIVE_URL='https://vcvnmcewoocoizjljmbc.supabase.co/storage/v1/object/public/news/club-assets/teams/scu-torreense.png';
 const fs=n=>{
  let v=n;
- if(Platform.OS!=='web'){
+ if(Platform.OS==='web'){
+  if(n<6)v=n*1.55;
+  else if(n<10)v=n*1.42;
+  else if(n<15)v=n*1.18;
+ }else{
   if(n<6)v=n*1.75;
   else if(n<10)v=n*1.60;
   else if(n<15)v=n*1.30;
@@ -136,21 +140,24 @@ function Page({children,scroll=true,overlay=null}){
    if(g.dx>=threshold&&(g.vx>=0.25||g.dx>=threshold+35))APP_SWIPE_BACK?.();
   }
  })).current;
- const canvasWidth=Math.min(width,height/2),canvasHeight=canvasWidth*2,canvasLeft=(width-canvasWidth)/2,canvasTop=(height-canvasHeight)/2;
- const logoStyle={position:'absolute',left:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
- const headerStyle={position:'absolute',left:canvasLeft+canvasWidth*.205,top:canvasTop+canvasHeight*.025,height:canvasHeight*.085,justifyContent:'flex-end',paddingBottom:canvasHeight*.006};
+ const webMaxWidth=480;
+ const canvasWidth=Math.min(width,height/2,Platform.OS==='web'?webMaxWidth:width),canvasHeight=canvasWidth*2;
+ const logoStyle={position:'absolute',left:canvasWidth*.055,top:canvasHeight*.025,width:canvasWidth*.13,height:canvasHeight*.085};
+ const headerStyle={position:'absolute',left:canvasWidth*.205,top:canvasHeight*.025,height:canvasHeight*.085,justifyContent:'flex-end',paddingBottom:canvasHeight*.006};
  const homePage=APP_SWIPE_SCREEN==='home';
- const contentStyle={position:'absolute',left:homePage?canvasLeft:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.145,width:homePage?canvasWidth:canvasWidth*.89,height:canvasHeight*.755};
- const cartStyle={position:'absolute',right:canvasLeft+canvasWidth*.055,top:canvasTop+canvasHeight*.044};
- return <View style={[s.root,light&&s.lightRoot]} {...(Platform.OS==='web'?{}:swipeBackResponder.panHandlers)}>
+ const contentStyle={position:'absolute',left:homePage?0:canvasWidth*.055,top:canvasHeight*.145,width:homePage?canvasWidth:canvasWidth*.89,height:canvasHeight*.755};
+ const cartStyle={position:'absolute',right:canvasWidth*.055,top:canvasHeight*.044};
+ return <View style={s.root} {...(Platform.OS==='web'?{}:swipeBackResponder.panHandlers)}>
   <StatusBar hidden/>
-  {!light?<Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>:null}
-  {light?<><View pointerEvents="none" style={s.lightThemeWash}/><View pointerEvents="none" style={s.lightTopBand}/></>:Platform.OS!=='web'?<View pointerEvents="none" style={s.mobileLightWash}/>:null}
-  <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={logoStyle} alt="SCU Torreense"/>
-  <View style={headerStyle}><Text style={[s.clubLine,light&&s.clubLineLightTheme]}><Text style={[s.clubLight,light&&s.clubLightTheme]}>SCU </Text>TORREENSE</Text></View>
-  <Pressable style={[cartStyle,s.topCartIcon]} onPress={()=>APP_OPEN_PORTAL?.('CARRINHO',CLUB_URLS.cart,APP_SWIPE_SCREEN)}><ShortcutIcon type="shop"/></Pressable>
-  <View style={contentStyle}>{scroll?<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[light?s.lightContent:null,s.pageScrollContent,homePage&&s.homePageScrollContent]}>{children}</ScrollView>:children}{overlay}</View>
-  <BottomNav/>
+  <View style={[s.appFrame,{width:canvasWidth,height:canvasHeight},light&&s.lightRoot]}>
+   {!light?<Image source={require('./assets/home-background.png')} style={s.background} resizeMode="contain"/>:null}
+   {light?<><View pointerEvents="none" style={s.lightThemeWash}/><View pointerEvents="none" style={s.lightTopBand}/></>:Platform.OS!=='web'?<View pointerEvents="none" style={s.mobileLightWash}/>:null}
+   <RemoteLogo uri={Platform.OS==='web'?LOGO_URL:LOGO_NATIVE_URL} style={logoStyle} alt="SCU Torreense"/>
+   <View style={headerStyle}><Text style={[s.clubLine,light&&s.clubLineLightTheme]}><Text style={[s.clubLight,light&&s.clubLightTheme]}>SCU </Text>TORREENSE</Text></View>
+   <Pressable style={[cartStyle,s.topCartIcon]} onPress={()=>APP_OPEN_PORTAL?.('CARRINHO',CLUB_URLS.cart,APP_SWIPE_SCREEN)}><ShortcutIcon type="shop"/></Pressable>
+   <View style={contentStyle}>{scroll?<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[light?s.lightContent:null,s.pageScrollContent,homePage&&s.homePageScrollContent]}>{children}</ScrollView>:children}{overlay}</View>
+   <BottomNav/>
+  </View>
  </View>;
 }
 function NewsThumb({uri,title}){
@@ -1611,7 +1618,7 @@ const _baseStyles=StyleSheet.create({
  introBubble:{position:'absolute',borderWidth:1,borderColor:'rgba(255,231,190,.82)',backgroundColor:'rgba(255,255,255,.10)',shadowColor:'#ffc468',shadowOpacity:.6,shadowRadius:4,shadowOffset:{width:0,height:0},zIndex:9},
  introFinalSpark:{position:'absolute',width:6,height:6,borderRadius:6,backgroundColor:'#ffd18a',shadowColor:'#ffd18a',shadowOpacity:1,shadowRadius:14,shadowOffset:{width:0,height:0},zIndex:10},
 brandIntroLoading:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000},brandIntroRoot:{...StyleSheet.absoluteFillObject,backgroundColor:'#F5F4F2',zIndex:1000,elevation:1000,alignItems:'center',justifyContent:'center',overflow:'hidden'},brandLine:{position:'absolute',top:'50%',width:'72%',height:2,backgroundColor:'#8F173B',borderRadius:2},brandConstruction:{position:'absolute',top:'21%',width:210,height:250,alignItems:'center',justifyContent:'center'},brandOutlineWrap:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center'},brandParticleLayer:{position:'absolute',left:0,top:0,width:210,height:250},brandParticle:{position:'absolute',backgroundColor:'#8F173B',shadowColor:'#8F173B',shadowOpacity:.24,shadowRadius:3},brandLogoWrap:{position:'absolute',top:'22%',width:174,height:204,alignItems:'center',justifyContent:'center'},brandLogo:{width:148,height:178},brandNameBlock:{position:'absolute',top:'58%',left:24,right:24,alignItems:'center'},brandClubName:{color:'#252A36',fontSize:25,fontWeight:'900',letterSpacing:2.0,textAlign:'center'},brandUnderline:{width:78,height:2.5,borderRadius:2,backgroundColor:'#8F173B',marginTop:12},brandTagline:{position:'absolute',top:'67%',left:24,right:24,color:'#555A63',fontSize:12.5,fontWeight:'700',letterSpacing:2.4,textAlign:'center'},brandSkip:{position:'absolute',right:'6%',top:'6%',height:34,paddingHorizontal:13,borderRadius:17,borderWidth:1,borderColor:'#D6D7DA',backgroundColor:'rgba(255,255,255,.72)',alignItems:'center',justifyContent:'center'},brandSkipText:{color:'#555A63',fontSize:11,fontWeight:'800',letterSpacing:.8},
- root:{flex:1,backgroundColor:Platform.OS==='web'?'#00142c':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
+ root:{flex:1,backgroundColor:Platform.OS==='web'?'#e9edf1':'#87abc3',alignItems:'center',justifyContent:'center',overflow:'hidden'},appFrame:{position:'relative',overflow:'hidden',backgroundColor:'#00142c',...(Platform.OS==='web'?{borderWidth:1,borderColor:'#d9dee4',shadowColor:'#000',shadowOpacity:.16,shadowRadius:18,shadowOffset:{width:0,height:5}}:{})},background:{width:'100%',height:'100%',opacity:Platform.OS==='web'?1:.72},mobileLightWash:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(235,246,252,.14)'},lightRoot:{backgroundColor:'#f3f4f6'},lightBackground:{opacity:0},lightThemeWash:{...StyleSheet.absoluteFillObject,backgroundColor:'#f3f4f6'},lightTopBand:{position:'absolute',left:0,right:0,top:0,height:'14.5%',backgroundColor:'#ffffff',borderBottomWidth:2,borderBottomColor:'#8f173b'},lightContent:{paddingBottom:8},
  card:{width:'100%',backgroundColor:'#ffffff',borderWidth:1,borderColor:'#d7e0e7',borderRadius:14,paddingHorizontal:13,paddingVertical:9},
  loading:{height:120,alignItems:'center',justifyContent:'center'},header:{flexDirection:'row',justifyContent:'space-between'},competition:{color:'#17324a',fontSize:fs(8),letterSpacing:.55},round:{color:'#17324a',fontSize:fs(8.5),marginTop:3},date:{color:'#17324a',fontSize:fs(8)},
  teams:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',marginTop:7},team:{width:'38%',alignItems:'center'},teamLogo:{width:39,height:43},bigLogo:{width:52,height:58},teamLogoFallback:{borderRadius:999,backgroundColor:'rgba(255,255,255,.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'rgba(255,255,255,.18)'},teamLogoFallbackText:{color:'#dce7ef',fontSize:fs(8),fontWeight:'700'},teamName:{color:'#17324a',fontSize:fs(8),marginTop:3,textAlign:'center',minHeight:16},teamStanding:{color:'#17324a',fontSize:fs(6),marginTop:1},vs:{color:'#17324a',fontSize:fs(12)},score:{color:'#17324a',fontSize:fs(19)},stadium:{color:'#17324a',fontSize:fs(8),textAlign:'center',marginTop:4},gameStatus:{color:'#f1b94f',fontSize:fs(6),textAlign:'center'},detailsArrow:{position:'absolute',right:10,top:'48%',color:'#17324a',fontSize:fs(24)},
