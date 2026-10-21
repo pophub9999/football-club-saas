@@ -1,5 +1,6 @@
 name: Sync Torreense Data
 # Sync trigger: persist news hero images
+# Sports parser retry hardened
 
 on:
   workflow_dispatch:
