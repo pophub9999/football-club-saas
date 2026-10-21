@@ -1,0 +1,57 @@
+name: Probe Torreense Sports
+on:
+  push:
+    branches: ['v2-visual-first']
+    paths:
+      - '.github/workflows/probe-sports.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install beautifulsoup4
+      - name: Probe official sports pages
+        run: |
+          python - <<'PY'
+          import urllib.request,re
+          from bs4 import BeautifulSoup
+          UA={"User-Agent":"Mozilla/5.0","Accept":"text/html,*/*"}
+          urls=[
+            "https://www.torreense.com/futebol-profissional/equipa-principal/calendario",
+            "https://www.torreense.com/futebol-profissional/equipa-principal/classificacao",
+            "https://www.torreense.com/futebol-profissional/seniores-feminino/calendario",
+            "https://www.torreense.com/futebol-profissional/seniores-feminino/classificacao",
+            "https://www.torreense.com/futsal/seniores-futsal-masculinos/calendario",
+            "https://www.torreense.com/futsal/seniores-futsal-masculinos/classificacao",
+            "https://www.torreense.com/futsal/seniores-feminino-futsal/calendario",
+            "https://www.torreense.com/futsal/seniores-feminino-futsal/classificacao",
+          ]
+          for u in urls:
+            print("\nURL",u)
+            try:
+              req=urllib.request.Request(u,headers=UA)
+              with urllib.request.urlopen(req,timeout=25) as r:
+                body=r.read().decode("utf-8","ignore")
+              print("STATUS",getattr(r,"status",200),"BYTES",len(body))
+              soup=BeautifulSoup(body,"html.parser")
+              print("TITLE",soup.title.get_text(" ",strip=True) if soup.title else "")
+              tables=soup.find_all("table")
+              print("TABLES",len(tables))
+              for ti,t in enumerate(tables[:3]):
+                rows=[]
+                for tr in t.find_all("tr")[:6]:
+                  rows.append([c.get_text(" ",strip=True) for c in tr.find_all(["th","td"])])
+                print("TABLE",ti,rows)
+              txt=soup.get_text(" ",strip=True)
+              print("TEXT",txt[:1200])
+            except Exception as e:
+              print("ERR",repr(e))
+          PY
