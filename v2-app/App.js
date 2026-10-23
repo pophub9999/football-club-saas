@@ -503,7 +503,7 @@ function MainApp(){
  const [checkoutForm,setCheckoutForm]=useState({name:'',email:'',phone:'',nif:'',shippingMethod:'home',street:'',number:'',postalCode:'',city:''});
  const [cart,setCart]=useState(()=>{try{return Platform.OS==='web'&&typeof window!=='undefined'?JSON.parse(window.localStorage.getItem('scut_cart')||'[]'):[]}catch{return []}});
  const [cartNotice,setCartNotice]=useState(''),cartNoticeTimer=useRef(null);
- const [syncVersion,setSyncVersion]=useState(null);
+ const [syncVersion,setSyncVersion]=useState(null),[refreshKey,setRefreshKey]=useState(0);
  const [scutvVideos,setScutvVideos]=useState([]),[sporttvHighlights,setSporttvHighlights]=useState([]),[selectedScutv,setSelectedScutv]=useState(null);
 
  useEffect(()=>{
