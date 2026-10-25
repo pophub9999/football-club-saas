@@ -1,0 +1,78 @@
+import { Injectable } from '@nestjs/common';
+import { FootballFixture, FootballPlayer, FootballProvider, FootballSquadPlayer, FootballStanding } from './football.types';
+
+@Injectable()
+export class MockFootballProvider implements FootballProvider {
+  readonly name = 'mock';
+
+  async listUpcomingFixtures(_tenantId: string, from: Date, to: Date): Promise<FootballFixture[]> {
+    const first = new Date(from);
+    first.setDate(first.getDate() + 3);
+    first.setHours(20, 15, 0, 0);
+
+    const second = new Date(first);
+    second.setDate(second.getDate() + 7);
+
+    return [
+      {
+        externalId: 'mock-fixture-001',
+        competitionExternalId: 'mock-league',
+        homeTeamExternalId: 'mock-home',
+        awayTeamExternalId: 'mock-away',
+        kickoffAt: first,
+        status: 'SCHEDULED',
+        venueName: 'Estádio do Clube',
+        venueCity: 'Lisboa',
+      },
+      {
+        externalId: 'mock-fixture-002',
+        competitionExternalId: 'mock-league',
+        homeTeamExternalId: 'mock-away',
+        awayTeamExternalId: 'mock-home',
+        kickoffAt: second,
+        status: 'SCHEDULED',
+        venueName: 'Estádio Municipal',
+        venueCity: 'Lisboa',
+      },
+    ].filter((fixture) => fixture.kickoffAt >= from && fixture.kickoffAt <= to);
+  }
+
+  async getStandings(_seasonExternalId: string): Promise<FootballStanding[]> {
+    return [
+      { externalId: 'mock-standing-1', position: 1, teamExternalId: 'mock-home', teamName: 'Clube da Casa', teamShortName: 'Casa', points: 9, played: 3, won: 3, drawn: 0, lost: 0, goalsFor: 7, goalsAgainst: 2, goalDifference: 5, result: 'up' },
+      { externalId: 'mock-standing-2', position: 2, teamExternalId: 'mock-away', teamName: 'Próximo Adversário', teamShortName: 'Adversário', points: 4, played: 3, won: 1, drawn: 1, lost: 1, goalsFor: 4, goalsAgainst: 4, goalDifference: 0, result: 'equal' },
+      { externalId: 'mock-standing-3', position: 3, teamExternalId: 'mock-third', teamName: 'Clube Visitante', teamShortName: 'Visitante', points: 1, played: 3, won: 0, drawn: 1, lost: 2, goalsFor: 2, goalsAgainst: 7, goalDifference: -5, result: 'down' },
+    ];
+  }
+
+  async getPlayer(externalPlayerId: string, _seasonExternalId?: string): Promise<FootballPlayer> {
+    const player: FootballPlayer = {
+      externalId: externalPlayerId,
+      name: externalPlayerId === 'mock-player-001' ? 'João Silva' : 'Jogador de demonstração',
+      nationality: 'Portugal',
+      birthDate: '2000-01-15',
+      height: 181,
+      weight: 76,
+      position: 'Midfielder',
+      detailedPosition: 'Central Midfielder',
+      teams: [{ team: { id: 'mock-home', name: 'Clube da Casa' } }],
+      statistics: [{ team: { name: 'Clube da Casa' }, season: { name: '2026/27', league: { name: 'Competição de demonstração' } }, details: [
+        { type: { name: 'Appearances' }, value: 3 },
+        { type: { name: 'Minutes Played' }, value: 245 },
+        { type: { name: 'Goals' }, value: 1 },
+        { type: { name: 'Assists' }, value: 2 },
+      ] }],
+    };
+    if (externalPlayerId === 'mock-player-001') player.displayName = 'J. Silva';
+    return player;
+  }
+
+  async getSquad(_teamExternalId: string, _seasonExternalId?: string): Promise<FootballSquadPlayer[]> {
+    return [
+      { externalId: 'mock-player-001', name: 'João Silva', displayName: 'J. Silva', imageUrl: 'https://cdn.sportmonks.com/images/soccer/players/1/1.png', position: 'Midfielder', detailedPosition: 'Central Midfielder', jerseyNumber: 8, isCaptain: true, inSquad: true },
+      { externalId: 'mock-player-002', name: 'Miguel Costa', displayName: 'M. Costa', position: 'Goalkeeper', detailedPosition: 'Goalkeeper', jerseyNumber: 1, inSquad: true },
+      { externalId: 'mock-player-003', name: 'Rui Santos', displayName: 'R. Santos', position: 'Defender', detailedPosition: 'Centre Back', jerseyNumber: 4, inSquad: true },
+      { externalId: 'mock-player-004', name: 'Pedro Martins', displayName: 'P. Martins', position: 'Forward', detailedPosition: 'Centre Forward', jerseyNumber: 9, inSquad: true },
+    ];
+  }
+}
