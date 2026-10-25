@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/v2-expo-go-cloud-preview.yml'
 
-# Publish trigger: refreshed sports data and responsive web/app data refresh
+# Publish trigger: Expo SDK 58 mobile preview
 jobs:
   publish:
     name: Publish Expo Go preview
