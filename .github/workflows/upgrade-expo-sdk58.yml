@@ -1,0 +1,40 @@
+name: Upgrade SCUT to Expo SDK 58
+on:
+  push:
+    branches: ['v2-visual-first']
+    paths:
+      - '.github/workflows/upgrade-expo-sdk58.yml'
+permissions:
+  contents: write
+jobs:
+  upgrade:
+    if: github.event.head_commit.message == 'Prepare Expo SDK 58 upgrade'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-visual-first
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Upgrade Expo SDK and align packages
+        working-directory: v2-app
+        run: |
+          set -e
+          npm install expo@~58.0.0
+          npx expo install --fix
+          npx expo-doctor || true
+          npx expo export --platform web --clear
+      - name: Commit SDK 58 upgrade
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v2-app/package.json v2-app/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No dependency changes"
+            exit 0
+          fi
+          git commit -m "Upgrade SCUT app to Expo SDK 58"
+          git push origin HEAD:v2-visual-first
